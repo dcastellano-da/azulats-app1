@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Talento ATS - Premium Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary": "#b9c7df",
+                    "on-primary-container": "#00302b",
+                    "tertiary-container": "#8392a8",
+                    "on-primary-fixed": "#00201d",
+                    "error": "#ffb4ab",
+                    "on-tertiary": "#233144",
+                    "tertiary-fixed": "#d5e3fc",
+                    "surface-tint": "#6bd8cb",
+                    "surface-container": "#1d2022",
+                    "inverse-primary": "#006a61",
+                    "inverse-on-surface": "#2d3133",
+                    "outline-variant": "#3d4947",
+                    "on-primary": "#003732",
+                    "secondary-fixed": "#e3dfff",
+                    "on-tertiary-container": "#1c2a3d",
+                    "on-surface": "#e0e3e5",
+                    "tertiary-fixed-dim": "#b9c7df",
+                    "error-container": "#93000a",
+                    "on-tertiary-fixed": "#0d1c2e",
+                    "on-secondary-fixed-variant": "#444173",
+                    "surface-container-highest": "#323537",
+                    "secondary": "#c4c1fb",
+                    "on-surface-variant": "#bcc9c6",
+                    "surface-bright": "#363a3b",
+                    "primary": "#6bd8cb",
+                    "on-error-container": "#ffdad6",
+                    "outline": "#879391",
+                    "on-secondary": "#2d2a5b",
+                    "background": "#101415",
+                    "surface-dim": "#101415",
+                    "secondary-fixed-dim": "#c4c1fb",
+                    "on-secondary-fixed": "#181445",
+                    "surface-variant": "#323537",
+                    "surface": "#101415",
+                    "secondary-container": "#444173",
+                    "primary-container": "#29a195",
+                    "surface-container-lowest": "#0b0f10",
+                    "surface-container-high": "#272a2c",
+                    "on-background": "#e0e3e5",
+                    "surface-container-low": "#191c1e",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "on-secondary-container": "#b3afe9",
+                    "primary-fixed": "#89f5e7",
+                    "inverse-surface": "#e0e3e5",
+                    "on-tertiary-fixed-variant": "#3a485b",
+                    "on-error": "#690005",
+                    "on-primary-fixed-variant": "#005049",
+                    "neon-mint": "#0D9488"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "2xl": "1rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "24px",
+                    "base": "4px",
+                    "xs": "8px",
+                    "gutter": "24px",
+                    "xl": "48px",
+                    "sm": "16px",
+                    "lg": "32px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "title-md": ["Manrope"],
+                    "headline-lg": ["Manrope"],
+                    "label-sm": ["Manrope"],
+                    "body-md": ["Manrope"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #101415;
+            color: #e0e3e5;
+            overflow-x: hidden;
+        }
+
+        .bg-blob {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(13, 148, 136, 0.15) 0%, rgba(16, 20, 21, 0) 70%);
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .glass-panel {
+            backdrop-filter: blur(24px);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card {
+            backdrop-filter: blur(16px);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            border-color: rgba(13, 148, 136, 0.4);
+            transform: translateY(-4px);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
+        }
+
+        .status-amber {
+            color: #FBBF24;
+            text-shadow: 0 0 12px rgba(251, 191, 36, 0.4);
+            background: rgba(251, 191, 36, 0.1);
+        }
+
+        .status-mint {
+            color: #2DD4BF;
+            text-shadow: 0 0 12px rgba(45, 212, 191, 0.4);
+            background: rgba(45, 212, 191, 0.1);
+        }
+
+        .neon-glow {
+            box-shadow: 0 0 15px rgba(13, 148, 136, 0.4);
+        }
+
+        .neon-glow:hover {
+            box-shadow: 0 0 25px rgba(13, 148, 136, 0.6);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="custom-scrollbar">
+<!-- Ambient Background Blobs -->
+<div class="bg-blob top-[-10%] left-[-10%]"></div>
+<div class="bg-blob bottom-[-10%] right-[-10%] opacity-50"></div>
+<div class="bg-blob top-[20%] right-[10%] w-[400px] h-[400px] opacity-30" style="background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);"></div>
+<main class="max-w-container-max mx-auto px-xl py-lg min-h-screen flex flex-col gap-lg">
+<!-- Header Section -->
+<header class="flex flex-col md:flex-row items-center justify-between gap-md">
+<h1 class="font-headline-lg text-headline-lg text-white tracking-tight">Talento</h1>
+<div class="flex flex-1 max-w-2xl w-full items-center gap-sm">
+<div class="relative flex-1 group">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors">search</span>
+<input class="w-full bg-white/5 border border-white/10 rounded-full py-sm pl-xl pr-md text-body-md focus:ring-2 focus:ring-neon-mint/30 focus:border-neon-mint outline-none transition-all placeholder:text-on-surface-variant/50" placeholder="Buscar candidatos..." type="text"/>
+</div>
+<div class="relative">
+<button class="glass-panel flex items-center gap-xs px-md py-sm rounded-full text-label-sm font-label-sm hover:bg-white/10 transition-colors">
+<span>Estado: Todos</span>
+<span class="material-symbols-outlined text-[20px]">expand_more</span>
+</button>
+</div>
+</div>
+<button class="bg-neon-mint text-on-primary-fixed font-title-md text-label-sm px-lg py-sm rounded-full neon-glow active:scale-95 transition-all flex items-center gap-xs">
+<span class="material-symbols-outlined">add</span>
+                Nuevo Postulante
+            </button>
+</header>
+<!-- Analytics Row -->
+<section class="flex flex-col md:flex-row items-end md:items-center justify-between gap-md border-b border-white/5 pb-md">
+<div class="flex flex-col md:flex-row md:items-center gap-lg">
+<h2 class="font-title-md text-title-md text-white/90">Resumen del pipeline</h2>
+<div class="flex items-center gap-md">
+<div class="flex flex-col">
+<span class="text-caption text-on-surface-variant/60 uppercase tracking-widest">Postulantes Totales</span>
+<span class="font-headline-lg text-headline-lg text-white">1,284</span>
+</div>
+<div class="h-8 w-px bg-white/10 mx-xs"></div>
+<div class="flex flex-col">
+<span class="text-caption text-on-surface-variant/60 uppercase tracking-widest">Pendientes</span>
+<span class="font-headline-lg text-headline-lg text-primary">48</span>
+</div>
+</div>
+</div>
+<div class="flex items-center glass-panel p-xs rounded-lg gap-xs">
+<button class="p-xs bg-white/10 rounded text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">grid_view</span>
+</button>
+<button class="p-xs hover:bg-white/5 rounded text-on-surface-variant flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[20px]">format_list_bulleted</span>
+</button>
+</div>
+</section>
+<!-- Candidate Grid -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-md">
+<!-- Candidate Card 1 -->
+<div class="glass-card rounded-2xl p-md flex flex-col gap-md relative group overflow-hidden">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 group-hover:border-neon-mint/50 transition-colors">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a female software engineer in her early 30s, smiling warmly against a blurred office background. The lighting is soft and cinematic, with cool blue and warm amber tones reflecting the premium dark UI aesthetic of a high-end ATS platform. She has short dark hair and modern glasses." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWMdCIU9DuChh7UzrFyN3xifbfjC0vAlzr7NP8c9RyilqX3ebr4JpbSu7IgZEJjqNkjP2xmNrtk8SBikURDAZAUl5_LvvANaxbaMIvsfX-SaOSc1Q9NJxNgggurfFmvKtY4UMCTE8Ame3dv3fvNmXWPF3FwDDjYKKmnndBEdlTZFvIiqtye448aNncTDga5kdvsitXAVaPVvRhGI_YE9jBPKFnVP02f6NTSPBD33tCo-ig1Vjzakfk1LGzKJXw6PHXi3_-ADKK7LM"/>
+</div>
+<a class="text-on-surface-variant/40 hover:text-[#0077B5] transition-colors" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.761 0 5-2.239 5-5v-14c0-2.761-2.239-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
+</a>
+</div>
+<div class="flex flex-col gap-xs">
+<h3 class="font-title-md text-title-md text-white">Elena Rodriguez</h3>
+<p class="text-body-md text-on-surface-variant">elena.rod@techcorp.io</p>
+</div>
+<div class="mt-xs">
+<span class="status-amber text-[10px] font-bold px-sm py-1 rounded-full uppercase tracking-widest inline-block">PENDIENTE</span>
+</div>
+<div class="flex items-center justify-between pt-md border-t border-white/5">
+<span class="text-caption text-on-surface-variant/60">Recibido hace 2h</span>
+<button class="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-neon-mint hover:text-on-primary-fixed transition-all group/btn">
+<span class="material-symbols-outlined text-[20px] group-hover/btn:translate-x-0.5 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Candidate Card 2 -->
+<div class="glass-card rounded-2xl p-md flex flex-col gap-md relative group overflow-hidden">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 group-hover:border-neon-mint/50 transition-colors">
+<img class="w-full h-full object-cover" data-alt="A portrait of a male creative director with a stylish beard and modern haircut, wearing a minimalist dark turtleneck. The image has a professional, moody studio lighting style with deep shadows and subtle teal highlights that match the dark glassmorphic UI environment. High contrast and premium feel." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCyrSE_iYPODJQHBBSarnujTD-3ax3Hd3FYQ-1gg5tDBk53SSBGY36DAlMw8jmLNALurjtns0wjCpibHbCab8AaHr4cXTzNPIMi6c0aWFfwKsaifkInGT04tHUateXhgGMBsn8HV8v5uUX8PsIm5jibAL7J7jo9X_2HopJySUOat5n2H_-JYEsYinIZd7ezHCVNuEe9UWWTFfRXPXvSi00H3RKev6SEF0AQXIdFulxg1pa_cbxnlliBqYCa2RVzPtGXCMjpIZgAHt4"/>
+</div>
+<a class="text-on-surface-variant/40 hover:text-[#0077B5] transition-colors" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.761 0 5-2.239 5-5v-14c0-2.761-2.239-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
+</a>
+</div>
+<div class="flex flex-col gap-xs">
+<h3 class="font-title-md text-title-md text-white">Marcos Silva</h3>
+<p class="text-body-md text-on-surface-variant">m.silva@creative.net</p>
+</div>
+<div class="mt-xs">
+<span class="status-mint text-[10px] font-bold px-sm py-1 rounded-full uppercase tracking-widest inline-block">REVISADO</span>
+</div>
+<div class="flex items-center justify-between pt-md border-t border-white/5">
+<span class="text-caption text-on-surface-variant/60">Recibido hace 5h</span>
+<button class="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-neon-mint hover:text-on-primary-fixed transition-all group/btn">
+<span class="material-symbols-outlined text-[20px] group-hover/btn:translate-x-0.5 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Candidate Card 3 -->
+<div class="glass-card rounded-2xl p-md flex flex-col gap-md relative group overflow-hidden">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 group-hover:border-neon-mint/50 transition-colors">
+<img class="w-full h-full object-cover" data-alt="Close-up portrait of a woman of Asian descent, a product manager with a focused and confident expression. Her hair is tied back, and she's wearing a sleek grey blazer. The lighting is vibrant yet sophisticated, highlighting her features with a glow that complements a dark, high-end recruitment software interface. Moody and executive aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyJVShozYSAGOsvGLgiZYHRJAY8n2qjZ4KXLai-l3ECbsUtN_IvhO-g04heUqopJ4c8jgHJALAmkCA9QNfx_y9ZqRImkPbowhe9daQ4shSWkY78KH-CRJkvyPgNNXQE7Sge-5fehfpenxz5G2d4PFyGxyfzNfd4dby5alfomuAFNscgbU5yiGIau7aCuDY5NGsgGqsGFSAtG3sKZg-csZ9ZYBVMXcMGNsMlYA4J39Y9J3qKqTU_npaWkkTGrTdH44ezz4_nCZWJWI"/>
+</div>
+<a class="text-on-surface-variant/40 hover:text-[#0077B5] transition-colors" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.761 0 5-2.239 5-5v-14c0-2.761-2.239-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
+</a>
+</div>
+<div class="flex flex-col gap-xs">
+<h3 class="font-title-md text-title-md text-white">Anaïs Chen</h3>
+<p class="text-body-md text-on-surface-variant">anais.chen@global.com</p>
+</div>
+<div class="mt-xs">
+<span class="status-amber text-[10px] font-bold px-sm py-1 rounded-full uppercase tracking-widest inline-block">PENDIENTE</span>
+</div>
+<div class="flex items-center justify-between pt-md border-t border-white/5">
+<span class="text-caption text-on-surface-variant/60">Recibido hace 1d</span>
+<button class="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-neon-mint hover:text-on-primary-fixed transition-all group/btn">
+<span class="material-symbols-outlined text-[20px] group-hover/btn:translate-x-0.5 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Candidate Card 4 -->
+<div class="glass-card rounded-2xl p-md flex flex-col gap-md relative group overflow-hidden">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 group-hover:border-neon-mint/50 transition-colors">
+<img class="w-full h-full object-cover" data-alt="A profile of a senior data scientist with silver hair and a thoughtful expression. He is wearing a dark navy casual shirt. The background is dark and moody, with bokeh lights in teal and soft white, reflecting a premium dark-mode dashboard atmosphere. Clean, sharp photography style with high detail." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXOS9dArKqOj85QUQP-PxesHgH1HV1GF0V4hHLGaF-l0dbqC5BkF1jHlAp6Jlrapw53Y0ughiU_64hv0SqenIV-rxIubn7eQ4PpR2DMIWXE3luGiIf_MHLwRZm2lKyv2x522Y4o_3VeHb6JiLxpCa8P3hpGw9N3nDhozxJl20OTQyJ1_ARpmL2sq37FGE4_Xfs83QAiBjPhjD8J_8v8QD62OP0rcOKUkq2Cxzg3yzPpr2E2YYLxcEW2hCxdiKMmcaNwiKlrZwmupU"/>
+</div>
+<a class="text-on-surface-variant/40 hover:text-[#0077B5] transition-colors" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.761 0 5-2.239 5-5v-14c0-2.761-2.239-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
+</a>
+</div>
+<div class="flex flex-col gap-xs">
+<h3 class="font-title-md text-title-md text-white">Roberto Jímenez</h3>
+<p class="text-body-md text-on-surface-variant">r.jimenez@data-labs.es</p>
+</div>
+<div class="mt-xs">
+<span class="status-mint text-[10px] font-bold px-sm py-1 rounded-full uppercase tracking-widest inline-block">REVISADO</span>
+</div>
+<div class="flex items-center justify-between pt-md border-t border-white/5">
+<span class="text-caption text-on-surface-variant/60">Recibido hace 1d</span>
+<button class="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-neon-mint hover:text-on-primary-fixed transition-all group/btn">
+<span class="material-symbols-outlined text-[20px] group-hover/btn:translate-x-0.5 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Repeated / Placeholder Cards to fill grid -->
+<!-- Card 5 -->
+<div class="glass-card rounded-2xl p-md flex flex-col gap-md relative group overflow-hidden opacity-90">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 group-hover:border-neon-mint/50 transition-colors">
+<img class="w-full h-full object-cover" data-alt="Young energetic marketing specialist with curly hair and a bright smile, wearing a yellow sweater that pops against the dark moody background. Soft studio lighting with a slight teal haze, fitting the premium aesthetic of a digital talent dashboard. Crisp, professional headshot." src="https://lh3.googleusercontent.com/aida-public/AB6AXuARpMVE-026ptcNMVJ2ted6-86UU-CoIbKC3GsZMafP5sTKSXWqIzrNYQdZ8qnlPYFaz9WqS2sVp_ip3xuiM-yYLjPEWXaNASG6OgRq8gDVwGR_7aA1QGwObHjWwGbvRHodnL6RqVtK6Aal0haH6GmHZetUX3y8Zkpg3DSP1SspXSSyskuWIhCr-Jcnsw5lTTtRYNGfwpyysprAQ61MkF60QAiKKA9oQBv1L2dLPC48rCCHnU9R0CNKIEDGl24IFdLaNcHSrqbxTeI"/>
+</div>
+<a class="text-on-surface-variant/40 hover:text-[#0077B5] transition-colors" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.761 0 5-2.239 5-5v-14c0-2.761-2.239-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
+</a>
+</div>
+<div class="flex flex-col gap-xs">
+<h3 class="font-title-md text-title-md text-white">Carla Méndez</h3>
+<p class="text-body-md text-on-surface-variant">c.mendez@marketing.pro</p>
+</div>
+<div class="mt-xs"><span class="status-amber text-[10px] font-bold px-sm py-1 rounded-full uppercase tracking-widest inline-block">PENDIENTE</span></div>
+<div class="flex items-center justify-between pt-md border-t border-white/5">
+<span class="text-caption text-on-surface-variant/60">Recibido hace 2d</span>
+<button class="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-neon-mint hover:text-on-primary-fixed transition-all group/btn">
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Card 6 -->
+<div class="glass-card rounded-2xl p-md flex flex-col gap-md relative group overflow-hidden opacity-80">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 group-hover:border-neon-mint/50 transition-colors">
+<img class="w-full h-full object-cover" data-alt="Middle-aged male operations manager with a calm, analytical expression. Wearing a casual white shirt in a modern dark office setting. The photo is treated with a cool temperature and high contrast, aligning with the dark glassmorphism design language of the platform. Professional and high quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDiirWUWK_iIWK4TIs1ck8N7Pe2gURgm_eJZdWyWbWWjHLHjYnyB5ZNyOFAiqTgbBf5wjiieu5XhCjjAb6BTdjPkP0Lz_5gKYsHpSEt0yvzFbT3HI5xRvl9ZTZM4E35JpWc7YLVhM6Tx6xddZOiT_5JjhWTRduz-WSHknLB5dsc3sbN4VXoDujxb6ZCO_VxFPgWN5v1xK8FAjGMMDwfHHvIaz9aDGE3AzdOdOSyWJ50gALAT0qfZqr0MS2tOUpqnqDAq9FtdM8jPz4"/>
+</div>
+<a class="text-on-surface-variant/40 hover:text-[#0077B5] transition-colors" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.761 0 5-2.239 5-5v-14c0-2.761-2.239-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
+</a>
+</div>
+<div class="flex flex-col gap-xs">
+<h3 class="font-title-md text-title-md text-white">Jorge Valdés</h3>
+<p class="text-body-md text-on-surface-variant">jorge.v@ops.co</p>
+</div>
+<div class="mt-xs"><span class="status-mint text-[10px] font-bold px-sm py-1 rounded-full uppercase tracking-widest inline-block">REVISADO</span></div>
+<div class="flex items-center justify-between pt-md border-t border-white/5">
+<span class="text-caption text-on-surface-variant/60">Recibido hace 3d</span>
+<button class="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-neon-mint hover:text-on-primary-fixed transition-all group/btn">
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Card 7 -->
+<div class="glass-card rounded-2xl p-md flex flex-col gap-md relative group overflow-hidden opacity-70">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 group-hover:border-neon-mint/50 transition-colors">
+<img class="w-full h-full object-cover" data-alt="Profile of a confident female UI designer with dyed blue hair, showcasing a creative personality. She is in a tech-forward studio environment with neon lights in the background. The style is sharp, modern, and high-contrast, designed to stand out in a dark-themed recruitment application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6tHDpxq2vJoc81T8m0i5aibOxerWU6cs4TaQoHf6lJsXDfua3VJCWF9hL7e_OYGFNtfiBXfabDFB_M0Lu7Z8JEIM2JwFLDToCEgBLq-8AE_d4xcT90f8CnniduWGBlzgrqfSurLgX4-HLJpiHpsB82M6YJigE7KcRGVsVFKmDkdp75Bq5phDePo4-GOCuduE3QoPflhA7BsyywdtcUQ8DCmuIh3fbCN8nPwY6DyThuw3EMOutBE3WGDaFvLIqoKkP2OJdDe5_dLc"/>
+</div>
+<a class="text-on-surface-variant/40 hover:text-[#0077B5] transition-colors" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.761 0 5-2.239 5-5v-14c0-2.761-2.239-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
+</a>
+</div>
+<div class="flex flex-col gap-xs">
+<h3 class="font-title-md text-title-md text-white">Lucía Ferrán</h3>
+<p class="text-body-md text-on-surface-variant">lucia.f@designhub.net</p>
+</div>
+<div class="mt-xs"><span class="status-amber text-[10px] font-bold px-sm py-1 rounded-full uppercase tracking-widest inline-block">PENDIENTE</span></div>
+<div class="flex items-center justify-between pt-md border-t border-white/5">
+<span class="text-caption text-on-surface-variant/60">Recibido hace 4d</span>
+<button class="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-neon-mint hover:text-on-primary-fixed transition-all group/btn">
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Card 8 -->
+<div class="glass-card rounded-2xl p-md flex flex-col gap-md relative group overflow-hidden opacity-60">
+<div class="flex justify-between items-start">
+<div class="w-16 h-16 rounded-full overflow-hidden border-2 border-white/10 group-hover:border-neon-mint/50 transition-colors">
+<img class="w-full h-full object-cover" data-alt="A portrait of a male backend developer with a minimalist aesthetic, wearing a charcoal hoodie. He has a subtle smile and deep, intelligent eyes. The lighting is low-key with sharp edges, highlighting the contours of his face against a dark, tech-oriented backdrop. High resolution, professional cinematic quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_c8S21UeNLimYHBITUkpvNbvktWq1WUy-xGDAZ7LWgNWN8D5Nnv_yXtpZcBh5_lCo0r73nrmnHaFv4qkEdSvhpLLkAXuM7r3cHDOnocGrSNlWvR3DxLm-9iyret_H7ACtZsV3dwc-DMP5eat8By6JpAXzye-f1KSACG34LHiBtsaZgNNSs2TXAVDMPBhK2FFCiYE5gZMP8vPogvudg_dKYR5OumeT7itZNJr3jBvBlb02jev_afRSNqSRft4yFC4y_zahTlRCG1s"/>
+</div>
+<a class="text-on-surface-variant/40 hover:text-[#0077B5] transition-colors" href="#">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.761 0 5-2.239 5-5v-14c0-2.761-2.239-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
+</a>
+</div>
+<div class="flex flex-col gap-xs">
+<h3 class="font-title-md text-title-md text-white">Mateo D'Amico</h3>
+<p class="text-body-md text-on-surface-variant">mateo.da@backend.io</p>
+</div>
+<div class="mt-xs"><span class="status-mint text-[10px] font-bold px-sm py-1 rounded-full uppercase tracking-widest inline-block">REVISADO</span></div>
+<div class="flex items-center justify-between pt-md border-t border-white/5">
+<span class="text-caption text-on-surface-variant/60">Recibido hace 1w</span>
+<button class="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-neon-mint hover:text-on-primary-fixed transition-all group/btn">
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Pagination or Load More -->
+<footer class="mt-lg flex flex-col items-center gap-md">
+<button class="glass-panel px-xl py-sm rounded-full text-label-sm font-label-sm hover:border-neon-mint/30 transition-all active:scale-95">
+                Cargar más postulantes
+            </button>
+<p class="text-caption text-on-surface-variant/40">Mostrando 8 de 1,284 candidatos</p>
+</footer>
+</main>
+<script>
+        // Micro-interactions and subtle mouse tracking for ambient blobs
+        document.addEventListener('mousemove', (e) => {
+            const blobs = document.querySelectorAll('.bg-blob');
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            
+            blobs.forEach((blob, index) => {
+                const speed = (index + 1) * 20;
+                blob.style.transform = `translate(${x * speed}px, ${y * speed}px)`;
+            });
+        });
+
+        // Add a "shimmer" effect to the primary button on a timer
+        setInterval(() => {
+            const btn = document.querySelector('.bg-neon-mint');
+            btn.classList.add('brightness-125');
+            setTimeout(() => {
+                btn.classList.remove('brightness-125');
+            }, 500);
+        }, 3000);
+    </script>
+</body></html>

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Talento | Candidato de Prueba 12</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "error": "#ffb4ab",
+                    "surface-container": "#1d2022",
+                    "surface-tint": "#6bd8cb",
+                    "on-tertiary": "#233144",
+                    "on-primary": "#003732",
+                    "on-secondary-container": "#b3afe9",
+                    "surface-container-low": "#191c1e",
+                    "surface-variant": "#323537",
+                    "on-surface": "#e0e3e5",
+                    "outline-variant": "#3d4947",
+                    "on-tertiary-container": "#1c2a3d",
+                    "on-primary-fixed": "#00201d",
+                    "primary-fixed": "#89f5e7",
+                    "on-background": "#e0e3e5",
+                    "on-tertiary-fixed-variant": "#3a485b",
+                    "on-error": "#690005",
+                    "inverse-surface": "#e0e3e5",
+                    "on-primary-container": "#00302b",
+                    "primary": "#6bd8cb",
+                    "inverse-on-surface": "#2d3133",
+                    "secondary-fixed": "#e3dfff",
+                    "primary-container": "#29a195",
+                    "background": "#101415",
+                    "secondary-fixed-dim": "#c4c1fb",
+                    "secondary-container": "#444173",
+                    "surface-container-highest": "#323537",
+                    "on-secondary-fixed": "#181445",
+                    "tertiary-fixed": "#d5e3fc",
+                    "surface-container-lowest": "#0b0f10",
+                    "inverse-primary": "#006a61",
+                    "on-secondary": "#2d2a5b",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "on-primary-fixed-variant": "#005049",
+                    "surface-container-high": "#272a2c",
+                    "tertiary": "#b9c7df",
+                    "surface-bright": "#363a3b",
+                    "on-secondary-fixed-variant": "#444173",
+                    "on-error-container": "#ffdad6",
+                    "secondary": "#c4c1fb",
+                    "surface-dim": "#101415",
+                    "surface": "#101415",
+                    "on-tertiary-fixed": "#0d1c2e",
+                    "tertiary-fixed-dim": "#b9c7df",
+                    "on-surface-variant": "#bcc9c6",
+                    "tertiary-container": "#8392a8",
+                    "outline": "#879391",
+                    "error-container": "#93000a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "48px",
+                    "container-max": "1440px",
+                    "md": "24px",
+                    "lg": "32px",
+                    "base": "4px",
+                    "sm": "16px",
+                    "xs": "8px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "display-lg": ["Manrope"],
+                    "title-md": ["Manrope"],
+                    "headline-lg": ["Manrope"],
+                    "caption": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "body-md": ["Manrope"],
+                    "label-sm": ["Manrope"]
+            },
+            "fontSize": {
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "title-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-sm": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #101415;
+            color: #e0e3e5;
+            font-family: 'Manrope', sans-serif;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .fader-track {
+            background: rgba(255, 255, 255, 0.05);
+            width: 4px;
+            border-radius: 2px;
+            height: 120px;
+            position: relative;
+        }
+        .fader-thumb {
+            width: 20px;
+            height: 10px;
+            background: #879391;
+            position: absolute;
+            left: -8px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="min-h-screen overflow-x-hidden">
+<!-- WebGL Background Overlay (Atmospheric) -->
+<div class="fixed inset-0 pointer-events-none z-0">
+
+</div>
+<!-- Top Navigation Bar -->
+<header class="sticky top-0 z-50 bg-transparent">
+<div class="max-w-container-max mx-auto px-xl py-sm flex justify-between items-center">
+<div class="flex items-center gap-md">
+<span class="text-headline-lg font-headline-lg font-bold text-primary">Talento</span>
+<nav class="hidden md:flex items-center gap-lg ml-xl">
+<a class="text-primary font-label-sm text-label-sm border-b-2 border-primary pb-1" href="#">Candidatos</a>
+<a class="text-on-surface-variant font-label-sm text-label-sm hover:text-primary transition-colors" href="#">Procesos</a>
+<a class="text-on-surface-variant font-label-sm text-label-sm hover:text-primary transition-colors" href="#">Analítica</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<div class="p-xs rounded-full hover:bg-surface-variant/20 transition-all cursor-pointer">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+</div>
+<div class="p-xs rounded-full hover:bg-surface-variant/20 transition-all cursor-pointer">
+<span class="material-symbols-outlined text-on-surface-variant">help</span>
+</div>
+<div class="w-10 h-10 rounded-full overflow-hidden border border-white/10">
+<img class="w-full h-full object-cover" data-alt="Professional corporate headshot of a recruitment manager in a minimalist modern office setting with soft indigo lighting and high-end glass aesthetics." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDx_eFcqsgYsN6cVLGcPYAoYofJQkC-uwm466KJ-FtdT8GZhpUo6rsC3hTJiW7qw6Stovvh20-9Xv5KUOPo3EDzMgKAXbOgrpkpQpeagXoBRz0fO1VgdObDhpGhANKuf1ip_4Q1oC6LHAAOu7-b2VfNkOHsGjV8eU1_1WJB0W3-FK_BEteS2w-jTDS0nO89J0T6KX7w-nuUQUe4N-J7u47DdH20jZNaSWf9rVDpD7GwQdYNxij_F-I-LCZqjvucBVLSBcSWp0mSaiA"/>
+</div>
+</div>
+</div>
+</header>
+<main class="relative z-10 max-w-container-max mx-auto px-xl py-lg">
+<!-- Breadcrumbs / Action Bar -->
+<div class="mb-lg flex items-center gap-xs text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[18px]">arrow_back</span>
+<span class="hover:text-primary cursor-pointer transition-colors">Volver al listado</span>
+<span class="mx-xs opacity-30">/</span>
+<span class="text-on-surface">Candidato de Prueba 12</span>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Column 1: Candidate Transact Data -->
+<div class="lg:col-span-5 flex flex-col gap-md">
+<div class="glass-card rounded-xl p-lg shadow-xl">
+<div class="flex justify-between items-start mb-lg">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Ficha de Candidato</h2>
+<p class="text-on-surface-variant font-caption text-caption opacity-60">ID: 95cac6a6-4d21-4f9e-b9e7-f1e5a5c6d3b2</p>
+</div>
+<span class="material-symbols-outlined text-primary text-[32px]">contact_page</span>
+</div>
+<div class="space-y-sm">
+<div class="flex flex-col gap-base pb-sm border-b border-white/5">
+<span class="text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">Nombre</span>
+<span class="text-on-surface font-title-md text-title-md">Candidato de Prueba 12</span>
+</div>
+<div class="flex flex-col gap-base py-sm border-b border-white/5">
+<span class="text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">Email</span>
+<span class="text-primary font-body-md text-body-md">prueba@digitalagil.es</span>
+</div>
+<div class="flex flex-col gap-base py-sm border-b border-white/5">
+<span class="text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">Puesto</span>
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">work</span>
+<span class="text-on-surface font-body-md text-body-md">Backend Dev</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-md py-sm border-b border-white/5">
+<div class="flex flex-col gap-base">
+<span class="text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">Origen</span>
+<span class="text-on-surface font-body-md text-body-md capitalize">directo</span>
+</div>
+<div class="flex flex-col gap-base">
+<span class="text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">Fecha</span>
+<span class="text-on-surface font-body-md text-body-md">2026-07-18</span>
+</div>
+</div>
+<div class="flex items-center gap-sm py-sm">
+<div class="flex items-center gap-xs px-sm py-xs bg-primary/10 rounded-full">
+<span class="material-symbols-outlined text-primary text-[16px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-primary font-label-sm text-label-sm">Privacidad Aceptada</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Status Selector -->
+<div class="glass-card rounded-xl p-md">
+<label class="block text-on-surface-variant font-label-sm text-label-sm mb-xs">Estado de Revisión</label>
+<div class="relative group">
+<select class="w-full bg-surface-container-low border border-white/10 rounded-lg px-md py-sm appearance-none text-on-surface font-title-md focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all cursor-pointer">
+<option selected="">Pendiente</option>
+<option>En Revisión</option>
+<option>Descartado</option>
+<option>Seleccionado</option>
+</select>
+<div class="absolute inset-y-0 right-0 flex items-center pr-md pointer-events-none">
+<span class="material-symbols-outlined text-on-surface-variant">expand_more</span>
+</div>
+<!-- Glowing Amber Indicator -->
+<div class="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.8)] animate-pulse"></div>
+</div>
+</div>
+<!-- Primary CTA -->
+<button class="w-full group relative overflow-hidden bg-[#0D9488] hover:bg-[#0D9488]/90 text-white font-title-md text-title-md py-lg rounded-xl transition-all duration-300 transform active:scale-[0.98] shadow-[0_0_20px_rgba(13,148,136,0.3)] hover:shadow-[0_0_30px_rgba(13,148,136,0.5)]">
+<div class="flex items-center justify-center gap-sm relative z-10">
+<span class="material-symbols-outlined">picture_as_pdf</span>
+<span>Abrir CV Original (PDF)</span>
+</div>
+<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+</button>
+</div>
+<!-- Column 2: Talent Mixer (Phase 2) - Inactive State -->
+<div class="lg:col-span-7 relative">
+<!-- Disabled Overlay -->
+<div class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#101415]/60 backdrop-blur-[2px] rounded-xl border border-white/5">
+<div class="glass-card p-xl rounded-2xl border border-white/10 shadow-2xl flex flex-col items-center gap-md text-center max-w-sm">
+<div class="w-16 h-16 bg-surface-variant/20 rounded-full flex items-center justify-center mb-xs">
+<span class="material-symbols-outlined text-[40px] text-on-surface-variant opacity-60">lock</span>
+</div>
+<h3 class="font-headline-lg text-headline-lg-mobile text-on-surface-variant">AI Analysis Pending</h3>
+<p class="text-on-surface-variant font-body-md text-body-md opacity-60">Phase 2: Talent Mixer functionality will be available once the automated skill assessment is complete.</p>
+<div class="mt-md px-md py-xs bg-white/5 rounded-full border border-white/10 flex items-center gap-xs">
+<div class="w-2 h-2 bg-on-surface-variant/30 rounded-full animate-bounce"></div>
+<div class="w-2 h-2 bg-on-surface-variant/30 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+<div class="w-2 h-2 bg-on-surface-variant/30 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+<span class="text-label-sm font-label-sm text-on-surface-variant opacity-40 ml-xs">Processing CV...</span>
+</div>
+</div>
+</div>
+<!-- Main Mixer Content (Inactive/Grayscale) -->
+<div class="h-full flex flex-col gap-md grayscale opacity-40 select-none pointer-events-none">
+<!-- Panel 1: Professional Summary -->
+<div class="glass-card rounded-xl p-lg flex-1">
+<h3 class="font-title-md text-title-md text-on-surface mb-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-on-surface-variant">auto_awesome</span>
+                            Professional Summary
+                        </h3>
+<div class="space-y-sm">
+<div class="w-full h-4 bg-white/5 rounded-full"></div>
+<div class="w-[92%] h-4 bg-white/5 rounded-full"></div>
+<div class="w-[95%] h-4 bg-white/5 rounded-full"></div>
+<div class="w-[88%] h-4 bg-white/5 rounded-full"></div>
+<div class="w-[40%] h-4 bg-white/5 rounded-full"></div>
+</div>
+</div>
+<!-- Panel 2: Skill Alignment Mixer -->
+<div class="glass-card rounded-xl p-lg">
+<div class="flex justify-between items-center mb-xl">
+<h3 class="font-title-md text-title-md text-on-surface flex items-center gap-xs">
+<span class="material-symbols-outlined text-on-surface-variant">tune</span>
+                                Skill Alignment Mixer
+                            </h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">v2.0 Beta</span>
+</div>
+<!-- DAW-style Faders -->
+<div class="flex justify-around items-end pt-md pb-xl">
+<!-- Fader 1 -->
+<div class="flex flex-col items-center gap-md">
+<span class="text-label-sm font-label-sm text-on-surface-variant rotate-[-90deg] origin-center translate-y-[-40px] whitespace-nowrap">Hard Skills</span>
+<div class="fader-track">
+<div class="fader-thumb" style="top: 30%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-sm">78%</span>
+</div>
+<!-- Fader 2 -->
+<div class="flex flex-col items-center gap-md">
+<span class="text-label-sm font-label-sm text-on-surface-variant rotate-[-90deg] origin-center translate-y-[-40px] whitespace-nowrap">Soft Skills</span>
+<div class="fader-track">
+<div class="fader-thumb" style="top: 45%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-sm">62%</span>
+</div>
+<!-- Fader 3 -->
+<div class="flex flex-col items-center gap-md">
+<span class="text-label-sm font-label-sm text-on-surface-variant rotate-[-90deg] origin-center translate-y-[-40px] whitespace-nowrap">Fit Cultural</span>
+<div class="fader-track">
+<div class="fader-thumb" style="top: 15%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-sm">94%</span>
+</div>
+<!-- Fader 4 -->
+<div class="flex flex-col items-center gap-md">
+<span class="text-label-sm font-label-sm text-on-surface-variant rotate-[-90deg] origin-center translate-y-[-40px] whitespace-nowrap">Seniority</span>
+<div class="fader-track">
+<div class="fader-thumb" style="top: 60%;"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-sm">45%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Micro-interaction for the status selector -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const select = document.querySelector('select');
+            const glow = document.querySelector('.animate-pulse');
+            
+            select.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if (val === 'Pendiente') {
+                    glow.className = 'absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.8)] animate-pulse';
+                } else if (val === 'Descartado') {
+                    glow.className = 'absolute -top-1 -right-1 w-3 h-3 bg-error rounded-full shadow-[0_0_12px_rgba(255,180,171,0.8)] animate-pulse';
+                } else {
+                    glow.className = 'absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full shadow-[0_0_12px_rgba(107,216,203,0.8)] animate-pulse';
+                }
+            });
+        });
+    </script>
+</body></html>
