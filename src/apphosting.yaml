@@ -1,0 +1,15 @@
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyDEUAtIiQm-SMagwFuEOMI_C0TXfa7NJsk"
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "azul-ats-1.firebaseapp.com"
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "azul-ats-1"
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "azul-ats-1.firebasestorage.app"
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "795205053212"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:795205053212:web:4c061d202da1f17d0528d9"
+  - variable: NEXT_PUBLIC_API_URL
+    value: "https://azulats-service1-795205053212.us-east1.run.app"
