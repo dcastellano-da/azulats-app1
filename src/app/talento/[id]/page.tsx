@@ -18,7 +18,11 @@ import {
   Info,
   Maximize2,
   Copy,
-  Check
+  Check,
+  Phone,
+  MapPin,
+  Globe,
+  Award
 } from "lucide-react";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 
@@ -34,6 +38,32 @@ export default function CandidatoDetailPage() {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
+
+  // Edit Mode states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editNombre, setEditNombre] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editLinkedin, setEditLinkedin] = useState("");
+  const [editTelefono, setEditTelefono] = useState("");
+  const [editUbicacion, setEditUbicacion] = useState("");
+  const [editSkills, setEditSkills] = useState("");
+  const [editNivelIngles, setEditNivelIngles] = useState("");
+  const [editOtrosIdiomas, setEditOtrosIdiomas] = useState("");
+  const [editNotas, setEditNotas] = useState("");
+
+  useEffect(() => {
+    if (cand) {
+      setEditNombre(cand.nombre_completo || "");
+      setEditEmail(cand.email || "");
+      setEditLinkedin(cand.linkedin_url || "");
+      setEditTelefono(cand.telefono_movil || "");
+      setEditUbicacion(cand.ubicacion || "");
+      setEditSkills(cand.skills_principales || "");
+      setEditNivelIngles(cand.nivel_ingles || "");
+      setEditOtrosIdiomas(cand.otros_idiomas || "");
+      setEditNotas(cand.notas_iniciales || "");
+    }
+  }, [cand]);
 
   // DAW faders simulated scores
   const [hardSkills, setHardSkills] = useState(85);
@@ -136,6 +166,80 @@ export default function CandidatoDetailPage() {
     }
   };
 
+  const handleSave = () => {
+    if (!editNombre.trim() || !editEmail.trim()) {
+      setFeedback({
+        type: "error",
+        message: "El nombre completo y correo electrónico son obligatorios."
+      });
+      return;
+    }
+
+    if (editSkills.trim()) {
+      const tags = editSkills.split(",").map(t => t.trim()).filter(Boolean);
+      if (tags.length < 3 || tags.length > 5) {
+        setFeedback({
+          type: "error",
+          message: "Las habilidades principales deben ser entre 3 y 5 etiquetas separadas por comas (ej: React, Node, CSS)."
+        });
+        return;
+      }
+    }
+
+    setFeedback(null);
+    startTransition(async () => {
+      try {
+        const payload = {
+          nombre_completo: editNombre.trim(),
+          email: editEmail.trim(),
+          linkedin_url: editLinkedin.trim(),
+          telefono_movil: editTelefono.trim(),
+          ubicacion: editUbicacion.trim(),
+          skills_principales: editSkills.trim(),
+          nivel_ingles: editNivelIngles.trim(),
+          otros_idiomas: editOtrosIdiomas.trim(),
+          notas_iniciales: editNotas.trim()
+        };
+
+        const response = await actualizarCandidatoAPI(id, payload);
+        if (response.success) {
+          setFeedback({
+            type: "success",
+            message: "Ficha de candidato actualizada correctamente."
+          });
+          setCand(prev => prev ? { ...prev, ...payload } : null);
+          setIsEditing(false);
+        } else {
+          setFeedback({
+            type: "error",
+            message: response.message || "Error al actualizar candidato."
+          });
+        }
+      } catch (_) {
+        setFeedback({
+          type: "error",
+          message: "Error de red al intentar actualizar el candidato."
+        });
+      }
+    });
+  };
+
+  const handleCancel = () => {
+    if (cand) {
+      setEditNombre(cand.nombre_completo || "");
+      setEditEmail(cand.email || "");
+      setEditLinkedin(cand.linkedin_url || "");
+      setEditTelefono(cand.telefono_movil || "");
+      setEditUbicacion(cand.ubicacion || "");
+      setEditSkills(cand.skills_principales || "");
+      setEditNivelIngles(cand.nivel_ingles || "");
+      setEditOtrosIdiomas(cand.otros_idiomas || "");
+      setEditNotas(cand.notas_iniciales || "");
+    }
+    setIsEditing(false);
+    setFeedback(null);
+  };
+
   const handleCopyCandidateData = () => {
     if (!cand) return;
     const formattedDate = new Date(cand.createdAt).toLocaleDateString("es-ES", {
@@ -144,10 +248,15 @@ export default function CandidatoDetailPage() {
     const textToCopy = `POSTULANTE: ${cand.nombre_completo}
 Puesto al que postula: ${cand.puesto || 'No especificado'}
 Email: ${cand.email}
-LinkedIn: ${cand.linkedin_url || 'No proporcionado'}
+Móvil: ${cand.telefono_movil || 'No especificado'}
+Ubicación: ${cand.ubicacion || 'No especificada'}
+Habilidades Principales: ${cand.skills_principales || 'Ninguna'}
+Inglés: ${cand.nivel_ingles || 'No especificado'}
+Otros Idiomas: ${cand.otros_idiomas || 'No especificados'}
 Estado de Revisión: ${cand.estado_revision}
 Origen: ${cand.origen}
-Fecha de Registro: ${formattedDate}`;
+Fecha de Registro: ${formattedDate}
+Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
 
     navigator.clipboard.writeText(textToCopy)
       .then(() => {
@@ -254,49 +363,134 @@ Fecha de Registro: ${formattedDate}`;
 
                 {/* Profile Header */}
                 <div className="flex justify-between items-start">
-                  <div className="space-y-1">
+                  <div className="space-y-1 w-full text-left">
                     <span className="text-[10px] text-[#879391] font-mono tracking-widest uppercase">Postulante Espontáneo</span>
-                    <h2 className="text-xl font-extrabold text-white tracking-tight">{cand.nombre_completo}</h2>
-                    <p className="text-sm font-semibold text-[#c4c1fb]">{cand.puesto}</p>
+                    {isEditing ? (
+                      <div className="space-y-3 pt-2">
+                        <div>
+                          <label className="text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase block text-left">Nombre Completo</label>
+                          <input
+                            type="text"
+                            value={editNombre}
+                            onChange={(e) => setEditNombre(e.target.value)}
+                            className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase block text-left">Puesto / Cargo</label>
+                          <p className="text-xs font-semibold text-white/55 bg-[#161a1b] px-3 py-1.5 rounded-xl border border-white/5 select-none">{cand.puesto} (Inmutable)</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <h2 className="text-xl font-extrabold text-white tracking-tight">{cand.nombre_completo}</h2>
+                        <p className="text-sm font-semibold text-[#c4c1fb]">{cand.puesto}</p>
+                      </>
+                    )}
                   </div>
                   
                   {/* Glowing dynamic status sphere */}
-                  <div className="flex flex-col items-center gap-1">
-                    <div className={`w-4 h-4 rounded-full ${getStatusBubbleClass(status)} animate-pulse shadow-lg`}></div>
-                    <span className="text-[8px] font-mono text-white/50">{status}</span>
-                  </div>
+                  {!isEditing && (
+                    <div className="flex flex-col items-center gap-1">
+                      <div className={`w-4 h-4 rounded-full ${getStatusBubbleClass(status)} animate-pulse shadow-lg`}></div>
+                      <span className="text-[8px] font-mono text-white/50">{status}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Info Fields */}
                 <div className="space-y-4.5 text-xs text-[#879391] pt-3 border-t border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/70">
-                      <Mail className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-white/40">Correo Electrónico</p>
-                      <a href={`mailto:${cand.email}`} className="text-white hover:underline font-medium">{cand.email}</a>
-                    </div>
-                  </div>
-
-                  {cand.linkedin_url && (
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-[#6bd8cb]/20 flex items-center justify-center text-[#6bd8cb] font-bold text-xs">
-                        in
+                  {isEditing ? (
+                    <div className="space-y-3 text-left">
+                      <div>
+                        <label className="text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase block text-left">Correo Electrónico</label>
+                        <input
+                          type="email"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                        />
                       </div>
                       <div>
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-white/40">Perfil Laboral</p>
-                        <a 
-                          href={cand.linkedin_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="text-[#6bd8cb] hover:underline font-medium flex items-center gap-1"
-                        >
-                          <span>Ver LinkedIn</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                        <label className="text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase block text-left">Enlace a LinkedIn</label>
+                        <input
+                          type="url"
+                          value={editLinkedin}
+                          onChange={(e) => setEditLinkedin(e.target.value)}
+                          className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase block text-left">Teléfono Móvil</label>
+                        <input
+                          type="text"
+                          value={editTelefono}
+                          onChange={(e) => setEditTelefono(e.target.value)}
+                          className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase block text-left">Ubicación</label>
+                        <input
+                          type="text"
+                          value={editUbicacion}
+                          onChange={(e) => setEditUbicacion(e.target.value)}
+                          className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                        />
                       </div>
                     </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/70">
+                          <Mail className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-wider text-white/40">Correo Electrónico</p>
+                          <a href={`mailto:${cand.email}`} className="text-white hover:underline font-medium">{cand.email}</a>
+                        </div>
+                      </div>
+
+                      {cand.linkedin_url && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-[#6bd8cb]/20 flex items-center justify-center text-[#6bd8cb] font-bold text-xs">
+                            in
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-white/40">Perfil Laboral</p>
+                            <a 
+                              href={cand.linkedin_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-[#6bd8cb] hover:underline font-medium flex items-center gap-1"
+                            >
+                              <span>Ver LinkedIn</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/70">
+                          <Phone className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-wider text-white/40">Teléfono Móvil</p>
+                          <p className="text-white font-medium">{cand.telefono_movil || "No especificado"}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/70">
+                          <MapPin className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-wider text-white/40">Ubicación</p>
+                          <p className="text-white font-medium">{cand.ubicacion || "No especificada"}</p>
+                        </div>
+                      </div>
+                    </>
                   )}
 
                   <div className="flex items-center gap-3">
@@ -379,17 +573,141 @@ Fecha de Registro: ${formattedDate}`;
 
             {/* RIGHT PANEL: DAW Console Equalizer Faders */}
             <div className="lg:col-span-7 space-y-6 text-left">
-              {/* Professional Summary Section (Future development placeholder) */}
-              <div className="p-6 rounded-3xl border border-white/10 bg-[#16191b] backdrop-blur-md space-y-4">
-                <div className="flex items-center gap-2 text-[#6bd8cb] border-b border-white/10 pb-3">
-                  <FileText className="w-4 h-4" />
-                  <h3 className="text-xs font-extrabold uppercase tracking-widest font-sans">
-                    Resumen Profesional
-                  </h3>
+              {/* Professional Profile Section */}
+              <div className="p-6 rounded-3xl border border-white/10 bg-[#16191b] backdrop-blur-md space-y-6">
+                <div className="flex justify-between items-center text-[#6bd8cb] border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-4.5 h-4.5" />
+                    <h3 className="text-xs font-extrabold uppercase tracking-widest font-sans">
+                      Perfil Profesional e Idiomas
+                    </h3>
+                  </div>
+
+                  {/* Mode Selector */}
+                  <div>
+                    {isEditing ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCancel}
+                          className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[9px] uppercase font-bold text-[#879391] hover:bg-neutral-800 transition-all cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={handleSave}
+                          className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] text-[9px] uppercase font-bold text-[#101415] hover:bg-[#6bd8cb]/90 transition-all cursor-pointer"
+                        >
+                          Guardar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[9px] uppercase font-bold text-[#c4c1fb] hover:bg-white/10 transition-all cursor-pointer"
+                      >
+                        Editar Datos
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <p className="text-xs text-[#879391] font-medium leading-relaxed italic select-none">
-                  A desarrollar
-                </p>
+                
+                {isEditing ? (
+                  <div className="space-y-4">
+                    {/* Skills Selection */}
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-white/40 tracking-wider">Habilidades Clave (3-5 separadas por comas)</label>
+                      <input
+                        type="text"
+                        value={editSkills}
+                        onChange={(e) => setEditSkills(e.target.value)}
+                        placeholder="Ejemplo: React, Node.js, CSS"
+                        className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Languages Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-white/40 tracking-wider">Nivel de Inglés</label>
+                        <input
+                          type="text"
+                          value={editNivelIngles}
+                          onChange={(e) => setEditNivelIngles(e.target.value)}
+                          placeholder="Ejemplo: B1"
+                          className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-white/40 tracking-wider">Otros Idiomas</label>
+                        <input
+                          type="text"
+                          value={editOtrosIdiomas}
+                          onChange={(e) => setEditOtrosIdiomas(e.target.value)}
+                          placeholder="Ejemplo: Francés"
+                          className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Notes initiales */}
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase text-white/40 tracking-wider">Anotaciones de Reclutamiento</label>
+                      <textarea
+                        value={editNotas}
+                        onChange={(e) => setEditNotas(e.target.value)}
+                        placeholder="Escribe anotaciones iniciales aquí..."
+                        rows={3}
+                        className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none resize-y min-h-[60px]"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Skills Section */}
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-black uppercase text-white/40 tracking-wider">Habilidades Clave</span>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {cand.skills_principales && cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).length > 0 ? (
+                          cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).map((tag, idx) => (
+                            <span
+                              key={idx}
+                              className="text-xs font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-3 py-1 rounded-xl border border-[#6bd8cb]/20 shadow-sm shadow-[#6bd8cb]/5 hover:bg-[#6bd8cb]/20 transition-all cursor-default"
+                            >
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-xs text-white/30 italic">Sin habilidades registradas en el perfil.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Languages Section */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-2xl bg-[#101415]/60 border border-white/5 space-y-1">
+                        <span className="text-[9px] font-black uppercase text-[#c4c1fb] tracking-wider block">Nivel de Inglés</span>
+                        <p className="text-xs font-bold text-white leading-normal">
+                          {cand.nivel_ingles || "Sin especificar"}
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-[#101415]/60 border border-white/5 space-y-1">
+                        <span className="text-[9px] font-black uppercase text-[#c4c1fb] tracking-wider block">Otros Idiomas</span>
+                        <p className="text-xs font-bold text-white leading-normal">
+                          {cand.otros_idiomas || "Sin especificar"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* notes section */}
+                    <div className="p-4 rounded-2xl bg-[#101415]/60 border border-white/5 space-y-2">
+                      <span className="text-[9px] font-black uppercase text-[#6bd8cb] tracking-wider block">Anotaciones de Reclutamiento</span>
+                      <p className="text-xs text-[#879391] font-medium leading-relaxed whitespace-pre-wrap">
+                        {cand.notas_iniciales || "Sin anotaciones preliminares sobre el candidato."}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="p-6 rounded-3xl border border-white/10 bg-[#16191b] backdrop-blur-md space-y-6">

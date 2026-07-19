@@ -24,7 +24,9 @@ import {
   Inbox,
   HelpCircle,
   Copy,
-  Check
+  Check,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import SlideOver from "../components/SlideOver";
 import CandidatoForm from "../components/CandidatoForm";
@@ -40,6 +42,21 @@ export default function TalentoPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEstado, setSelectedEstado] = useState("Todos");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  
+  // View mode
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+
+  useEffect(() => {
+    const savedMode = localStorage.getItem("talento_view_mode");
+    if (savedMode === "list" || savedMode === "cards") {
+      setViewMode(savedMode);
+    }
+  }, []);
+
+  const handleToggleViewMode = (mode: "cards" | "list") => {
+    setViewMode(mode);
+    localStorage.setItem("talento_view_mode", mode);
+  };
   
   // Slide Over state
   const [isSlideOpen, setIsSlideOpen] = useState(false);
@@ -135,10 +152,15 @@ export default function TalentoPage() {
     const textToCopy = `POSTULANTE: ${c.nombre_completo}
 Puesto al que postula: ${c.puesto || 'No especificado'}
 Email: ${c.email}
-LinkedIn: ${c.linkedin_url || 'No proporcionado'}
+Móvil: ${c.telefono_movil || 'No especificado'}
+Ubicación: ${c.ubicacion || 'No especificada'}
+Habilidades Principales: ${c.skills_principales || 'Ninguna'}
+Inglés: ${c.nivel_ingles || 'No especificado'}
+Otros Idiomas: ${c.otros_idiomas || 'No especificados'}
 Estado de Revisión: ${c.estado_revision}
 Origen: ${c.origen}
-Fecha de Registro: ${formattedDate}`;
+Fecha de Registro: ${formattedDate}
+Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
 
     navigator.clipboard.writeText(textToCopy)
       .then(() => {
@@ -289,6 +311,32 @@ Fecha de Registro: ${formattedDate}`;
               ))}
             </div>
 
+            {/* View Mode Toggle Buttons */}
+            <div className="flex gap-1 p-1 bg-[#101415] border border-white/10 rounded-xl shrink-0">
+              <button
+                onClick={() => handleToggleViewMode("cards")}
+                title="Vista de Tarjetas"
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  viewMode === "cards"
+                    ? "bg-[#6bd8cb]/10 text-[#6bd8cb]"
+                    : "text-[#879391] hover:text-white"
+                }`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleToggleViewMode("list")}
+                title="Vista de Lista"
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  viewMode === "list"
+                    ? "bg-[#6bd8cb]/10 text-[#6bd8cb]"
+                    : "text-[#879391] hover:text-white"
+                }`}
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+
             {/* Help Tooltip */}
             <div className="relative group flex items-center shrink-0">
               <button 
@@ -336,7 +384,7 @@ Fecha de Registro: ${formattedDate}`;
               </p>
             </div>
           </div>
-        ) : (
+        ) : viewMode === "cards" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {filteredCandidatos.map((cand) => (
               <div
@@ -467,6 +515,126 @@ Fecha de Registro: ${formattedDate}`;
               </div>
             ))}
           </div>
+        ) : (
+          /* List view represented in a robust glassmorphism table overlay */
+          <section className="glass-panel rounded-2xl overflow-hidden backdrop-blur-md border border-white/10 text-left">
+            <div className="overflow-x-auto mr-[-1px] mb-[-1px]">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/10 bg-[#161a1b]/60 text-xs font-bold tracking-wider text-[#c4c1fb]">
+                    <th className="py-4 px-6">ID</th>
+                    <th className="py-4 px-6">Candidato</th>
+                    <th className="py-4 px-6">Puesto</th>
+                    <th className="py-4 px-6">Ubicación</th>
+                    <th className="py-4 px-6">Habilidades Clave</th>
+                    <th className="py-4 px-6 text-center">Estado</th>
+                    <th className="py-4 px-6 text-right">Creado</th>
+                    <th className="py-4 px-6 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-xs text-white">
+                  {filteredCandidatos.map((cand) => (
+                    <tr 
+                      key={cand.id}
+                      onClick={() => router.push(`/talento/${cand.id}`)}
+                      className="group hover:bg-white/[0.04] transition-colors duration-250 cursor-pointer"
+                    >
+                      <td className="py-4 px-6 font-mono text-[#879391]">
+                        {cand.id.substring(0, 8)}
+                      </td>
+                      <td className="py-4 px-6 font-bold group-hover:text-[#6bd8cb] transition-colors">
+                        <div>
+                          <div className="text-white group-hover:text-[#6bd8cb] font-bold">{cand.nombre_completo}</div>
+                          <div className="text-[10px] text-[#879391] font-normal">{cand.email}</div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 font-semibold text-[#c4c1fb]">
+                        {cand.puesto}
+                      </td>
+                      <td className="py-4 px-6 text-[#879391]">
+                        {cand.ubicacion || <span className="italic opacity-30">No especificada</span>}
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex flex-wrap gap-1.5 max-w-xs">
+                          {cand.skills_principales && cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).length > 0 ? (
+                            cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).slice(0, 3).map((tag, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[9px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2 py-0.5 rounded border border-[#6bd8cb]/20"
+                              >
+                                {tag}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-white/30 italic">Sin skills</span>
+                          )}
+                          {cand.skills_principales && cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).length > 3 && (
+                            <span className="text-[9px] text-neutral-400 font-bold bg-white/5 border border-white/10 px-1 py-0.5 rounded">
+                              +{cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold capitalize ${
+                          cand.estado_revision === "Pendiente" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                          cand.estado_revision === "Revisado" ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" :
+                          cand.estado_revision === "Seleccionado" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                          "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                        }`}>
+                          {cand.estado_revision}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-right text-[#879391] font-mono whitespace-nowrap">
+                        {new Date(cand.createdAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <Link
+                            href={`/talento/${cand.id}`}
+                            className="px-2.5 py-1 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb] text-[#6bd8cb] hover:text-[#101415] border border-[#6bd8cb]/20 rounded-md text-[10px] font-extrabold transition-all cursor-pointer"
+                          >
+                            Detalle
+                          </Link>
+                          <button
+                            onClick={() => handleViewCv(cand.id, cand.url_cv)}
+                            title="Ver Documento CV PDF"
+                            className="p-1 rounded-md text-[#6bd8cb] hover:bg-[#6bd8cb]/10 transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-[#6bd8cb]/30"
+                          >
+                            <FileText className="w-4.5 h-4.5" />
+                          </button>
+                          <button
+                            onClick={() => handleCopyCandidateData(cand)}
+                            title="Copiar datos"
+                            className={`p-1 rounded-md border transition-all cursor-pointer ${
+                              copiedId === cand.id 
+                                ? "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/30" 
+                                : "text-[#c4c1fb] bg-white/5 border-white/10 hover:bg-[#c4c1fb]/10 hover:border-[#c4c1fb]/30"
+                            }`}
+                          >
+                            {copiedId === cand.id 
+                              ? <Check className="w-3.5 h-3.5" /> 
+                              : <Copy className="w-3.5 h-3.5" />
+                            }
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* List summary info */}
+            <div className="bg-[#161a1b]/40 border-t border-white/5 px-6 py-4.5 flex items-center justify-between text-[11px] text-[#879391]">
+              <div>
+                Mostrando <span className="font-bold text-[#e0e3e5]">{filteredCandidatos.length}</span> de <span className="font-bold text-[#e0e3e5]">{candidatos.length}</span> postulantes
+              </div>
+              <div>
+                Plataforma de Reclutamiento de Talento
+              </div>
+            </div>
+          </section>
         )}
       </div>
 

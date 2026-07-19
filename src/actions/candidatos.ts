@@ -14,6 +14,12 @@ export interface Candidato {
   url_cv: string;
   createdAt: string;
   updatedAt?: string;
+  telefono_movil?: string | null;
+  ubicacion?: string | null;
+  skills_principales?: string | null;
+  nivel_ingles?: string | null;
+  otros_idiomas?: string | null;
+  notas_iniciales?: string | null;
 }
 
 export interface APIResponse {
@@ -90,7 +96,13 @@ export async function getCandidatosAPI(): Promise<APIResponse> {
         estado_revision: apiToFrontendStatus(cand.estado_revision),
         url_cv: cand.url_cv || "",
         createdAt: cand.createdAt || new Date().toISOString(),
-        updatedAt: cand.updatedAt
+        updatedAt: cand.updatedAt,
+        telefono_movil: cand.telefono_movil || "",
+        ubicacion: cand.ubicacion || "",
+        skills_principales: cand.skills_principales || "",
+        nivel_ingles: cand.nivel_ingles || "",
+        otros_idiomas: cand.otros_idiomas || "",
+        notas_iniciales: cand.notas_iniciales || ""
       }));
 
       return {
@@ -139,6 +151,14 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
     const aceptaPrivacidadStr = formData.get("acepta_privacidad")?.toString();
     const cvFile = formData.get("cv");
 
+    // Nuevos campos opcionales
+    const telefono = formData.get("telefono_movil")?.toString()?.trim() || "";
+    const ubicacion = formData.get("ubicacion")?.toString()?.trim() || "";
+    const skills = formData.get("skills_principales")?.toString()?.trim() || "";
+    const ingles = formData.get("nivel_ingles")?.toString()?.trim() || "";
+    const otrosIdiomas = formData.get("otros_idiomas")?.toString()?.trim() || "";
+    const notas = formData.get("notas_iniciales")?.toString()?.trim() || "";
+
     // Server-side validation to enable robust 400 Bad Request simulation
     if (!nombre || !email || !puesto || !cvFile) {
       return {
@@ -167,6 +187,13 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
     apiFormData.append("puesto_postulacion", puesto);
     if (linkedin) apiFormData.append("linkedin_url", linkedin);
     apiFormData.append("acepta_privacidad", "true");
+    
+    apiFormData.append("telefono_movil", telefono);
+    apiFormData.append("ubicacion", ubicacion);
+    apiFormData.append("skills_principales", skills);
+    apiFormData.append("nivel_ingles", ingles);
+    apiFormData.append("otros_idiomas", otrosIdiomas);
+    apiFormData.append("notas_iniciales", notas);
 
     const response = await fetch(url, {
       method: "POST",
@@ -193,7 +220,13 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
         acepta_privacidad: true,
         estado_revision: "Pendiente",
         url_cv: result?.data?.url_cv || "",
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        telefono_movil: telefono,
+        ubicacion: ubicacion,
+        skills_principales: skills,
+        nivel_ingles: ingles,
+        otros_idiomas: otrosIdiomas,
+        notas_iniciales: notas
       };
       
       return {
@@ -257,6 +290,12 @@ export async function actualizarCandidatoAPI(id: string, payload: Partial<Candid
         apiPayload.estado_revision = payload.estado_revision;
       }
     }
+    if (payload.telefono_movil !== undefined) apiPayload.telefono_movil = payload.telefono_movil;
+    if (payload.ubicacion !== undefined) apiPayload.ubicacion = payload.ubicacion;
+    if (payload.skills_principales !== undefined) apiPayload.skills_principales = payload.skills_principales;
+    if (payload.nivel_ingles !== undefined) apiPayload.nivel_ingles = payload.nivel_ingles;
+    if (payload.otros_idiomas !== undefined) apiPayload.otros_idiomas = payload.otros_idiomas;
+    if (payload.notas_iniciales !== undefined) apiPayload.notas_iniciales = payload.notas_iniciales;
 
     const url = `${apiBaseUrl}/api/v1/candidatos/${id}`;
     console.log(`[Candidatos Action] PATCH a: ${url}`);
@@ -282,7 +321,7 @@ export async function actualizarCandidatoAPI(id: string, payload: Partial<Candid
         message: "Candidato actualizado en el backend con éxito.",
         data: {
           id,
-          estado_revision: payload.estado_revision || undefined,
+          ...payload,
           updatedAt: result?.data?.updatedAt || new Date().toISOString()
         }
       };

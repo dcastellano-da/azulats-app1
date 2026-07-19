@@ -118,21 +118,36 @@ El **Talent Mixer** proporciona la bandeja de entrada inteligente para centraliz
 
 ---
 
-## Ejecución del Servidor Local
+## Ejecución del Servidor Local and Tests
 
-1.  Instala las dependencias:
+1.  **Instala las dependencias:**
     ```bash
     npm install
     ```
-2.  Arranca el servidor local de desarrollo:
+2.  **Arranca el servidor local de desarrollo:**
     ```bash
     npm run dev
     ```
-3.  Abre [http://localhost:3000](http://localhost:3000) en el navegador.
+3.  **Ejecutar pruebas unitarias de integración (Etapa 1: Lectura):**
+    ```bash
+    source ~/.zshrc && npx tsx --test tests/candidatos_etapa1.test.js
+    ```
+4.  **Ejecutar pruebas unitarias de integración (Etapa 2: Escritura/Validación):**
+    ```bash
+    source ~/.zshrc && npx tsx --test tests/candidatos_etapa2.test.js
+    ```
+5.  Abre [http://localhost:3000](http://localhost:3000) en el navegador.
 
 ---
 
 ## Log de Cambios
+
+*   **20/07/2026:** Integración de Nuevos Campos de Candidato, Modo Edición y Vista de Lista Alternable (Etapas 1 y 2):
+    *   **Mapeo de Datos & Inmutabilidad:** Modificación del server action `getCandidatosAPI` en `src/actions/candidatos.ts` para mapear de manera robusta los 6 campos adicionales (`telefono_movil`, `ubicacion`, `skills_principales`, `nivel_ingles`, `otros_idiomas` y `notas_iniciales`). Actualización de `actualizarCandidatoAPI` para implantar protección sobre metadatos históricos inmutables.
+    *   **Modo Edición Interactivo y Detalle:** Panel derecho de la ficha `/talento/[id]/page.tsx` dotado de conmutador de edición (`isEditing`) y validaciones en tiempo real para actualizar en caliente los campos mutables del perfil.
+    *   **Vista de Lista Alternable:** Agregados controles toggle de tipo rejilla y lista en la bandeja `/talento` con almacenamiento persistente del layout preferido en `localStorage`. Renderiza una tabla glassmórfica con columnas para el ID, Candidato (nombre y email), Puesto, Ubicación, Habilidades clave y fecha de creación, junto a un botón "Detalle" de redirección.
+    *   **Formulario de Alta Ampliado:** Extensión del Slide-over en `CandidatoForm.tsx` con inputs para los 6 nuevos campos, incluyendo validación interactiva de formato (3 a 5 tags en habilidades).
+    *   **Automatización de Pruebas:** Implementación de dos suites completas de pruebas unitarias (`tests/candidatos_etapa1.test.js` y `tests/candidatos_etapa2.test.js`) ejecutadas a través del runner nativo de Node.js.
 
 *   **18/07/2026:** Integración Definitiva con Backend Real (módulo **Postulantes**):
     *   **Remoción de Mocks:** Desconexión y eliminación absoluta de `mockCandidatos` y `useMockDB()` en `src/actions/candidatos.ts`.

@@ -17,6 +17,14 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false);
   
+  // New developer-defined optional fields
+  const [telefonoMovil, setTelefonoMovil] = useState("");
+  const [ubicacion, setUbicacion] = useState("");
+  const [skillsPrincipales, setSkillsPrincipales] = useState("");
+  const [nivelIngles, setNivelIngles] = useState("");
+  const [otrosIdiomas, setOtrosIdiomas] = useState("");
+  const [notasIniciales, setNotasIniciales] = useState("");
+
   // File upload state
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -116,6 +124,17 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
       return;
     }
 
+    if (skillsPrincipales.trim()) {
+      const tags = skillsPrincipales.split(",").map(t => t.trim()).filter(Boolean);
+      if (tags.length < 3 || tags.length > 5) {
+        setFeedback({
+          type: "error",
+          message: "Las habilidades principales deben ser entre 3 y 5 etiquetas separadas por comas (ej: React, Node, CSS)."
+        });
+        return;
+      }
+    }
+
     setFeedback(null);
 
     const formData = new FormData();
@@ -125,6 +144,13 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
     formData.append("linkedin_url", linkedinUrl);
     formData.append("acepta_privacidad", aceptaPrivacidad ? "true" : "false");
     formData.append("cv", file);
+
+    formData.append("telefono_movil", telefonoMovil);
+    formData.append("ubicacion", ubicacion);
+    formData.append("skills_principales", skillsPrincipales);
+    formData.append("nivel_ingles", nivelIngles);
+    formData.append("otros_idiomas", otrosIdiomas);
+    formData.append("notas_iniciales", notasIniciales);
 
     startTransition(async () => {
       try {
@@ -295,6 +321,104 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
             </button>
           </div>
         )}
+      </div>
+
+      {/* Información Detallada (Opcional) */}
+      <div className="pt-4 border-t border-white/5 space-y-4">
+        <p className="text-[10px] font-bold text-[#6bd8cb] tracking-wider uppercase text-left">Información Adicional (Opcional)</p>
+        
+        {/* Teléfono Móvil y Ubicación */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="relative">
+            <input
+              type="text"
+              value={telefonoMovil}
+              onChange={(e) => setTelefonoMovil(e.target.value)}
+              placeholder=" "
+              disabled={isPending}
+              className="peer w-full bg-white/5 border border-white/10 rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50"
+            />
+            <label className="absolute left-4 top-1.5 text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-[#879391] peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-[#6bd8cb]">
+              Teléfono Móvil
+            </label>
+          </div>
+
+          <div className="relative">
+            <input
+              type="text"
+              value={ubicacion}
+              onChange={(e) => setUbicacion(e.target.value)}
+              placeholder=" "
+              disabled={isPending}
+              className="peer w-full bg-white/5 border border-white/10 rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50"
+            />
+            <label className="absolute left-4 top-1.5 text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-[#879391] peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-[#6bd8cb]">
+              Ubicación
+            </label>
+          </div>
+        </div>
+
+        {/* Habilidades Principales (3-5 tags) */}
+        <div className="relative">
+          <input
+            type="text"
+            value={skillsPrincipales}
+            onChange={(e) => setSkillsPrincipales(e.target.value)}
+            placeholder=" "
+            disabled={isPending}
+            className="peer w-full bg-white/5 border border-white/10 rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50"
+          />
+          <label className="absolute left-4 top-1.5 text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-[#879391] peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-[#6bd8cb]">
+            Habilidades Clave (3-5 separadas por comas)
+          </label>
+          <span className="text-[9px] text-[#879391] mt-1 pl-1 block text-left">Ejemplo: React, Next.js, Node.js</span>
+        </div>
+
+        {/* Nivel de Inglés y Otros Idiomas */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="relative">
+            <input
+              type="text"
+              value={nivelIngles}
+              onChange={(e) => setNivelIngles(e.target.value)}
+              placeholder=" "
+              disabled={isPending}
+              className="peer w-full bg-white/5 border border-white/10 rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50"
+            />
+            <label className="absolute left-4 top-1.5 text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-[#879391] peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-[#6bd8cb]">
+              Nivel de Inglés
+            </label>
+          </div>
+
+          <div className="relative">
+            <input
+              type="text"
+              value={otrosIdiomas}
+              onChange={(e) => setOtrosIdiomas(e.target.value)}
+              placeholder=" "
+              disabled={isPending}
+              className="peer w-full bg-white/5 border border-white/10 rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50"
+            />
+            <label className="absolute left-4 top-1.5 text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-[#879391] peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-[#6bd8cb]">
+              Otros Idiomas
+            </label>
+          </div>
+        </div>
+
+        {/* Notas Iniciales */}
+        <div className="relative">
+          <textarea
+            value={notasIniciales}
+            onChange={(e) => setNotasIniciales(e.target.value)}
+            placeholder=" "
+            disabled={isPending}
+            rows={3}
+            className="peer w-full bg-white/5 border border-white/10 rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50 resize-y min-h-[70px]"
+          />
+          <label className="absolute left-4 top-1.5 text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-[#879391] peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-[#6bd8cb]">
+            Notas Iniciales de Reclutamiento
+          </label>
+        </div>
       </div>
 
       {/* Checkbox Aceptación LOPDGDD / RGPD */}

@@ -181,14 +181,9 @@ El módulo de **Postulantes** centraliza el ingreso y visualización de candidat
 ### ✨ Características Clave
 *   **Buscador Reactivo Integrado:** Barra de entrada en caliente que busca en tiempo real por el nombre del candidato, el cargo deseado o la dirección de email.
 *   **Clasificador de Fases:** Botonera superior de filtrado rápido por estados (`Todos`, `Pendiente`, `Revisado`, `Seleccionado`, `Descartado`).
-*   **Tarjetas de Candidatos (Glass Grid):** Cada ficha individual presenta información relevante en diseño premium:
-    *   **Identificador único:** ID correlativo (ej. `CAND-001`).
-    *   **Puesto e Información de contacto:** Cargo solicitado y dirección de email configurada como enlace directo `mailto:`.
-    *   **Enlaces externos:** Acceso directo al perfil de LinkedIn adjunto en nueva pestaña de navegación.
-    *   **Indicador Luminoso de Estado:** Burbuja con brillo radial animado según su fase.
-    *   **Control Fader de Selección:** Permite mutar / cambiar la fase del postulante en vivo con sliders responsivos rápidos (`Pen`, `Rev`, `Sel`, `Des`).
-    *   **Visualizador CV directo:** Botón con icono de documento para abrir el archivo PDF cargado del candidato en una pestaña nueva.
-    *   **Botón de Ficha ("Detalles"):** Redirección al panel del mezclador analítico IA de la ficha del postulante.
+*   **Selector de Modo de Visualización (Tarjetas / Lista):** Botón selector (toggle) ubicado en la barra de controles que permite alternar la vista entre:
+    *   **Vista de Tarjetas (Cards):** Grilla responsiva de tarjetas con fader integrado para mutar el estado y accesos de copia y detalles rápido.
+    *   **Vista de Lista (List):** Tabla de datos moderna basada en glassmorphism que sintetiza el ID, Candidato (nombre y email), Puesto, Ubicación, Habilidades clave (badges dinámicos) y fecha de creación, con acciones directas para ver CV, copiar perfil y abrir el panel de detalles (`Detalle`). La preferencia de vista se almacena localmente en `localStorage`.
 *   **Slide-over de Alta de Candidatos (Formulario):** Slide interactivo deslizable lateralmente para agregar un perfil manual:
     *   **Validación de Archivo CV:** Soporta Drag-and-Drop limitado exclusivamente a archivos `.pdf` con un tamaño máximo de `5MB`.
     *   **Consentimiento Legal Traceable:** Checkbox mandatorio (`acepta_privacidad`) para registrar la aceptación de términos de confidencialidad y RGPD.
@@ -210,15 +205,20 @@ Ficha Técnica:
 ```
 
 ### 💡 Descripción Funcional
-Muestra las calificaciones detalladas y perfil completo de un candidato específico mediante la metáfora visual premium de una consola de mezcla de audio DAW. Los aspectos del perfil son calificados en faders MIDI verticales analíticos.
+Muestra las calificaciones detalladas y perfil completo de un candidato específico mediante la metáfora visual premium de una consola de mezcla de audio DAW (faders MIDI de IA) combinada con una completa ficha técnica integral de habilidades, idiomas y contacto.
 
 ### ✨ Características Clave
 *   **Botón Retorno ("Volver a Postulantes"):** Navegación fluida e integrada con animación hacia el listado principal `/talento`.
-*   **Ecualizador de Calificaciones (Faders de IA):** Cuatro faders MIDI interactivos de volumen mezclador para visualizar de manera gráfica las métricas calculadas por inteligencia artificial:
-    1.  *Hard Skills* (Capacidad técnica y herramientas del perfil)
-    2.  *Soft Skills* (Competencias interpersonales y comunicación)
-    3.  *Fit Cultural* (Alineación con los valores de la empresa y cliente)
-    4.  *Seniority Index* (Nivel de experiencia y madurez profesional)
+*   **Ficha de Contacto Enriquecida (Panel Izquierdo):**
+    *   *Teléfono Móvil:* Muestra el número celular de contacto.
+    *   *Ubicación:* Ubicación física o regional configurada.
+*   **Panel Profesional e Idiomas (Panel Derecho):**
+    *   *Habilidades Clave:* Badges tipo Pill interactivos generados de forma dinámica a partir de la lista provista en `skills_principales`.
+    *   *Idiomas:* Tarjetas dedicadas para el nivel de inglés (`nivel_ingles`) y otros idiomas alternativos (`otros_idiomas`).
+    *   *Anotaciones:* Contenedor estilo bloc de notas con soporte multilínea para comentarios iniciales de reclutamiento (`notas_iniciales`).
+*   **Botón Copiar Resumen:** Botón interactivo que copia una ficha textual estructurada (incluyendo los nuevos datos de contacto, habilidades e idiomas) con un clic al portapapeles.
+*   **Ecualizador de Calificaciones (Faders de IA):** Cuatro faders MIDI interactivos de volumen mezclador para visualizar de manera gráfica las métricas calculadas por inteligencia artificial (Hard Skills, Soft Skills, Fit Cultural, y Seniority Index).
 *   **Acciones Directas:**
     *   *Ver CV Adjunto:* Botón interactivo para consultar el documento de currículum PDF persistido.
     *   *Descartar Postulante:* Botón de Soft Delete para cambiar de inmediato el estado del postulante a "Descartado" previniendo visualizaciones operativas ulteriores.
+    *   *Modo Edición Interactivo:* Permite conmutar la ficha a modo de edición para actualizar en caliente los campos mutables: Nombre Completo, Email, LinkedIn, Teléfono Móvil, Ubicación, Habilidades Clave (entre 3 y 5 separadas por comas), Inglés, Otros Idiomas, y Anotaciones, mientras se resguarda la inmutabilidad de metadatos históricos.

@@ -35,6 +35,13 @@ graph TD
 2.  **Consentimiento Legal Obligatorio (RGPD):** Para registrarse, el candidato debe aceptar de forma explícita las políticas de privacidad. El backend requiere que el parámetro `acepta_privacidad` sea exactamente `true`. Si no lo es, la postulación es denegada, garantizando la trazabilidad de auditorías legales en el ATS.
 3.  **Mecanismo Antihuerfanos (Consistencia Transaccional):** Al procesar un alta, primero se almacena el archivo binario del CV en Firebase Storage usando un identificador único (UUID). Inmediatamente después, se intentan escribir los datos del candidato en Firestore. Si la escritura en Firestore falla (por caída de red u otra anomalía), el servicio ejecuta un **Rollback automático**, borrando el archivo cargado en la nube. Esto asegura que no se acumulen archivos de currículum huérfanos que consuman espacio innecesario sin tener una ficha asociada en la base de datos.
 4.  **Enriquecimiento en Calidad y Analítica:** Cada candidato registrado exitosamente se inicializa por defecto con el estado de revisión `"pendiente"`. A través de BigQuery CDC (Firebase Extensions), la información se streamea de inmediato para analíticas de rendimiento de canales de captación.
+5.  **Campos Opcionales de Perfil Técnico y de Contacto:** Se incorporan 6 nuevos campos para robustecer la ficha de talentos:
+    *   `telefono_movil`: Teléfono personal móvil (opcional, admite null o vacío).
+    *   `ubicacion`: Dirección o ciudad y país (opcional, admite null o vacío).
+    *   `skills_principales`: Habilidades o tecnologías clave separadas por comas. Opcional, pero si se envía y posee caracteres no vacíos, se aplica una validación estricta que exige contener entre 3 y 5 etiquetas/habilidades.
+    *   `nivel_ingles`: Nivel del idioma inglés (opcional, texto libre sin nomenclaturas restrictivas).
+    *   `otros_idiomas`: Otros idiomas o dialectos que posee (opcional, admite null o vacío).
+    *   `notas_iniciales`: Texto libre para observaciones o apreciaciones preliminares sobre el candidato (opcional, admite null o vacío).
 
 ---
 
@@ -54,6 +61,7 @@ Para prevenir inconsistencias y mantener el legajo histórico legal inalterado, 
     *   `nombre_completo` y `email`: Permite corregir errores tipográficos de los candidatos en sus datos de contacto.
     *   `linkedin_url`: Para complementar el perfil del candidato.
     *   `estado_revision`: Propiedad operativa para avanzar postulantes en el proceso de reclutamiento.
+    *   `telefono_movil`, `ubicacion`, `skills_principales`, `nivel_ingles`, `otros_idiomas`, `notas_iniciales`: Nuevos campos de perfil y contacto que los reclutadores pueden ingresar o modificar de forma libre (respetando la regla de 3-5 tags para `skills_principales` si es provisto).
 *   **Campos Inmutables (Bloqueados):**
     *   `acepta_privacidad`: Inalterable. Impedimos que se modifique o anule el consentimiento histórico de privacidad ya firmado.
     *   `url_cv`: Protege al currículum original de ser alterado por terceros, previniendo inyecciones de archivos maliciosos.
@@ -90,9 +98,15 @@ A continuación se detallan los detalles de envío, autorización, parámetros y
     *   `cv` *(Archivo adjunto en binario; obligatorio)*: El documento CV en formatos PDF (preferente), DOC, o DOCX de hasta 5MB.
     *   `nombre_completo` *(Texto; obligatorio)*: Nombre y apellido del candidato.
     *   `email` *(Texto; obligatorio)*: Correo electrónico de comunicación.
-    *   `puesto_postulacion` *(Texto; obligatorio)*: Puesto deseado o área funcional básica.
+    *   `puesto_postulacion` *(Texto; opcional)*: Puesto deseado o área funcional básica.
     *   `linkedin_url` *(Texto; opcional)*: Enlace al perfil público de LinkedIn.
     *   `acepta_privacidad` *(Texto/Boolean; obligatorio)*: Debe enviarse en valor `'true'`.
+    *   `telefono_movil` *(Texto; opcional)*: Número móvil.
+    *   `ubicacion` *(Texto; opcional)*: Dirección o ciudad/país.
+    *   `skills_principales` *(Texto; opcional)*: 3 a 5 tecnologías clave separadas por comas.
+    *   `nivel_ingles` *(Texto; opcional)*: Nivel del idioma inglés.
+    *   `otros_idiomas` *(Texto; opcional)*: Otros idiomas del candidato.
+    *   `notas_iniciales` *(Texto; opcional)*: Anotaciones de reclutamiento preliminares.
 *   **Códigos de Respuesta:**
     *   `201 Created`: Postulación y archivo CV persistidos con éxito.
     *   `400 Bad Request`: Parámetro requerido ausente, falta aceptación de privacidad, o formato incompatibles/tamaño excedido del archivo adjunto.
@@ -110,10 +124,20 @@ A continuación se detallan los detalles de envío, autorización, parámetros y
     ```json
     {
       "status": "success",
-      "message": "Postulación registrada exitosamente.",
+      "message": "Postulación registrada con éxito en todos los sistemas.",
       "data": {
         "id": "e44c2079-c5c8-4a92-bf32-90177dfc8aa0",
-        "url_cv": "gs://azul-ats-1.firebasestorage.app/cvs/e44c2079-c5c8-4a92-bf32-90177dfc8aa0_curriculum.pdf"
+        "nombre_completo": "Andrea Soler",
+        "email": "andrea.soler@domain.com",
+        "puesto_postulacion": "Product Owner",
+        "url_cv": "gs://azul-ats-1.firebasestorage.app/cvs/e44c2079-c5c8-4a92-bf32-90177dfc8aa0_curriculum.pdf",
+        "estado_revision": "pendiente",
+        "telefono_movil": "+34666555444",
+        "ubicacion": "Madrid, España",
+        "skills_principales": "Product Management, Scrum, Agile",
+        "nivel_ingles": "C1 Advanced",
+        "otros_idiomas": "Francés (Medio)",
+        "notas_iniciales": "Contacto inicial positivo en evento de empleo."
       }
     }
     ```
@@ -168,6 +192,12 @@ A continuación se detallan los detalles de envío, autorización, parámetros y
     *   `email` *(Texto; opcional)*
     *   `linkedin_url` *(Texto; opcional)*
     *   `estado_revision` *(Texto; opcional)*: Admite `"Revisado"` o `"Descartado"`.
+    *   `telefono_movil` *(Texto; opcional)*
+    *   `ubicacion` *(Texto; opcional)*
+    *   `skills_principales` *(Texto; opcional)*: Lista con validación estricta de 3 a 5 habilidades separadas por comas.
+    *   `nivel_ingles` *(Texto; opcional)*
+    *   `otros_idiomas` *(Texto; opcional)*
+    *   `notas_iniciales` *(Texto; opcional)*
 *   **Campos inmutables bloqueados (Generarán HTTP 400 si se incluyen):**
     *   `acepta_privacidad`, `url_cv`, `origen`, `createdAt`, e `id`.
 *   **Códigos de Respuesta:**
