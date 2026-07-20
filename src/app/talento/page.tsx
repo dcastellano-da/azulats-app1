@@ -27,10 +27,12 @@ import {
   Check,
   LayoutGrid,
   List,
-  Compass
+  Compass,
+  Sparkles
 } from "lucide-react";
 import SlideOver from "../components/SlideOver";
 import CandidatoForm from "../components/CandidatoForm";
+import ImportarIaModal from "../components/ImportarIaModal";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 
 export default function TalentoPage() {
@@ -62,10 +64,25 @@ export default function TalentoPage() {
   // Slide Over state
   const [isSlideOpen, setIsSlideOpen] = useState(false);
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
+
+  // Importar con IA Modal state & toast feedback
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   
   // Transitions
   const [isPending, startTransition] = useTransition();
   const [errorFeedback, setErrorFeedback] = useState<string | null>(null);
+
+  const handleImportSuccess = (nombreCompleto: string) => {
+    setIsImportModalOpen(false);
+    setToast({
+      type: "success",
+      message: `Candidato ${nombreCompleto} importado con éxito`
+    });
+    setTimeout(() => setToast(null), 5000);
+    // Re-fetch list
+    loadCandidatos();
+  };
 
   // Client-side authentication protection
   useEffect(() => {
@@ -280,6 +297,14 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
             </Link>
 
             <div className="h-6 w-[1px] bg-white/10 mx-1 hidden md:block"></div>
+
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-xs font-bold text-[#101415] bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 hover:glow-btn transition-all shadow-md shadow-[#0d9488]/15 cursor-pointer"
+            >
+              <Sparkles className="w-4.5 h-4.5" />
+              <span>Importar con IA</span>
+            </button>
 
             <button
               onClick={() => setIsSlideOpen(true)}
@@ -664,6 +689,21 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
           onSubmittingChange={(submitting) => setIsSubmittingForm(submitting)}
         />
       </SlideOver>
+
+      {/* Importar con IA Modal */}
+      <ImportarIaModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={handleImportSuccess}
+      />
+
+      {/* Floating success toast notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-4 bg-[#161b1d]/90 border border-emerald-500/30 text-emerald-400 rounded-2xl text-xs font-bold shadow-2xl backdrop-blur-md animate-fade-in transition-all">
+          <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
+          <span>{toast.message}</span>
+        </div>
+      )}
     </div>
   );
 }

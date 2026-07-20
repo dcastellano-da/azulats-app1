@@ -402,3 +402,73 @@ export async function eliminarCandidatoAPI(id: string, hardDelete: boolean): Pro
     };
   }
 }
+
+/**
+ * Server Action: Importación asistida por Inteligencia Artificial (Genkit + Vertex AI).
+ * POST /api/v1/candidatos/importar-ia
+ */
+export async function importarCandidatoIA_API(formData: FormData): Promise<APIResponse> {
+  try {
+    const token = await getServerAuthToken();
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiBaseUrl) {
+      return {
+        status: 500,
+        success: false,
+        message: "Error de configuración: NEXT_PUBLIC_API_URL no está definido."
+      };
+    }
+
+    const cvFile = formData.get("cv");
+    if (!cvFile) {
+      return {
+        status: 400,
+        success: false,
+        message: "Debe cargar un currículum (archivo PDF, DOC o DOCX)."
+      };
+    }
+
+    const url = `${apiBaseUrl}/api/v1/candidatos/importar-ia`;
+    console.log(`[Candidatos Action] POST (Importar IA) a: ${url}`);
+    
+    const apiFormData = new FormData();
+    apiFormData.append("cv", cvFile);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+      body: apiFormData
+    });
+
+    const status = response.status;
+    let result: any = null;
+    try {
+      result = await response.json();
+    } catch (_) {}
+
+    if (status === 201 || status === 200) {
+      return {
+        status,
+        success: true,
+        message: "Candidato importado y procesado por IA correctamente.",
+        data: result?.data
+      };
+    }
+
+    return {
+      status,
+      success: false,
+      message: result?.message || result?.error || `Error al importar candidato con IA (Código ${status}).`,
+    };
+  } catch (error: any) {
+    console.error("[Candidatos Action] Error en importarCandidatoIA_API:", error);
+    return {
+      status: 500,
+      success: false,
+      message: `Error de red al conectar con el backend: ${error.message || error}`
+    };
+  }
+}
+

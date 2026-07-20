@@ -115,6 +115,7 @@ El **Talent Mixer** proporciona la bandeja de entrada inteligente para centraliz
 *   **Bandeja Principal (/talento):** Listado responsivo en formato de tarjetas con indicadores de burbuja de luz led reactivos según el estado. Cuenta con buscador en caliente y barra de clasificación por fase.
 *   **Consola DAW (Faders de Calificación IA):** Faders de ecualización analógicos simulados e interactivos dentro de la ficha de detalle (`/talento/[id]`) para calificar en caliente los scores de *Hard Skills*, *Soft Skills*, *Fit Cultural* y *Seniority Index*.
 *   **Slide-over de Alta de Candidato:** Formulario con etiquetas flotantes dinámicas, Drag-and-drop de archivos PDF, control estricto de consentimiento legal y captura inteligente para alertas de error `400 Bad Request` del servidor.
+*   **Importación Asistida por IA:** Popup glassmórfico de importación con zona Drag & Drop compatible con formatos `.pdf`, `.doc` y `.docx` (máx 5MB). Realiza la llamada asíncrona a `POST /api/v1/candidatos/importar-ia` del backend, bloquea la interfaz durante la inferencia y muestra una notificación de éxito reactiva con autorefresco de la base de candidatos tras su creación (201).
 
 ### Módulo G: F1 Descubrimiento (Atracción & Sourcing inicial)
 El **F1 Descubrimiento** brinda a los reclutadores el tablero maestro de sourcing potenciado por inteligencia artificial para detectar y evaluar candidatos.
@@ -160,6 +161,11 @@ git push origin main
 
 -------------------------------------------------------------------------------------------------
 ### Log de Cambios
+
+*   **20/07/2026:** Integración de la Importación Asistida por IA (Módulo Postulantes):
+    *   **Server Actions Ampliadas:** Incorporación de la Server Action `importarCandidatoIA_API(formData)` en `src/actions/candidatos.ts` para gestionar el enlace asíncrono y seguro con el endpoint `POST /api/v1/candidatos/importar-ia` inyectando JWT.
+    *   **Popup de Importación Conectado (`ImportarIaModal.tsx`):** Desarrollo del modal de importación premium con soporte exclusivo para archivos `.pdf`, `.doc` y `.docx` hasta 5MB. Implementa una interfaz de bloqueo visual (blocker overlay) y spinner animado para salvaguardar la sincronización y la experiencia de usuario.
+    *   **Acceso e Interactividad Refrescada (`/talento`):** Botón "✨ Importar con IA" junto al botón de registro manual, con notificación de éxito verde conteniendo el nombre extraído del candidato por IA e invocación reactiva a la carga de datos (`loadCandidatos()`).
 
 *   **20/07/2026:** Integración de Fase 2 (Detalles) y Fase 3 (Integración de Gemini AI Live) en Módulo F1 Descubrimiento:
     *   **Página Detallada de Candidato (/descubrimiento/[id]):** Creación de la vista premium en profundidad, persistencia y sincronización dinámica mediante `localStorage`, modal integrado de edición de campos y transiciones rápidas del pipeline de reclutamiento.

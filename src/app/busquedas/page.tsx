@@ -227,6 +227,9 @@ export default function BusquedasPage() {
               className="bg-transparent border-0 text-white outline-none w-full cursor-pointer text-xs font-bold"
             >
               <option value="Todos" className="bg-[#101415] text-white">Todos los Estados</option>
+              <option value="Abierta" className="bg-[#101415] text-[#6bd8cb]">Abierta</option>
+              <option value="Pausada" className="bg-[#101415] text-amber-500">Pausada</option>
+              <option value="Cerrada" className="bg-[#101415] text-[#879391]">Cerrada</option>
               <option value="preparacion_previa" className="bg-[#101415] text-[#6bd8cb]">Preparación Previa</option>
               <option value="evaluacion_tecnica" className="bg-[#101415] text-amber-500">Evaluación Técnica</option>
               <option value="revision_cliente" className="bg-[#101415] text-purple-400">Revisión de Cliente</option>
@@ -312,10 +315,10 @@ export default function BusquedasPage() {
                       </td>
                       <td className="py-4 px-6 text-center">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-bold capitalize ${
-                          item.estado_fase === "preparacion_previa" ? "bg-[#6bd8cb]/10 text-[#6bd8cb] border border-[#6bd8cb]/20" :
-                          item.estado_fase === "evaluacion_tecnica" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                          item.estado_fase === "preparacion_previa" || item.estado_fase === "Abierta" || item.estado_fase === "abierta" ? "bg-[#6bd8cb]/10 text-[#6bd8cb] border border-[#6bd8cb]/20" :
+                          item.estado_fase === "evaluacion_tecnica" || item.estado_fase === "Pausada" || item.estado_fase === "pausada" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
                           item.estado_fase === "revision_cliente" ? "bg-purple-500/10 text-purple-400 border border-purple-500/20" :
-                          item.estado_fase === "oferta_cierre" ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" :
+                          item.estado_fase === "oferta_cierre" || item.estado_fase === "Cerrada" || item.estado_fase === "cerrada" ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" :
                           "bg-white/5 text-[#879391] border border-white/10"
                         }`}>
                           {(item.estado_fase || "").replace("_", " ")}
