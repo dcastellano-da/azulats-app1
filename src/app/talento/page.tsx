@@ -26,7 +26,8 @@ import {
   Copy,
   Check,
   LayoutGrid,
-  List
+  List,
+  Compass
 } from "lucide-react";
 import SlideOver from "../components/SlideOver";
 import CandidatoForm from "../components/CandidatoForm";
@@ -245,6 +246,14 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
             </Link>
 
             <Link
+              href="/descubrimiento"
+              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
+            >
+              <Compass className="w-4 h-4" />
+              <span>F1 Descubrimiento</span>
+            </Link>
+
+            <Link
               href="/busquedas"
               className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#6bd8cb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
             >
@@ -252,6 +261,7 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
               <span>Búsquedas</span>
             </Link>
 
+            {/*
             <Link
               href="/reclutamiento"
               className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-amber-400 hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
@@ -259,6 +269,7 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
               <Users className="w-4 h-4" />
               <span>Reclutamiento</span>
             </Link>
+            */}
 
             <Link
               href="/configuracion"

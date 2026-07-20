@@ -116,6 +116,18 @@ El **Talent Mixer** proporciona la bandeja de entrada inteligente para centraliz
 *   **Consola DAW (Faders de Calificación IA):** Faders de ecualización analógicos simulados e interactivos dentro de la ficha de detalle (`/talento/[id]`) para calificar en caliente los scores de *Hard Skills*, *Soft Skills*, *Fit Cultural* y *Seniority Index*.
 *   **Slide-over de Alta de Candidato:** Formulario con etiquetas flotantes dinámicas, Drag-and-drop de archivos PDF, control estricto de consentimiento legal y captura inteligente para alertas de error `400 Bad Request` del servidor.
 
+### Módulo G: F1 Descubrimiento (Atracción & Sourcing inicial)
+El **F1 Descubrimiento** brinda a los reclutadores el tablero maestro de sourcing potenciado por inteligencia artificial para detectar y evaluar candidatos.
+*   **Estructuración Kanban Estricta:** Pipeline clasificado en 4 columnas de progresión (`01 - Nuevo (Para Revisión)`, `02 - Contactado (En Espera)`, `03 - Bloqueado / Pendiente` y `04 - Rechazado en Fase Inicial`).
+*   **Métricas de Funnel Temprano:** KPI cards en cabecera para *TTFME* (Time to First Meaningful Engagement con fórmulas interactivas de cálculo en overlay manual `?`), índice de personalización A/B, tasa de rechazo temprano, y volumen total.
+*   **Vista de Lista Detallada con Ordenamiento:** Tabla responsiva de tipo glassmorphism con ordenamiento interactivo ascendente/descendente en todas sus cabeceras clave (excepto acciones) y un panel lateral con indicador de filtro de estado adicional.
+*   **Maximizado (Pantalla Completa):** Botón interactivo para maximizar la región operativa del headlining y tablero de búsqueda, ocultando las barras y KPIs globales para potenciar la visibilidad del reclutador, y conmutando automáticamente al modo "Salir".
+*   **Ficha Premium de Postulante (/descubrimiento/[id]):** Sección de detalles en profundidad, autocompletado y edición sincrónica persistiendo en `localStorage` con botón 'Detalles' para visualización técnica en profundidad.
+*   **Integración Gemini AI Sourcing (Live vs Mock):**
+  - *Motor de Matching Semántico*: Analiza con la API de Google Gemini (1.5 Flash) el CV y puesto mostrando un Fit score (%), fortalezas, debilidades e instrucciones detalladas con indicador específico de fuente (`✨ GEMINI LIVE` vs `📋 MOCK`).
+  - *Redacción de Outreach con Inteligencia Artificial*: Genera mensajes adaptados al perfil del candidato y permite A/B testing reescribiendo variantes A y B dinámicamente con IA.
+  - *Sourcing Avanzado Booleano & X-Ray*: Generador de cadenas booleanas y strings premium de X-Ray (LinkedIn / Google) con auto-fill de plantillas (e.g. Rust Architect, UX Designer) e importación simulada directa al backlog del kanban, indicando si proviene de Gemini o Mock.
+
 ---
 
 ## Ejecución del Servidor Local and Tests
@@ -139,8 +151,23 @@ El **Talent Mixer** proporciona la bandeja de entrada inteligente para centraliz
 5.  Abre [http://localhost:3000](http://localhost:3000) en el navegador.
 
 ---
+## Despliegue en hosting Pruebas de Firebase
+```bash
+git add .   
+git commit -m "Texto del cambio" 
+git push origin main
+```
 
-## Log de Cambios
+-------------------------------------------------------------------------------------------------
+### Log de Cambios
+
+*   **20/07/2026:** Integración de Fase 2 (Detalles) y Fase 3 (Integración de Gemini AI Live) en Módulo F1 Descubrimiento:
+    *   **Página Detallada de Candidato (/descubrimiento/[id]):** Creación de la vista premium en profundidad, persistencia y sincronización dinámica mediante `localStorage`, modal integrado de edición de campos y transiciones rápidas del pipeline de reclutamiento.
+    *   **Servicios Live de Google Gemini (1.5 Flash):** Implementación del módulo asíncrono centralizado en `src/lib/gemini.ts` con llamada HTTP de producción a la API y resiliencia auto-failover hacia mocks locales en fallas de API Key o red.
+    *   **Motor de Matching Semántico Integrado:** Incorporación del bot de análisis semántico del CV contra vacantes en las vistas de board y detalles, con clasificación de puntos clave (fortalezas, debilidades, recomendaciones) y visualización del tipo de origen (`✨ GEMINI LIVE` / `📋 MOCK`).
+    *   **Redactor de Outreach Personalizado & A/B Tests:** Generación asíncrona de invitaciones específicas mediante IA integradas con el conmutador de variantes A y B en la pantalla detallada.
+    *   **Constructor de Búsquedas Booleanas:** Generador inteligente de cadenas avanzadas booleanas y X-Ray, con autocompletado de presets, simulación directa de candidatos mapeados, y visualización de origen del dato en tiempo real.
+    *   **Optimización de Tipado del Proyecto:** Limpieza y modularización de la interfaz `SemanticMatchResult` para unificar el retorno de datos entre vistas y gemini hooks, logrando una compilación modular sin fallos en Next.js.
 
 *   **20/07/2026:** Integración de Nuevos Campos de Candidato, Modo Edición y Vista de Lista Alternable (Etapas 1 y 2):
     *   **Mapeo de Datos & Inmutabilidad:** Modificación del server action `getCandidatosAPI` en `src/actions/candidatos.ts` para mapear de manera robusta los 6 campos adicionales (`telefono_movil`, `ubicacion`, `skills_principales`, `nivel_ingles`, `otros_idiomas` y `notas_iniciales`). Actualización de `actualizarCandidatoAPI` para implantar protección sobre metadatos históricos inmutables.

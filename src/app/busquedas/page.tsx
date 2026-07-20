@@ -17,7 +17,8 @@ import {
   LayoutDashboard,
   AlertCircle,
   Contact,
-  Settings
+  Settings,
+  Compass
 } from "lucide-react";
 import SlideOver from "../components/SlideOver";
 import SearchForm from "../components/SearchForm";
@@ -154,12 +155,22 @@ export default function BusquedasPage() {
             </Link>
 
             <Link
+              href="/descubrimiento"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-[#c4c1fb] border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
+            >
+              <Compass className="w-4 h-4" />
+              <span>F1 Descubrimiento</span>
+            </Link>
+
+            {/*
+            <Link
               href="/reclutamiento"
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-amber-400 border border-white/10 bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
             >
               <Users className="w-4 h-4" />
               <span>Reclutamiento</span>
             </Link>
+            */}
 
             <Link
               href="/talento"

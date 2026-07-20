@@ -1,0 +1,261 @@
+--- PAGE 1 ---
+ Candidatos (vincular Postulantes con Búsquedas) 
+ Cómo conectar ambas entidades (La magia del sistema) 
+ Cuando un candidato de tu  "Talent Pool"  (la hoja anterior)  pasa a ser considerado para una 
+ búsqueda específica de esta nueva hoja, no debes duplicar sus datos. 
+ Lo ideal es crear una  tercera hoja puente  llamada  "Pipeline de Entrevistas" (o Funnel)  . Esa 
+ hoja solo necesita tres datos clave para empezar: 
+ 1.  ID_Busqueda  (De esta hoja) 
+ 2.  ID_Candidato  (De la primera hoja) 
+ 3.  Estado_Proceso  (Ej:  Enviado a Cliente, Entrevista Técnica, Oferta, Rechazado  ). 
+ Con esta arquitectura de tres tablas (Candidatos > Proceso < Búsquedas), tendrás la base 
+ perfecta para luego migrar a cualquier sistema ATS (Applicant Tracking System) profesional 
+ cuando tu volumen de clientes crezca. 
+ Nombre de este proceso 
+ En el mundo corporativo actual, y muy especialmente en los ecosistemas ágiles y de 
+ tecnología, los anglicismos dominan el vocabulario. Al igual que en la arquitectura de software 
+ se diseña un  pipeline  de despliegue para mover código  por distintas fases, en la adquisición de 
+ talento se usa exactamente el mismo concepto para mover personas a través del proceso de 
+ contratación. 
+ Mantener estos nombres es una práctica estándar, pero aquí te detallo la diferencia técnica 
+ entre ambos y sus equivalentes directos, por si prefieres una nomenclatura 100% en español: 
+ ●  Pipeline (Flujo de Entrevistas / Proceso de Selección):  Hace referencia a las etapas 
+ secuenciales por las que avanza una persona. Se centra en el "movimiento" y en saber 
+ en qué paso exacto se encuentra el candidato. 
+ ●  Funnel (Embudo de Reclutamiento / Embudo de Conversión):  Se enfoca en el 
+ volumen y las métricas. Ilustra visualmente cómo entran 100 perfiles por la parte ancha 
+ del embudo, 15 llegan a la evaluación técnica y solo 1 sale contratado por la parte 
+ estrecha. 
+ Si tu objetivo operativo es hacer un seguimiento diario de dónde está cada persona,  "Pipeline 
+ de Entrevistas"  (o simplemente  "Pipeline"  ) es el término  más preciso, profesional y 
+ universalmente comprendido en el rubro. 
+ Si te inclinas por evitar el anglicismo, las mejores alternativas en español serían  "Flujo de 
+ Entrevistas"  o  "Seguimiento de Candidaturas"  . 
+ ¿Te gustaría que definamos cuáles deberían ser las columnas exactas (las etapas del proceso) 
+ para estructurar esta tercera hoja y dejar el sistema conectado? 
+ Pag.  4 --- PAGE 2 ---
+ Estructura de Columnas Recomendada 
+ Pensando en la arquitectura de los datos, esta hoja funciona exactamente como una  tabla 
+ relacional  que une dos entidades principales (los  candidatos y las vacantes). Además, en el 
+ día a día, actuará como tu tablero de control, muy similar a un flujo de estados por el que 
+ avanza un elemento hasta llegar a su "Done" (la contratación). 
+ Aquí tienes la estructura ideal para la hoja  "Pipeline de Entrevistas"  : 
+ Categoría  Nombre de la Columna  Descripción / Formato Sugerido 
+ Claves de 
+ Conexión 
+ ID_Pipeline  (Opcional) Un código único para este 
+ registro específico. 
+ ID_Busqueda  El código de la vacante (ej. REQ-001) 
+ que traes del Master de Búsquedas. 
+ ID_Candidato  El código del postulante que traes del 
+ Master de Talento. 
+ Pag.  5 --- PAGE 3 ---
+ Flujo 
+ (Workflow) 
+ Estado_Actual  Columna crítica.  Debe ser una lista 
+ desplegable estricta. Sugerencia de 
+ estados: 
+ 1.  Screening  (Evaluación inicial) 
+ 2.  Enviado al Cliente 
+ 3.  Entrevista Técnica 
+ 4.  Oferta Extendida 
+ 5.  Contratado (Won) 
+ 6.  Rechazado (Lost) 
+ Fecha_Ultimo_Cambio  Cuándo fue la última vez que el 
+ candidato cambió de estado. Vital para 
+ medir si alguien se quedó "estancado" 
+ en un paso. 
+ Evaluación  Puntaje_Tecnico  Una calificación simple (ej. 1 a 5) que 
+ deja el entrevistador o líder técnico. 
+ Feedback_Cliente  Notas breves sobre por qué avanzó o 
+ por qué fue rechazado. 
+ Cierre  Fecha_Cierre  Fecha en la que se define el final del 
+ proceso (sea contratación o rechazo). 
+ Sirve para medir el  Time-to-Fill  (tiempo 
+ para cubrir la vacante). 
+ Motivo_Rechazo  Si el estado es "Rechazado", elegir de 
+ una lista:  Presupuesto, Falta de Skills 
+ Técnicos, Nivel de Inglés, Cultura, 
+ Oferta Declinada. 
+ Pag.  6 --- PAGE 4 ---
+ ¿Por qué esta estructura es tan eficiente? 
+ 1.  Evita la duplicación:  No tienes que volver a escribir el teléfono, el perfil de LinkedIn ni 
+ el sueldo pretendido del candidato. Esa información ya vive en su hoja maestra. Aquí 
+ solo gestionas  el evento  (su participación en una  búsqueda particular). 
+ 2.  Permite métricas inmediatas:  Al tener estados claros y motivos de rechazo 
+ categorizados, podrás ver rápidamente si hay cuellos de botella (por ejemplo, si muchos 
+ candidatos están rebotando en la "Entrevista Técnica" o por "Presupuesto", te da 
+ argumentos para ir a hablar con tu cliente y ajustar la estrategia). 
+ 3.  Escalabilidad:  Si en el futuro necesitas mapear esto  hacia un software o armar un 
+ tablero visual donde muevas tarjetas por columnas, la estructura de datos ya es 
+ perfectamente compatible. 
+ Fases del proceso: 
+ Tener un flujo de estados (workflow) bien granulado es clave para que no se te acumulen 
+ candidatos en un "limbo" y para que sepas exactamente dónde está el cuello de botella. 
+ Dividimos el proceso en 4 fases bien diferenciadas, cada una con gestión y funcionalidades 
+ bien definidas. 
+ ●  Fase 1: Descubrimiento y Contacto Inicial 
+ ●  Fase 2: Evaluación Interna (Filtro de la Agencia) 
+ ●  Fase 3: Presentación y Evaluación del Cliente 
+ ●  Fase 4: Cierre del Proceso 
+ Dentro de cada fase, es muy útil estructurar sus estados como si fueran las columnas de un 
+ tablero Kanban, donde cada candidato avanza por distintos estados y puede quedar bloqueado 
+ por una dependencia (como la falta de información). 
+ Nombres de los estados: 
+ Si configuras estos 13 estados en una lista desplegable (Data Validation) dentro de tu columna 
+ Estado_Actual, te sugiero anteponerles el número (ej. "07 - Enviado a Cliente"). 
+ Esto te permitirá que, al ordenar o filtrar la hoja de cálculo, el ordenamiento alfabético siga 
+ perfectamente la secuencia lógica del flujo temporal, facilitando muchísimo la lectura rápida de 
+ cuántas personas tienes cerca de la línea de meta. 
+ Métricas de las fases: 
+ Pensar en el reclutamiento con una mentalidad ágil significa dejar de lado las métricas de 
+ vanidad tradicionales de recursos humanos. Al igual que al gestionar el  cycle time  de un 
+ proyecto de desarrollo o al validar que los puntos de estimación de un  backlog  coincidan 
+ exactamente con el esfuerzo real del equipo, tu embudo de talento necesita indicadores 
+ Pag.  7 --- PAGE 5 ---
+ precisos que expongan los bloqueos sin deshumanizar a la persona que está del otro lado de la 
+ pantalla. 
+ Pag.  8 --- PAGE 6 ---
+ Fase 1: Descubrimiento y Contacto Inicial 
+ Estados de candidatos en la fase 
+ ●  01 - Nuevo (Para Revisión):  El candidato fue asociado  a la vacante, pero aún nadie de 
+ tu equipo ha mirado el CV en detalle ni lo ha contactado. Es tu  backlog  inicial. 
+ ●  02 - Contactado (Esperando Respuesta):  Le enviaste  un mensaje (por correo o 
+ LinkedIn) contándole sobre la oportunidad, pero aún no hay respuesta. 
+ ●  03 - Bloqueado / Datos Pendientes:  ¡Este es el estado  que mencionas! El candidato 
+ respondió y hay interés, pero el proceso no puede avanzar por una dependencia 
+ externa: falta que envíe el CV actualizado, no completó sus pretensiones salariales, o 
+ estamos esperando que confirme su nivel de idioma. 
+ Desglose técnico de la fase 
+ Esta etapa es la cima del embudo (Top of the Funnel). El objetivo es atraer y capturar el interés 
+ del talento adecuado, minimizando el ruido y maximizando la conversión. 
+ ●  Nombres Técnicos:  Sourcing  (Búsqueda pasiva),  Inbound/Outbound  Recruiting  ,  Top of 
+ the Funnel (ToFu) Management  . 
+ ●  Acciones del Reclutador Experimentado: 
+ ○  Diseño de Búsquedas Booleanas y X-Ray:  No depender  solo del buscador 
+ básico de LinkedIn, sino usar operadores lógicos avanzados para rastrear 
+ repositorios, foros o listados de asistentes a conferencias. 
+ ○  A/B Testing en Mensajes (Outreach):  Enviar diferentes  variantes de mensajes 
+ de contacto para medir cuál tiene mejor tasa de respuesta. 
+ ○  Calificación Temprana de Dependencias:  Identificar  rápidamente los 
+ "bloqueadores" (como expectativas salariales fuera de rango o necesidad de 
+ visados) en el primer intercambio de mensajes. 
+ ●  Metodologías: 
+ ○  Sourcing Sprints:  Dedicar bloques de tiempo exclusivos  (ej. 2 horas) a buscar e 
+ identificar candidatos sin distracciones, enfocándose en la velocidad de armado 
+ del  backlog  inicial. 
+ ○  Candidate Persona:  Mapeo previo del perfil ideal,  entendiendo no solo sus 
+ skills  técnicos, sino qué lo motiva a cambiar de empleo. 
+ ●  Herramientas Avanzadas: 
+ ○  Extensiones de contacto (Lusha, Apollo, ContactOut) para obtener emails 
+ directos. 
+ ○  Plataformas específicas del nicho (GitHub o StackOverflow si buscas perfiles 
+ técnicos). 
+ ●  Métricas Clave:  Response Rate  (Tasa de respuesta a  mensajes en frío),  Time to 
+ Sourcing  (Tiempo hasta encontrar los primeros perfiles válidos). 
+ Pag.  9 --- PAGE 7 ---
+ Métricas de la fase 
+ En esta etapa, el foco ágil está en la tracción temprana y en refinar el  backlog  de talento. 
+ Tipo de 
+ Métrica 
+ Nombre del Indicador  Descripción y Enfoque Humano 
+ Velocidad  Time-to-First-Meanin 
+ gful-Engagement 
+ (TTFME) 
+ Mide el tiempo exacto (en horas o días) 
+ desde que la búsqueda entra en  Sprint  hasta 
+ que un candidato no solo responde, sino que 
+ entabla una conversación bidireccional sobre 
+ la vacante. Castiga el  spam  masivo y premia 
+ la segmentación aguda. 
+ Calidad  Índice de 
+ Personalización 
+ (Hyper-Personalizatio 
+ n Ratio) 
+ Compara la tasa de respuesta de los 
+ mensajes generados por plantillas 
+ automáticas versus aquellos donde el 
+ reclutador incluyó un dato específico del 
+ portfolio, repositorio o trayectoria del 
+ candidato. Valida que el uso de herramientas 
+ de automatización no esté matando el interés 
+ genuino. 
+ Diseñar sin límites de presupuesto o capacidad técnica nos permite pensar en la adquisición de 
+ talento no como un proceso administrativo, sino como una obra de arquitectura de software 
+ predictiva. Si contara con un equipo de desarrollo avanzado, inteligencia artificial y analítica de 
+ datos, estas son las herramientas (Epics) que construiría para potenciar a los reclutadores, 
+ diseñadas para automatizar el trabajo transaccional y elevar el trato humano. 
+ Herramientas tecnológicas de la fase 
+ En esta fase, la prioridad es encontrar la señal dentro del ruido. La tecnología debe anticiparse 
+ a la necesidad del candidato antes de que este actualice su perfil. 
+ ●  Herramienta: "Radar Predictivo de Fuga y Grafo de Conocimiento" 
+ Pag.  10 --- PAGE 8 ---
+ ○  Funcionalidad:  Un algoritmo que no busca palabras clave en LinkedIn, sino que 
+ escanea repositorios (GitHub), contribuciones  open-source  ,  foros técnicos y 
+ publicaciones. El sistema predice qué profesionales están a punto de buscar un 
+ cambio basándose en la madurez de sus proyectos actuales o cambios en el 
+ liderazgo de sus empresas. 
+ ○  El Toque Humano (IA):  Un motor de NLP (Procesamiento  de Lenguaje Natural) 
+ que analice la huella digital del candidato para comprender su lenguaje 
+ subyacente y motivaciones profundas, logrando descifrar su estilo de 
+ comunicación casi como si tratara de entender un idioma no lineal. Con esto, la 
+ IA redacta sugerencias de mensajes radicalmente empáticos y personalizados. 
+ ○  Prioridad:  Alta.  Quien llega primero al talento pasivo  y con el mensaje correcto, 
+ domina el mercado. 
+ Otras herramientas operativas 
+ Objetivo de las herramientas: Captura de datos estructurada, eliminación de tareas manuales y 
+ perfilado rápido. 
+ Solución 
+ Operativa 
+ Arquitectura y Funcionalidad  Impacto en el Día a 
+ Día 
+ 1. Ingesta 
+ Inteligente de 
+ CVs (Parser LLM) 
+ Un sistema de extracción (OCR + 
+ LLM) que lee el PDF o Word, lo 
+ convierte a formato JSON y 
+ autocompleta instantáneamente las 
+ columnas de tu hoja de "Talent Pool". 
+ Elimina el 100% del 
+ data entry  manual al 
+ recibir postulaciones de 
+ cualquier fuente. 
+ 2. Motor de 
+ Matching 
+ Semántico 
+ Una base de datos vectorial que 
+ compara semánticamente el perfil del 
+ candidato contra la vacante y asigna 
+ un porcentaje de afinidad real, 
+ entendiendo conceptos y no solo 
+ palabras clave. 
+ Permite ordenar tu 
+ pipeline  inicial en 
+ segundos y saber a 
+ quién llamar primero. 
+ Pag.  11 --- PAGE 9 ---
+ 3. Bot de  Triage 
+ Multicanal 
+ Un asistente integrado a WhatsApp o 
+ correo que contacta al candidato para 
+ validar un dato crítico faltante (ej. 
+ expectativa salarial, modalidad de 
+ trabajo) antes de avanzar. 
+ Libera tu calendario de 
+ llamadas improductivas 
+ con talento fuera de 
+ rango. 
+ 4. Enriquecedor 
+ de Huella Digital 
+ Un  script  automatizado que toma el 
+ email o nombre y rastrea GitHub, 
+ portafolios públicos y foros, 
+ adjuntando los enlaces a la ficha del 
+ postulante. 
+ Centraliza la 
+ información externa del 
+ candidato sin perder 
+ tiempo navegando 
+ perfiles cruzados. 
+ Pag.  12 

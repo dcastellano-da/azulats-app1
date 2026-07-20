@@ -15,6 +15,8 @@ Las imágenes correspondientes de cada pantalla han sido guardadas en esta misma
 6. [Módulo E: Ajustes y Configuración del Sistema (Incluye Zona de Peligro RGPD)](#5-módulo-e-ajustes-y-configuración-del-sistema)
 7. [Módulo F: Postulantes (Maestro y Registro de Candidatos)](#6-módulo-f-postulantes-maestro-y-registro-de-candidatos)
 8. [Módulo F.1: Ficha de Postulante y Consola DAW (Faders de IA)](#61-ficha-de-postulante-y-consola-daw-faders-de-ia)
+9. [Módulo G: F1 Descubrimiento (Tablero Kanban y Lista de Sourcing)](#7-módulo-g-f1-descubrimiento)
+10. [Módulo G.1: Ficha de Candidato en F1 Descubrimiento y Motores de IA Google Gemini](#71-ficha-de-candidato-en-f1-descubrimiento-y-motores-de-ia-google-gemini)
 
 ---
 
@@ -222,3 +224,56 @@ Muestra las calificaciones detalladas y perfil completo de un candidato específ
     *   *Ver CV Adjunto:* Botón interactivo para consultar el documento de currículum PDF persistido.
     *   *Descartar Postulante:* Botón de Soft Delete para cambiar de inmediato el estado del postulante a "Descartado" previniendo visualizaciones operativas ulteriores.
     *   *Modo Edición Interactivo:* Permite conmutar la ficha a modo de edición para actualizar en caliente los campos mutables: Nombre Completo, Email, LinkedIn, Teléfono Móvil, Ubicación, Habilidades Clave (entre 3 y 5 separadas por comas), Inglés, Otros Idiomas, y Anotaciones, mientras se resguarda la inmutabilidad de metadatos históricos.
+
+---
+
+## 7. Módulo G: F1 Descubrimiento (Tablero Kanban y Lista de Sourcing)
+
+### 📸 Imagen de Referencia: `descubrimiento_lista.png`
+
+![descubrimiento_lista.png](descubrimiento_lista.png)
+
+```
+Ficha Técnica:
+- Ruta: /descubrimiento
+- Estilo Visual: Tablero Kanban (4 columnas glassmorphic) y Vista de Lista Alternable con filtros e indicadores de origen de consultas
+- Conectividad: API de Google Gemini (1.5 Flash) + Fallback local base
+```
+
+### 💡 Descripción Funcional
+El módulo de **F1 Descubrimiento** es el panel avanzado de atracción de talento que centraliza el pipeline de reclutamiento temprano, filtrado avanzado, maximizado completo y simuladores de sourcing asistidos por Inteligencia Artificial.
+
+### ✨ Características Clave
+*   **Tablero Kanban de Entrada:** Cuatro columnas para clasificar el estado operativo del talento:
+    1. *01 - Nuevo (Para Revisión)*: Backlog de currículums entrantes listos para evaluar.
+    2. *02 - Contactado (En Espera)*: Candidatos donde se inició el contacto inicial o triage.
+    3. *03 - Bloqueado / Pendiente*: Candidatos con información faltante (e.g. CV legible, expectativa salarial).
+    4. *04 - Rechazado (Fase Inicial)*: Perfiles que no superan el primer filtro técnico inicial.
+*   **KPIs de Conversión Operacionales:** Indicadores superiores que informan la velocidad y calidad del sourcing: *TTFME* (Time to First Meaningful Engagement con fórmulas interactivas de cálculo en overlay manual `?`), índice de personalización A/B, tasa de rechazo temprano, y total volumétrico.
+*   **Vista Alternativa de Lista y Ordenación:** Control para conmutar a vista de tabla glassmorphic con ordenación interactiva clickeable en todas las cabeceras (ascendente/descendente), y filtro lateral adicional por estado del candidato.
+*   **Maximizado Total (Foco de Pantalla Completa):** Enlace en barra de filtros para ocultar cabeceras y KPI cards corporativas superiores, maximizando el panel de trabajo operativo del reclutador a pantalla completa.
+
+---
+
+## 7.1 Módulo G.1: Ficha de Candidato en F1 Descubrimiento y Motores de IA Google Gemini
+
+### 📸 Imágenes de Referencia: `descubrimiento_detalle.png` y `descubrimiento_matching.png`
+
+![descubrimiento_detalle.png](descubrimiento_detalle.png)
+![descubrimiento_matching.png](descubrimiento_matching.png)
+
+```
+Ficha Técnica:
+- Ruta: /descubrimiento/[id]
+- Motores IA: Google Gemini 1.5 Flash (Semantic Analyzer + Outreach Writer + Query Builder)
+- Acceso: Botón "Detalles" en tarjeta o lista
+```
+
+### 💡 Descripción Funcional
+Permite ingresar a la visualización técnica del candidato reclutado en la fase de descubrimiento para editar sus datos, correr análisis semánticos detallados mediante LLM contra la vacante provista, y autogenerar plantillas de acercamiento eficaces.
+
+### ✨ Características Clave
+*   **Motor de Matching Semántico (Live vs Mock):** Analiza el perfil técnico del candidato contra la descripción de la vacante, entregando puntuaciones detalladas y listados de fortalezas, brechas, y recomendaciones para entrevistas. Muestra un badge de color distintivo indicando la fuente de los datos (`✨ GEMINI LIVE` si se conecta a la API o `📋 MOCK` local de fallback).
+*   **Redacción de Outreach Automatizada con IA:** Redacta y reescribe dinámicamente mensajes de bienvenida adaptables según variantes A y B que extrae del perfil del candidato.
+*   **Buscador Booleano y X-Ray AI:** Generador de strings avanzados de filtrado booleano y búsquedas X-Ray (LinkedIn / Google) con precarga de presets y simulación directa de importados al pipeline.
+*   **Edición y Sincronización Local:** Formulario modal para actualizar en caliente datos operacionales del postulante, sincronizados de forma instantánea con el Kanban general a través de `localStorage`.

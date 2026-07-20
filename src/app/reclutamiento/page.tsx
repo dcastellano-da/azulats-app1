@@ -15,7 +15,8 @@ import {
   Search,
   Filter,
   Contact,
-  Settings
+  Settings,
+  Compass
 } from "lucide-react";
 
 // Mock candidates suited for the Spanish recruiter market
@@ -172,6 +173,14 @@ export default function ReclutamientoPage() {
             >
               <LayoutDashboard className="w-4 h-4" />
               <span>Ver Dashboard</span>
+            </Link>
+
+            <Link
+              href="/descubrimiento"
+              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
+            >
+              <Compass className="w-4 h-4" />
+              <span>F1 Descubrimiento</span>
             </Link>
             
             <Link
