@@ -18,7 +18,8 @@ import {
   Clock,
   Contact,
   ShieldAlert,
-  Trash2
+  Trash2,
+  Compass
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -27,25 +28,6 @@ import { getCandidatosAPI, eliminarCandidatoAPI } from "@/actions/candidatos";
 export default function ConfiguracionPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-
-  // Client-side authentication protection
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/login");
-    }
-  }, [user, authLoading, router]);
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#101415] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-[#6bd8cb] border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
 
   // Navigation indicators and inputs options state
   const [selectedTimeZone, setSelectedTimeZone] = useState("Europe/Madrid");
@@ -68,6 +50,13 @@ export default function ConfiguracionPage() {
   const [deleting, setDeleting] = useState(false);
   const [dangerZoneFeedback, setDangerZoneFeedback] = useState<{type: "success" | "error"; message: string} | null>(null);
 
+  // Client-side authentication protection
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, authLoading, router]);
+
   // Load candidate list for Super Admin Zone
   const loadCandidatosList = async () => {
     setLoadingCandidatos(true);
@@ -88,6 +77,18 @@ export default function ConfiguracionPage() {
       loadCandidatosList();
     }
   }, [user]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#101415] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-[#6bd8cb] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const handleStartDelete = (id: string) => {
     setDeleteConfirmId(id);
@@ -160,58 +161,118 @@ export default function ConfiguracionPage() {
       <div className="relative z-10 max-w-5xl mx-auto space-y-8">
         
         {/* Navigation Banner Header */}
-        <header className="flex flex-col md:flex-row justify-between md:items-center gap-6 pb-6 border-b border-white/10">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#6bd8cb] to-[#0d9488] flex items-center justify-center shadow-lg shadow-[#6bd8cb]/20">
-              <Settings className="w-6 h-6 text-[#101415]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-[#c4c1fb] bg-[#c4c1fb]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Configuración General
-                </span>
-                <span className="text-[10px] font-bold text-white/40">Ref: AJ-90</span>
+        <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 pb-6 border-b border-white/10">
+          <div className="flex justify-between items-center w-full lg:w-auto gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#6bd8cb] to-[#0d9488] flex items-center justify-center shadow-lg shadow-[#6bd8cb]/20">
+                <Settings className="w-6 h-6 text-[#101415]" />
               </div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
-                Ajustes del Sistema
-              </h1>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-[#c4c1fb] bg-[#c4c1fb]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Configuración General
+                  </span>
+                  <span className="text-[10px] font-bold text-white/40">Ref: AJ-90</span>
+                </div>
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
+                  Ajustes del Sistema
+                </h1>
+              </div>
             </div>
+
+            {/* Mobile/Tablet Avatar (visible in top-right of the title block on mobile/tablet) */}
+            <Link
+              href="/configuracion"
+              className="lg:hidden relative w-9 h-9 rounded-full bg-gradient-to-tr from-[#9b5de5] to-[#6bd8cb] text-white flex items-center justify-center text-xs font-black shadow-md shadow-[#9b5de5]/30 hover:scale-105 active:scale-95 transition-all duration-200 border-2 border-[#9b5de5] select-none cursor-pointer shrink-0"
+              title="Ajustes de Perfil (Actual)"
+            >
+              {user?.displayName
+                ? user.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
+                : user?.email
+                  ? user.email.slice(0, 2).toUpperCase()
+                  : "AD"}
+            </Link>
           </div>
 
           {/* Quick links to alternate views */}
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-            </Link>
-            
-            <Link
-              href="/busquedas"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#6bd8cb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Briefcase className="w-4 h-4" />
-              <span className="hidden sm:inline">Búsquedas</span>
-            </Link>
+          <div className="flex items-start gap-3">
+            <div className="flex items-center flex-wrap gap-3">
+              {/* Grupo 1: Navegación Global */}
+              <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1 shadow-inner">
+                <Link
+                  href="/dashboard"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </Link>
 
-            {/*
-            <Link
-              href="/reclutamiento"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-amber-400 hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Reclutamiento</span>
-            </Link>
-            */}
+                <Link
+                  href="/busquedas"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span className="hidden sm:inline">Búsquedas</span>
+                </Link>
+
+                <Link
+                  href="/talento"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Contact className="w-4 h-4" />
+                  <span className="hidden sm:inline">Postulantes</span>
+                </Link>
+              </div>
+
+              {/* Separador visual */}
+              <div className="text-white/20 select-none text-xs font-light hidden sm:block">|</div>
+
+              {/* Grupo 2: Navegación Contextual del Pipeline */}
+              <div className="flex items-center gap-1 bg-[#9b5de5]/5 border border-[#9b5de5]/20 rounded-xl p-1 shadow-inner">
+                <Link
+                  href="/descubrimiento"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#c4c1fb] hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4" />
+                  <span className="hidden sm:inline">F1 Descubrimiento</span>
+                </Link>
+
+                <Link
+                  href="/evaluacion"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#9b5de5] hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-[#9b5de5]" />
+                  <span className="hidden sm:inline">F2 Evaluación</span>
+                </Link>
+
+                <Link
+                  href="/presentacion"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-500 hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-amber-500" />
+                  <span className="hidden sm:inline">F3 Cliente</span>
+                </Link>
+
+                <Link
+                  href="/cierre"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-500 hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-emerald-500" />
+                  <span className="hidden sm:inline">F4 Cierre</span>
+                </Link>
+              </div>
+            </div>
 
             <Link
-              href="/talento"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#6bd8cb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
+              href="/configuracion"
+              className="hidden lg:flex relative w-9 h-9 rounded-full bg-gradient-to-tr from-[#9b5de5] to-[#6bd8cb] text-white flex items-center justify-center text-xs font-black shadow-md shadow-[#9b5de5]/30 hover:scale-105 active:scale-95 transition-all duration-200 border-2 border-[#9b5de5] select-none cursor-pointer shrink-0"
+              title="Ajustes de Perfil (Actual)"
             >
-              <Contact className="w-4 h-4" />
-              <span className="hidden sm:inline">Postulantes</span>
+              {user?.displayName
+                ? user.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
+                : user?.email
+                  ? user.email.slice(0, 2).toUpperCase()
+                  : "AD"}
             </Link>
           </div>
         </header>

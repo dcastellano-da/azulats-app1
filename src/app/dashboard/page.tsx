@@ -108,69 +108,93 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Quick links to alternate views */}
-            <Link
-              href="/descubrimiento"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Compass className="w-4 h-4" />
-              <span className="hidden sm:inline">F1 Descubrimiento</span>
-            </Link>
+          <div className="flex items-start gap-3">
+            <div className="flex items-center flex-wrap gap-3">
+              {/* Grupo 1: Navegación Global */}
+              <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1 shadow-inner">
+                <div 
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-white flex items-center gap-1.5 select-none"
+                  title="Dashboard (Página Actual)"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </div>
 
-            <Link
-              href="/busquedas"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#6bd8cb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Briefcase className="w-4 h-4" />
-              <span className="hidden sm:inline">Búsquedas</span>
-            </Link>
+                <Link
+                  href="/busquedas"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span className="hidden sm:inline">Búsquedas</span>
+                </Link>
 
-            {/*
-            <Link
-              href="/reclutamiento"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-amber-400 hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Reclutamiento</span>
-            </Link>
-            */}
+                <Link
+                  href="/talento"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Contact className="w-4 h-4" />
+                  <span className="hidden sm:inline">Postulantes</span>
+                </Link>
+              </div>
 
-            <Link
-              href="/talento"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#6bd8cb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Contact className="w-4 h-4" />
-              <span className="hidden sm:inline">Postulantes</span>
-            </Link>
+              {/* Separador visual */}
+              <div className="text-white/20 select-none text-xs font-light hidden sm:block">|</div>
 
-            <Link
-              href="/configuracion"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Ajustes</span>
-            </Link>
+              {/* Grupo 2: Navegación Contextual del Pipeline */}
+              <div className="flex items-center gap-1 bg-[#9b5de5]/5 border border-[#9b5de5]/20 rounded-xl p-1 shadow-inner">
+                <Link
+                  href="/descubrimiento"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#c4c1fb] hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4" />
+                  <span className="hidden sm:inline">F1 Descubrimiento</span>
+                </Link>
 
-            <div className="h-6 w-[1px] bg-white/10 mx-1"></div>
+                <Link
+                  href="/evaluacion"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#9b5de5] hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-[#9b5de5]" />
+                  <span className="hidden sm:inline">F2 Evaluación</span>
+                </Link>
 
-            <button
-              onClick={handleRefresh}
-              className={`w-10 h-10 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all ${
-                refreshing ? "animate-spin text-[#6bd8cb]" : "text-[#c4c1fb]"
-              }`}
-              title="Actualizar Datos"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
+                <Link
+                  href="/presentacion"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-500 hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-amber-500" />
+                  <span className="hidden sm:inline">F3 Cliente</span>
+                </Link>
 
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-xs font-bold text-[#ffb4ab] border border-[#ffb4ab]/25 bg-red-950/20 hover:bg-red-950/40 transition-all cursor-pointer shadow-sm"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Cerrar Sesión</span>
-            </button>
+                <Link
+                  href="/cierre"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-500 hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-emerald-500" />
+                  <span className="hidden sm:inline">F4 Cierre</span>
+                </Link>
+              </div>
+
+              <div className="h-6 w-[1px] bg-white/10 mx-1 hidden md:block"></div>
+
+              <button
+                onClick={handleRefresh}
+                className={`w-10 h-10 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all ${
+                  refreshing ? "animate-spin text-[#6bd8cb]" : "text-[#c4c1fb]"
+                }`}
+                title="Actualizar Datos"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-xs font-bold text-[#ffb4ab] border border-[#ffb4ab]/25 bg-red-950/20 hover:bg-red-950/40 transition-all cursor-pointer shadow-sm"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Cerrar Sesión</span>
+              </button>
+            </div>
           </div>
         </header>
 

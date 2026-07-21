@@ -126,8 +126,20 @@ El **F1 Descubrimiento** brinda a los reclutadores el tablero maestro de sourcin
 *   **Ficha Premium de Postulante (/descubrimiento/[id]):** Sección de detalles en profundidad, autocompletado y edición sincrónica persistiendo en `localStorage` con botón 'Detalles' para visualización técnica en profundidad.
 *   **Integración Gemini AI Sourcing (Live vs Mock):**
   - *Motor de Matching Semántico*: Analiza con la API de Google Gemini (1.5 Flash) el CV y puesto mostrando un Fit score (%), fortalezas, debilidades e instrucciones detalladas con indicador específico de fuente (`✨ GEMINI LIVE` vs `📋 MOCK`).
-  - *Redacción de Outreach con Inteligencia Artificial*: Genera mensajes adaptados al perfil del candidato y permite A/B testing reescribiendo variantes A y B dinámicamente con IA.
+  - *Redacción de Outreach con Inteligencia Artificial*: Genera mensajes adaptados al perfil del candidato y permite A/B testing reescribiendo variantes A y B dináminamente con IA.
   - *Sourcing Avanzado Booleano & X-Ray*: Generador de cadenas booleanas y strings premium de X-Ray (LinkedIn / Google) con auto-fill de plantillas (e.g. Rust Architect, UX Designer) e importación simulada directa al backlog del kanban, indicando si proviene de Gemini o Mock.
+
+### Módulo H: F2 Evaluación (Pruebas Técnicas & Simulaciones IA)
+El **F2 Evaluación** gestiona la fase interna de validación técnica, entrevistas en profundidad y assessments interactivos libres de sesgo tecnológico.
+*   **Pipeline de Evaluación Kanban:** Tablero de control clasificado en 3 columnas de progresión técnica: `05 - Entrevista Inicial / screening`, `06 - Prueba / Assessment Técnico` y `07 - Descartado (Interno)`, provisto de interacciones *Drag & Drop* completas y actualización instantánea de fase.
+*   **Métricas e Indicadores de Rendimiento de Evaluación:** Tarjetas analíticas de control para *WIP Cycle Time* promedio (horas activas acumuladas en evaluación), *cNPS* general de candidatos, e índice de aprobación *Pass-through Rate*. Adicionalmente, incluye alerta de sobrecarga operativa en color amarillo ámbar cuando el WIP supera los 10 candidatos activos.
+*   **Filtros de Búsqueda y Multi-Cliente:** Barra de filtrado dinámico para acotar y aislar candidatos por rol y cliente corporativo clave (ej. Telefónica, Santander, SEAT).
+*   **Slide-over Contenedor de Diagnóstico IA:** Cajón lateral deslizable e interactivo enfocado en herramientas cognitivas avanzadas libres de sesgos:
+  - *Sintetizador de Entrevistas*: Cruce inteligente de notas de llamadas y descripciones de puestos clasificando en Puntos Fuertes (Pros), Brechas Técnicas (Cons) y Señales de Alerta (Riesgos).
+  - *Detector de Inconsistencias Cronológicas*: Escaneo automático de la trayectoria laboral del candidato para alertar sobre solapamientos sospechosos u holguras (gaps) de tiempo.
+  - *Generador de Preguntas Técnicas STAR*: Formulación automatizada de cuestionarios de comportamiento y código contextualizados bajo el formato Situación, Tarea, Acción y Resultado (STAR).
+  - *Validador de Identidad y Entorno*: Chequeo asincrónico IP, geolocalización latente y capturas de cámara web simuladas con interfaz interactiva ("Iniciar escaneo") para prevenir fraudes.
+  - *AI Co-Pilot Adaptive Pair Programming*: Entorno simulado de colaboración en vivo ("Live coding test") con visor de compilador de sandbox interactivo compatible con Rust/WASM y TypeScript, mostrando tasa de completación, dificultad y esfuerzo estimado.
 
 ---
 
@@ -149,7 +161,19 @@ El **F1 Descubrimiento** brinda a los reclutadores el tablero maestro de sourcin
     ```bash
     source ~/.zshrc && npx tsx --test tests/candidatos_etapa2.test.js
     ```
-5.  Abre [http://localhost:3000](http://localhost:3000) en el navegador.
+5.  **Ejecutar pruebas del Módulo de Evaluación (KPIs y Mocks):**
+    ```bash
+    export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && node --experimental-strip-types --test tests/evaluacion.test.js
+    ```
+6.  **Ejecutar pruebas del Módulo de Presentación (F3):**
+    ```bash
+    export PATH="/Users/dcastellano/.local/node-v20.12.2-darwin-arm64/bin:$PATH" && npx tsx --test tests/presentacion.test.js
+    ```
+7.  **Ejecutar pruebas del Módulo de Cierre (F4):**
+    ```bash
+    export PATH="/Users/dcastellano/.local/node-v20.12.2-darwin-arm64/bin:$PATH" && npx tsx --test tests/cierre.test.js
+    ```
+8.  Abre [http://localhost:3000](http://localhost:3000) en el navegador.
 
 ---
 ## Despliegue en hosting Pruebas de Firebase
@@ -161,6 +185,27 @@ git push origin main
 
 -------------------------------------------------------------------------------------------------
 ### Log de Cambios
+
+*   **21/07/2026:** Lanzamiento e integración del Módulo "F4 Cierre del Proceso" (Cierre):
+    *   **Tablero Kanban y Detalle en Lista:** Construcción del pipeline final para la entrega al candidato o cierre del expediente (Oferta Extendida / Negociación, Contratado - Won, Rechazado Cliente - Lost, Candidato se baja - Drop-out) con arrastre nativo Drag & Drop, conmutador de pantalla completa, y ordenamiento interactivo multitabla.
+    *   **Indicadores KPI y Límites WIP:** Mapeo automatizado de Decision Latency (tiempo de respuesta de la oferta en horas), Constructive Feedback Rate (cobertura de feedback empático y estructurado en descartes), Offer Acceptance Rate (OAR) y WIP de ofertas activas con avisos dinámicos en cabecera si supera el límite de 5 procesos concurrentes.
+    *   **Consola de Herramientas de IA para Cierre (Slide-over):** Cajón lateral interactivo con 5 pestañas de simulación funcional: Motor Predictivo de Aceptación (estimación de probabilidad base vs ajustada por mitigadores), Simulador de Salario y Beneficios en Especie (salario flexible interactivo con slider), Copiloto Redactor de Contratos (compilación de fecha e indefectibilidad contractual), Redactor de Empathy Feedback estructurado, y Programador de Cadencias de Pre-Onboarding (adición de hitos interactiva con actualización en timeline en tiempo real).
+    *   **Suite de Pruebas Unitarias:** Creación de `tests/cierre.test.js` bajo `node:test` + `tsx` para certificar la consistencia del dataset inicial y la precisión de los KPIs y límites de concurrencia.
+    *   **Navegación Global Unificada:** Integración del botón horizontal de acceso rápido "F4 Cierre" en todas las cabeceras compartidas (Dashboard, Descubrimiento, Evaluación, Presentación, Configuración, Búsquedas y Talentos).
+
+*   **21/07/2026:** Lanzamiento e integración del Módulo "F3 Cliente Evaluación" (Presentación):
+    *   **Tablero Kanban y Detalle en Lista:** Construcción del pipeline final para la entrega al cliente (Shortlist, Entrevista, Standby) con arrastre nativo y controles avanzados de visualización (modo pantalla completa, filtros dinámicos por cliente/búsqueda y ordenación multitabla).
+    *   **Indicadores KPI de Negocio y Alertas SLA:** Mapeo automatizado del Stakeholder Blockage Time (demora de feedback en horas), Calibration Accuracy, cNPS promedio de entrevistas con clientes y control de sobrecarga con alerta de saturación de cola (límite de 10 candidaturas activas en calibración cliente).
+    *   **Consola de Herramientas de IA para Calibración (Slide-over):** Panel interactivo con 5 herramientas operativas simuladas con feedback dinámico, simulación de estados y toasts interactivos: Analítica de Entrevistas Zoom/Meet (Sentiment score y microexpresiones con guardado local persistente), Traductor y Estandarizador de Perfiles (Inglés unificado ATS), Generador de Executive Candidate Briefings redactados por IA, Orquestador de Agendas Condicional (sugerencia de horario óptimo) y Bot de alerta de escalamiento e incidencias de SLA.
+    *   **Suite de Pruebas Unitarias:** Creación de `tests/presentacion.test.js` bajo `node:test` para certificar la consistencia del dataset inicial y la precisión de los KPIs y límites WIP.
+    *   **Navegación Global Unificada:** Integración del botón horizontal de acceso rápido "F3 Cliente Evaluación" en todas las vistas de la aplicación (Dashboard, Búsquedas, Reclutamiento, postulación/Talento, Ajustes/Configuración y F2 Evaluación).
+
+*   **21/07/2026:** Lanzamiento e integración del Módulo "F2 Evaluación":
+    *   **Tablero Kanban y Lista Glassmorphic:** Implementación del pipeline interactivo (Screening, Assessment, Descartado) con soporte Drag & Drop nativo de HTML5, animación de transiciones de fase y vista detallada en tabla ordenable.
+    *   **Indicadores KPI de Negocio:** Cálculos automáticos de WIP Cycle Time, cNPS promedio e índice Pass-through Rate, con alertas visuales de sobrecarga (límite de 10 candidatos activos en cola).
+    *   **Herramientas Operativas Avanzadas de IA:** Slide-over contextual con tabulación interactiva que alberga simuladores visuales para el Sintetizador de llamadas (Pros/Cons/Riesgos), Detector Cronológico (Gaps/Overlaps), Preguntas STAR con copiado rápido, Validador de Identidad/Entorno (IP/Geofencing/Cámara) y AI Co-Pilot (Entorno de Live Coding con sandbox en Rust y TSX).
+    *   **Suite de Pruebas Unitarias:** Creación de `tests/evaluacion.test.js` bajo el framework nativo `node:test` para certificar la precisión del dataset inicial y el correcto cómputo de desviaciones en KPIs.
+    *   **Consistencia de Navegación Global:** Vinculación del acceso directo horizontal "F2 Evaluación" en los encabezados principales de Dashboard, Descubrimiento, Búsquedas, Talento, Configuración y Reclutamiento.
 
 *   **20/07/2026:** Integración de la Importación Asistida por IA (Módulo Postulantes):
     *   **Server Actions Ampliadas:** Incorporación de la Server Action `importarCandidatoIA_API(formData)` en `src/actions/candidatos.ts` para gestionar el enlace asíncrono y seguro con el endpoint `POST /api/v1/candidatos/importar-ia` inyectando JWT.

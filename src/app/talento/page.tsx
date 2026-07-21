@@ -234,66 +234,118 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
       <div className="relative z-10 max-w-7xl mx-auto space-y-8">
         
         {/* Navigation Banner Header */}
-        <header className="flex flex-col md:flex-row justify-between md:items-center gap-6 pb-6 border-b border-white/10">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#0d9488] to-[#6bd8cb] flex items-center justify-center shadow-lg shadow-[#0d9488]/20">
-              <Contact className="w-6 h-6 text-[#101415]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Maestro de Postulantes
-                </span>
-                <span className="text-[10px] font-bold text-white/40">Fase 2: Postulantes</span>
+        <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 pb-6 border-b border-white/10">
+          <div className="flex justify-between items-center w-full lg:w-auto gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#0d9488] to-[#6bd8cb] flex items-center justify-center shadow-lg shadow-[#0d9488]/20">
+                <Contact className="w-6 h-6 text-[#101415]" />
               </div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
-                Postulantes & Candidatos
-              </h1>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Maestro de Postulantes
+                  </span>
+                  <span className="text-[10px] font-bold text-white/40">Fase 2: Postulantes</span>
+                </div>
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
+                  Postulantes & Candidatos
+                </h1>
+              </div>
             </div>
+
+            {/* Mobile/Tablet Avatar (visible in top-right of the title block on mobile/tablet) */}
+            <Link
+              href="/configuracion"
+              className="lg:hidden relative w-9 h-9 rounded-full bg-gradient-to-tr from-[#9b5de5] to-[#6bd8cb] text-white flex items-center justify-center text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all duration-200 border border-white/20 select-none cursor-pointer shrink-0"
+              title="Ajustes de Perfil"
+            >
+              {user?.displayName
+                ? user.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
+                : user?.email
+                  ? user.email.slice(0, 2).toUpperCase()
+                  : "AD"}
+            </Link>
           </div>
 
-          <div className="flex items-center flex-wrap gap-3">
+          <div className="flex items-start gap-3">
+            <div className="flex items-center flex-wrap gap-3">
             {/* Quick links to alternate views */}
-            <Link
-              href="/dashboard"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Ver Dashboard</span>
-            </Link>
+              {/* Grupo 1: Navegación Global */}
+              <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1 shadow-inner">
+                <Link
+                  href="/dashboard"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Ver Dashboard</span>
+                </Link>
 
-            <Link
-              href="/descubrimiento"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Compass className="w-4 h-4" />
-              <span>F1 Descubrimiento</span>
-            </Link>
+                <Link
+                  href="/busquedas"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span>Búsquedas</span>
+                </Link>
 
-            <Link
-              href="/busquedas"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#6bd8cb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Briefcase className="w-4 h-4" />
-              <span>Búsquedas</span>
-            </Link>
+                <div
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 text-white flex items-center gap-1.5 select-none"
+                  title="Postulantes (Página Actual)"
+                >
+                  <Contact className="w-4 h-4" />
+                  <span>Postulantes</span>
+                </div>
+              </div>
 
-            {/*
-            <Link
-              href="/reclutamiento"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-amber-400 hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Users className="w-4 h-4" />
-              <span>Reclutamiento</span>
-            </Link>
-            */}
+              {/* Separador visual */}
+              <div className="text-white/20 select-none text-xs font-light hidden sm:block">|</div>
+
+              {/* Grupo 2: Navegación Contextual del Pipeline */}
+              <div className="flex items-center gap-1 bg-[#9b5de5]/5 border border-[#9b5de5]/20 rounded-xl p-1 shadow-inner">
+                <Link
+                  href="/descubrimiento"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#c4c1fb] hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4" />
+                  <span>F1 Descubrimiento</span>
+                </Link>
+
+                <Link
+                  href="/evaluacion"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#9b5de5] hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-[#9b5de5]" />
+                  <span>F2 Evaluación</span>
+                </Link>
+
+                <Link
+                  href="/presentacion"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-500 hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-amber-500" />
+                  <span>F3 Cliente</span>
+                </Link>
+
+                <Link
+                  href="/cierre"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-500 hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-emerald-500" />
+                  <span>F4 Cierre</span>
+                </Link>
+              </div>
+            </div>
 
             <Link
               href="/configuracion"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
+              className="hidden lg:flex relative w-9 h-9 rounded-full bg-gradient-to-tr from-[#9b5de5] to-[#6bd8cb] text-white flex items-center justify-center text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all duration-200 border border-white/20 select-none cursor-pointer shrink-0"
+              title="Ajustes de Perfil"
             >
-              <Settings className="w-4 h-4" />
-              <span>Ajustes</span>
+              {user?.displayName
+                ? user.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
+                : user?.email
+                  ? user.email.slice(0, 2).toUpperCase()
+                  : "AD"}
             </Link>
 
             <div className="h-6 w-[1px] bg-white/10 mx-1 hidden md:block"></div>

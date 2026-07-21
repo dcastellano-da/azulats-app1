@@ -1139,88 +1139,140 @@ export default function DescubrimientoPage() {
         
         {/* Navigation Banner Header */}
         {!isFullScreen && (
-          <header className="flex flex-col md:flex-row justify-between md:items-center gap-6 pb-6 border-b border-white/10">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#0d9488] to-[#c4c1fb] flex items-center justify-center shadow-lg shadow-[#0d9488]/20">
-              <Compass className="w-6 h-6 text-[#101415]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Fase 1: Atracción & Sourcing
-                </span>
-                <span className="text-[10px] font-bold text-white/40">Ref: Descubrimiento Inicial</span>
+          <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 pb-6 border-b border-white/10">
+          <div className="flex justify-between items-center w-full lg:w-auto gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#0d9488] to-[#c4c1fb] flex items-center justify-center shadow-lg shadow-[#0d9488]/20">
+                <Compass className="w-6 h-6 text-[#101415]" />
               </div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
-                Pipeline de Descubrimiento
-              </h1>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Fase 1: Atracción & Sourcing
+                  </span>
+                  <span className="text-[10px] font-bold text-white/40">Ref: Descubrimiento Inicial</span>
+                </div>
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
+                  Pipeline de Descubrimiento
+                </h1>
+              </div>
             </div>
+
+            {/* Mobile/Tablet Avatar (visible in top-right of the title block on mobile/tablet) */}
+            <Link
+              href="/configuracion"
+              className="lg:hidden relative w-9 h-9 rounded-full bg-gradient-to-tr from-[#9b5de5] to-[#6bd8cb] text-white flex items-center justify-center text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all duration-200 border border-white/20 select-none cursor-pointer shrink-0"
+              title="Ajustes de Perfil"
+            >
+              {user?.displayName
+                ? user.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
+                : user?.email
+                  ? user.email.slice(0, 2).toUpperCase()
+                  : "AD"}
+            </Link>
           </div>
 
-          <div className="flex items-center flex-wrap gap-3">
-            <Link
-              href="/dashboard"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              <span>Ver Dashboard</span>
-            </Link>
+          <div className="flex items-start gap-3">
+            <div className="flex items-center flex-wrap gap-3">
+              {/* Grupo 1: Navegación Global */}
+              <div className="flex items-center gap-1 bg-white/5 border border-white/10 rounded-xl p-1 shadow-inner">
+                <Link
+                  href="/dashboard"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Ver Dashboard</span>
+                </Link>
 
-            <Link
-              href="/busquedas"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#6bd8cb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Briefcase className="w-4 h-4" />
-              <span>Búsquedas</span>
-            </Link>
+                <Link
+                  href="/busquedas"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span>Búsquedas</span>
+                </Link>
 
-            {/*
-            <Link
-              href="/reclutamiento"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-amber-400 hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Users className="w-4 h-4" />
-              <span>Reclutamiento</span>
-            </Link>
-            */}
+                <Link
+                  href="/talento"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Contact className="w-4 h-4" />
+                  <span>Postulantes</span>
+                </Link>
+              </div>
 
-            <Link
-              href="/talento"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#6bd8cb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
-            >
-              <Contact className="w-4 h-4" />
-              <span>Postulantes</span>
-            </Link>
+              {/* Separador visual */}
+              <div className="text-white/20 select-none text-xs font-light hidden sm:block">|</div>
+
+              {/* Grupo 2: Navegación Contextual del Pipeline */}
+              <div className="flex items-center gap-1 bg-[#9b5de5]/5 border border-[#9b5de5]/20 rounded-xl p-1 shadow-inner">
+                <div 
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#9b5de5]/25 text-white flex items-center gap-1.5 select-none"
+                  title="F1 Descubrimiento (Módulo Actual)"
+                >
+                  <Compass className="w-4 h-4 text-white" />
+                  <span>F1 Descubrimiento</span>
+                </div>
+
+                <Link
+                  href="/evaluacion"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#9b5de5] hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-[#9b5de5]" />
+                  <span>F2 Evaluación</span>
+                </Link>
+
+                <Link
+                  href="/presentacion"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-500 hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-amber-500" />
+                  <span>F3 Cliente</span>
+                </Link>
+
+                <Link
+                  href="/cierre"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-500 hover:bg-[#9b5de5]/10 hover:text-white transition-all duration-200 flex items-center gap-1.5"
+                >
+                  <Compass className="w-4 h-4 text-emerald-450" />
+                  <span>F4 Cierre</span>
+                </Link>
+              </div>
+
+              <div className="h-6 w-[1px] bg-white/10 mx-1 hidden md:block"></div>
+
+              {/* Búsquedas Booleanas y X-Ray Button */}
+              <button
+                onClick={() => setIsBooleanSearchOpen(true)}
+                className="flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-xs font-bold text-[#101415] bg-[#c4c1fb] hover:bg-[#c4c1fb]/90 hover:glow-btn transition-all shadow-md shadow-[#4338ca]/15 cursor-pointer"
+              >
+                <Search className="w-4 h-4" />
+                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                <span>Boolean & X-Ray AI</span>
+              </button>
+
+              {/* Ingesta Inteligente Action Button */}
+              <button
+                onClick={() => setIsIngestOpen(true)}
+                className="flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-xs font-bold text-[#101415] bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 hover:glow-btn transition-all shadow-md shadow-[#0d9488]/15 cursor-pointer"
+              >
+                <Plus className="w-4.5 h-4.5" />
+                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                <span>Parser Ingesta CV</span>
+              </button>
+            </div>
 
             <Link
               href="/configuracion"
-              className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all duration-200 flex items-center gap-2"
+              className="hidden lg:flex relative w-9 h-9 rounded-full bg-gradient-to-tr from-[#9b5de5] to-[#6bd8cb] text-white flex items-center justify-center text-xs font-black shadow-md hover:scale-105 active:scale-95 transition-all duration-200 border border-white/20 select-none cursor-pointer shrink-0"
+              title="Ajustes de Perfil"
             >
-              <Settings className="w-4 h-4" />
-              <span>Ajustes</span>
+              {user?.displayName
+                ? user.displayName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
+                : user?.email
+                  ? user.email.slice(0, 2).toUpperCase()
+                  : "AD"}
             </Link>
-
-            <div className="h-6 w-[1px] bg-white/10 mx-1 hidden md:block"></div>
-
-            {/* Búsquedas Booleanas y X-Ray Button */}
-            <button
-              onClick={() => setIsBooleanSearchOpen(true)}
-              className="flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-xs font-bold text-[#101415] bg-[#c4c1fb] hover:bg-[#c4c1fb]/90 hover:glow-btn transition-all shadow-md shadow-[#4338ca]/15 cursor-pointer"
-            >
-              <Search className="w-4 h-4" />
-              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-              <span>Boolean & X-Ray AI</span>
-            </button>
-
-            {/* Ingesta Inteligente Action Button */}
-            <button
-              onClick={() => setIsIngestOpen(true)}
-              className="flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-xs font-bold text-[#101415] bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 hover:glow-btn transition-all shadow-md shadow-[#0d9488]/15 cursor-pointer"
-            >
-              <Plus className="w-4.5 h-4.5" />
-              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-              <span>Parser Ingesta CV</span>
-            </button>
           </div>
         </header>
         )}
@@ -1537,7 +1589,7 @@ export default function DescubrimientoPage() {
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide">01 - Nuevo (Para Revisión)</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">01 - NUEVO (PARA REVISIÓN)</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Sourced backlog inicial</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[#c4c1fb]">
@@ -1561,7 +1613,7 @@ export default function DescubrimientoPage() {
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide">02 - Contactado (En Espera)</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">02 - CONTACTADO (EN ESPERA)</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Esperando respuesta outreach</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[#6bd8cb]">
@@ -1585,7 +1637,7 @@ export default function DescubrimientoPage() {
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide">03 - Bloqueado / Pendiente</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">03 - BLOQUEADO / PENDIENTE</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Dependencia o datos críticos</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-amber-400">
@@ -1609,7 +1661,7 @@ export default function DescubrimientoPage() {
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide">04 - Rechazado (Fase Inicial)</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">04 - RECHAZADO (FASE INICIAL)</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Descartes tempraneros</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-rose-500">
