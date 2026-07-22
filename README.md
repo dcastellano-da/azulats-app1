@@ -112,18 +112,20 @@ El **Módulo de Configuración** provee el control de personalización y operabi
 
 ### Módulo F: Talent Mixer (Postulantes)
 El **Talent Mixer** proporciona la bandeja de entrada inteligente para centralizar todo el padrón de postulantes ingresantes.
-*   **Bandeja Principal (/talento):** Listado responsivo en formato de tarjetas con indicadores de burbuja de luz led reactivos según el estado. Cuenta con buscador en caliente y barra de clasificación por fase.
+*   **Bandeja Principal (/talento) en Formato Kanban:** Tablero Kanban responsive organizado en 4 columnas de progresión: `PENDIENTE`, `REVISADO`, `SELECCIONADO` y `DESCARTADO`, con soporte para interacciones Drag & Drop e indicadores de estado reactivos.
+*   **Asignación de Búsquedas Activas al SELECCIONAR:** Al mover a un candidato a la columna `SELECCIONADO`, el subtítulo cambia a "Candidatos en búsquedas" y se despliega un modal glassmorphic de asignación de vacantes. El modal permite asociar el candidato a un proceso de búsqueda activo, actualizando su estatus y creando de forma física la postulación dentro del pipeline de Descubrimiento en el estado inicial `01 - NUEVO EN REVISION`.
 *   **Consola DAW (Faders de Calificación IA):** Faders de ecualización analógicos simulados e interactivos dentro de la ficha de detalle (`/talento/[id]`) para calificar en caliente los scores de *Hard Skills*, *Soft Skills*, *Fit Cultural* y *Seniority Index*.
 *   **Slide-over de Alta de Candidato:** Formulario con etiquetas flotantes dinámicas, Drag-and-drop de archivos PDF, control estricto de consentimiento legal y captura inteligente para alertas de error `400 Bad Request` del servidor.
 *   **Importación Asistida por IA:** Popup glassmórfico de importación con zona Drag & Drop compatible con formatos `.pdf`, `.doc` y `.docx` (máx 5MB). Realiza la llamada asíncrona a `POST /api/v1/candidatos/importar-ia` del backend, bloquea la interfaz durante la inferencia y muestra una notificación de éxito reactiva con autorefresco de la base de candidatos tras su creación (201).
 
 ### Módulo G: F1 Descubrimiento (Atracción & Sourcing inicial)
 El **F1 Descubrimiento** brinda a los reclutadores el tablero maestro de sourcing potenciado por inteligencia artificial para detectar y evaluar candidatos.
-*   **Estructuración Kanban Estricta:** Pipeline clasificado en 4 columnas de progresión (`01 - Nuevo (Para Revisión)`, `02 - Contactado (En Espera)`, `03 - Bloqueado / Pendiente` y `04 - Rechazado en Fase Inicial`).
+*   **Estructuración Kanban Estricta:** Pipeline clasificado en 4 columnas de progresión (`01 - Nuevo en Revisión`, `02 - Bloqueado / Pendiente`, `03 - En Duda a Confirmar` y `04 - Rechazado en Fase Inicial`).
 *   **Métricas de Funnel Temprano:** KPI cards en cabecera para *TTFME* (Time to First Meaningful Engagement con fórmulas interactivas de cálculo en overlay manual `?`), índice de personalización A/B, tasa de rechazo temprano, y volumen total.
 *   **Vista de Lista Detallada con Ordenamiento:** Tabla responsiva de tipo glassmorphism con ordenamiento interactivo ascendente/descendente en todas sus cabeceras clave (excepto acciones) y un panel lateral con indicador de filtro de estado adicional.
 *   **Maximizado (Pantalla Completa):** Botón interactivo para maximizar la región operativa del headlining y tablero de búsqueda, ocultando las barras y KPIs globales para potenciar la visibilidad del reclutador, y conmutando automáticamente al modo "Salir".
-*   **Ficha Premium de Postulante (/descubrimiento/[id]):** Sección de detalles en profundidad, autocompletado y edición sincrónica persistiendo en `localStorage` con botón 'Detalles' para visualización técnica en profundidad.
+*   **Detalle Dinámico por ID de Pipeline (/descubrimiento/[id]):** Redirección selectiva al detalle de candidatura priorizando el ID del Pipeline (con fallback seguro al ID de Candidato para retrocompatibilidad).
+*   **Panel de Datos del Pipeline y SLA Timeline:** Incorporación en la ficha de detalle de un contenedor glassmorphic con los metadatos de vinculación (ID de búsqueda asignada, ID de pipeline) y una línea de tiempo (SLA Track) visual para auditar el historial e intervalos de fechas de los cambios de estado.
 *   **Integración Gemini AI Sourcing (Live vs Mock):**
   - *Motor de Matching Semántico*: Analiza con la API de Google Gemini (1.5 Flash) el CV y puesto mostrando un Fit score (%), fortalezas, debilidades e instrucciones detalladas con indicador específico de fuente (`✨ GEMINI LIVE` vs `📋 MOCK`).
   - *Redacción de Outreach con Inteligencia Artificial*: Genera mensajes adaptados al perfil del candidato y permite A/B testing reescribiendo variantes A y B dináminamente con IA.
@@ -153,27 +155,39 @@ El **F2 Evaluación** gestiona la fase interna de validación técnica, entrevis
     ```bash
     npm run dev
     ```
-3.  **Ejecutar pruebas unitarias de integración (Etapa 1: Lectura):**
+3.  **Ejecutar pruebas de Candidatos - Etapa 1 (Lectura):**
     ```bash
     source ~/.zshrc && npx tsx --test tests/candidatos_etapa1.test.js
     ```
-4.  **Ejecutar pruebas unitarias de integración (Etapa 2: Escritura/Validación):**
+4.  **Ejecutar pruebas de Candidatos - Etapa 2 (Escritura/Validación):**
     ```bash
     source ~/.zshrc && npx tsx --test tests/candidatos_etapa2.test.js
     ```
-5.  **Ejecutar pruebas del Módulo de Evaluación (KPIs y Mocks):**
+5.  **Ejecutar pruebas de Descubrimiento - Etapa 1 (Lectura de Pipeline):**
+    ```bash
+    source ~/.zshrc && npx tsx --test tests/descubrimiento_etapa1.test.js
+    ```
+6.  **Ejecutar pruebas de Descubrimiento - Etapa 2 (Escritura y Mutaciones de Pipeline):**
+    ```bash
+    source ~/.zshrc && npx tsx --test tests/descubrimiento_etapa2.test.js
+    ```
+7.  **Ejecutar pruebas de Descubrimiento - Etapa 3 (Detalle y Sincronización IA Backend):**
+    ```bash
+    source ~/.zshrc && npx tsx --test tests/descubrimiento_etapa3.test.js
+    ```
+8.  **Ejecutar pruebas del Módulo de Evaluación (KPIs y Mocks):**
     ```bash
     export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && node --experimental-strip-types --test tests/evaluacion.test.js
     ```
-6.  **Ejecutar pruebas del Módulo de Presentación (F3):**
+9.  **Ejecutar pruebas del Módulo de Presentación (F3):**
     ```bash
     export PATH="/Users/dcastellano/.local/node-v20.12.2-darwin-arm64/bin:$PATH" && npx tsx --test tests/presentacion.test.js
     ```
-7.  **Ejecutar pruebas del Módulo de Cierre (F4):**
+10. **Ejecutar pruebas del Módulo de Cierre (F4):**
     ```bash
     export PATH="/Users/dcastellano/.local/node-v20.12.2-darwin-arm64/bin:$PATH" && npx tsx --test tests/cierre.test.js
     ```
-8.  Abre [http://localhost:3000](http://localhost:3000) en el navegador.
+11. Abre [http://localhost:3000](http://localhost:3000) en el navegador.
 
 ---
 ## Despliegue en hosting Pruebas de Firebase
@@ -183,8 +197,39 @@ git commit -m "Texto del cambio"
 git push origin main
 ```
 
--------------------------------------------------------------------------------------------------
-### Log de Cambios
+----------------------------------------------------------------------------------------------------------------------------------------------
+### LOG DE CAMBIOS
+
+*   **22/07/2026:** Rediseño Kanban, Asignación Activa de Búsquedas, Ruteo por ID de Pipeline y Renombramiento de Estados:
+    *   **Tablero Kanban en Talento:** Rediseño de la vista principal del módulo de talentos `/talento` para organizar a los candidatos en 4 columnas: PENDIENTE, REVISADO, SELECCIONADO y DESCARTADO, soportando Drag & Drop nativo.
+    *   **Modal de Asignación Activa:** Creación de popup glassmorphic interactivo que intercepta transiciones al estado SELECCIONADO para asociar al postulante a una búsqueda activa y registrar un nuevo documento en la colección de `pipeline` en estado inicial.
+    *   **Ruteo Detalle por ID de Pipeline:** Actualización de la página de detalle `/descubrimiento/[id]` para emplear el ID del Pipeline asíncronamente con un fallback robusto hacia el id de Candidato.
+    *   **Ficha de Metadatos y SLA Timeline:** Incorporación de un visor con metadatos de vinculación del reclutamiento e historial visual secuencial de cambios de estado (SLA tracker).
+    *   **Renombramiento de Estados de Descubrimiento:** Remodelación completa de las nomenclaturas para el pipeline de descubrimiento en tablero de columnas, tablas, dropdowns, y mapeos persistentes:
+        - `01 - Nuevo (Para Revisión)` ➔ `01 - Nuevo en Revisión` / `01 - NUEVO EN REVISION`
+        - `02 - Selección en Marcha / Contactado` ➔ `02 - Bloqueado / Pendiente` / `02 - BLOQUEADO / PENDIENTE`
+        - `03 - Bloqueado / Pendiente` ➔ `03 - En Duda a Confirmar` / `03 - EN DUDA A CONFIRMAR`
+        - `04 - Descartado / Rechazado / Fase Inicial` ➔ `04 - Rechazado en Fase Inicial` / `04 - RECHAZADO EN FASE INICIAL`
+    *   **Compatibilidad y Pruebas:** Implementación de consultas adaptativas insensibles a mayúsculas para retrocompatibilidad con registros existentes, garantizando que el paso de tests automatizados unitarios locales sea del 100%.
+
+*   **22/07/2026 (Stage 3):** Migración del Backend de Descubrimiento - Etapa 3 (Detalle y Sincronización IA Backend):
+    *   **Integración del Detalle de Candidatos:** Conexión de `/descubrimiento/[id]` con Server Actions dinámicas. Realiza carga unificada de candidato (`getCandidatosAPI`), búsquedas (`getBusquedasAPI`) y el pipeline correspondiente (`getPipelineAPI`) para poblar el modelo `SourcedCandidate`.
+    *   **Mutaciones Dinámicas del Detalle:** Refactorización de `handleSave` y `handleTransitionState` para persistir los cambios mediante Server Actions directas al backend (nombre, puesto, ubicación, notas de motivación, enlace al portfolio/LinkedIn y motivos específicos de descarte/bloqueo).
+    *   **Persistencia Física de IA y Outreach:** Captura automática y persistencia con `actualizarPipelineAPI` de los resultados dinámicos tanto del **Match Semántico** (`analisis_semantico` con fit_score, origen, fortalezas, etc.) como del **Outreach Directo** (con su variante y custom outreach templates).
+    *   **Fallback Seguro de Conexión:** Robustez añadida mediante cacheo inteligente en `localStorage` ante errores de conexión HTTP de la base de datos, con opción UI para reintentar la llamada.
+    *   **Suite de Pruebas Automatizadas:** Creación de `tests/descubrimiento_etapa3.test.js` bajo `node:test` + `tsx` para garantizar que la capa REST del detalle maneja adecuadamente campos permitidos vs denegados y la consolidación de datos IA.
+
+*   **22/07/2026 (Stage 2):** Migración del Backend de Descubrimiento - Etapa 2 (Escritura y Mutaciones de Pipeline):
+    *   **Mutaciones del Pipeline:** Implementación de las Server Actions `crearPipelineAPI`, `actualizarPipelineAPI` y `eliminarPipelineAPI` para persistir cambios en el backend.
+    *   **Transiciones Kanban Persistentes:** Integración en `handleTransitionState` de llamadas a la API mediante `actualizarPipelineAPI` para persistir los cambios de estado (arrastre Drag & Drop, selección rápida, especificación de motivos de rechazo/bloqueos).
+    *   **Ingest Inteligente de CV:** Actualización de la acción de ingestión OCR CV (`handleIngestSubmit`) para crear primero el perfil del candidato vía API (`crearCandidatoAPI`) y luego vincularlo automáticamente en el pipeline (`crearPipelineAPI`).
+    *   **Suite de Pruebas Automatizadas:** Creación de `tests/descubrimiento_etapa2.test.js` para asegurar y validar las operaciones de escritura/mutación contra el backend de pipeline.
+
+*   **22/07/2026:** Migración del Backend de Descubrimiento - Etapa 1 (Lectura del Pipeline):
+    *   **Consolidación del Pipeline de Búsquedas:** Integración de la Server Action `getPipelineAPI` para consultar items de pipeline asociados a `id_busqueda` contra la API del backend.
+    *   **Sincronización en Tablero y Lista:** Refactorización de la vista `/descubrimiento/page.tsx` para cargar dinámicamente las postulaciones y búsquedas activas vía REST, eliminando el mockeo basado puramente en `localStorage` inicial.
+    *   **Preservación de Features Simuladas:** Mantenimiento operativo de la importación rápida OCR CV, generación Boolean & X-Ray AI (Gemini 1.5 Flash) y Triage de WhatsApp mediante mutaciones locales en el estado reactivo principal.
+    *   **Suite de Pruebas Automatizadas:** Creación de `tests/descubrimiento_etapa1.test.js` bajo `node:test` + `tsx` para verificar el correcto flujo de autorización HTTP y deserialización de items de pipeline del backend.
 
 *   **21/07/2026:** Lanzamiento e integración del Módulo "F4 Cierre del Proceso" (Cierre):
     *   **Tablero Kanban y Detalle en Lista:** Construcción del pipeline final para la entrega al candidato o cierre del expediente (Oferta Extendida / Negociación, Contratado - Won, Rechazado Cliente - Lost, Candidato se baja - Drop-out) con arrastre nativo Drag & Drop, conmutador de pantalla completa, y ordenamiento interactivo multitabla.

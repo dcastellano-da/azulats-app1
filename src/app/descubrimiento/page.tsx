@@ -42,10 +42,15 @@ import {
   Minimize2
 } from "lucide-react";
 import { analyzeSemanticMatchLive, generateBooleanQueryLive, SemanticMatchResult } from "@/lib/gemini";
+import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
+import { getCandidatosAPI, Candidato, crearCandidatoAPI } from "@/actions/candidatos";
+import { getPipelineAPI, PipelineItem, crearPipelineAPI, actualizarPipelineAPI } from "@/actions/pipeline";
 
 // Candidate interface for Phase 1
 interface SourcedCandidate {
+  pipeId?: string; // Cache the pipeline item UUID
   id: string;
+
   name: string;
   role: string;
   client: string;
@@ -219,7 +224,98 @@ const getDynamicMatchResult = (cad: SourcedCandidate): SemanticMatchResult => {
   };
 };
 
+const mapPipelineToSourcedCandidates = (
+  pipelineItems: PipelineItem[],
+  candidatosList: Candidato[],
+  busquedasList: Busqueda[]
+): SourcedCandidate[] => {
+  const candidatoMap = new Map(candidatosList.map(c => [c.id, c]));
+  const busquedaMap = new Map(busquedasList.map(b => [b.id, b]));
+
+  return pipelineItems.map(pipe => {
+    const cand = candidatoMap.get(pipe.claves_conexion.id_candidato);
+    const busq = busquedaMap.get(pipe.claves_conexion.id_busqueda);
+
+    let phase1State: SourcedCandidate["phase1State"] = "01_nuevo";
+    const stateStr = pipe.flujo?.estado_actual || "";
+    const lowerState = stateStr.toLowerCase();
+    if (lowerState.includes("01 -") || lowerState.includes("01_nuevo")) {
+      phase1State = "01_nuevo";
+    } else if (lowerState.includes("02 -") || lowerState.includes("02_contactado")) {
+      phase1State = "02_contactado";
+    } else if (lowerState.includes("03 -") || lowerState.includes("03_bloqueado")) {
+      phase1State = "03_bloqueado";
+    } else if (lowerState.includes("04 -") || lowerState.includes("04_rechazado") || lowerState.includes("descartado") || lowerState.includes("rechazado")) {
+      phase1State = "04_rechazado";
+    } else {
+      if (lowerState === "02_contactado") phase1State = "02_contactado";
+      else if (lowerState === "03_bloqueado") phase1State = "03_bloqueado";
+      else if (lowerState === "04_rechazado") phase1State = "04_rechazado";
+    }
+
+    let lastChangeDate = "Hace poco";
+    if (pipe.flujo?.fecha_ultimo_cambio) {
+      const diffMs = Date.now() - new Date(pipe.flujo.fecha_ultimo_cambio).getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      if (diffHours < 1) {
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        lastChangeDate = diffMins <= 1 ? "Ahora mismo" : `Hace ${diffMins} min`;
+      } else if (diffHours < 24) {
+        lastChangeDate = `Hace ${diffHours} horas`;
+      } else {
+        const diffDays = Math.floor(diffHours / 24);
+        lastChangeDate = `Hace ${diffDays} ${diffDays === 1 ? "día" : "días"}`;
+      }
+    }
+
+    let blockReason = pipe.cierre?.motivo_rechazo || undefined;
+    let missingField: SourcedCandidate["missingField"] = undefined;
+    if (phase1State === "03_bloqueado") {
+      blockReason = pipe.cierre?.motivo_rechazo || "Falta información";
+      if (blockReason.toLowerCase().includes("cv")) {
+        missingField = "cv";
+      } else if (blockReason.toLowerCase().includes("salario") || blockReason.toLowerCase().includes("pretensión")) {
+        missingField = "salario";
+      } else if (blockReason.toLowerCase().includes("ingles") || blockReason.toLowerCase().includes("inglés")) {
+        missingField = "ingles";
+      }
+    }
+
+    const score = pipe.f1_descubrimiento?.analisis_semantico?.fit_score ?? (cand ? 80 : 85);
+    const rejectionReason = phase1State === "04_rechazado" ? (pipe.cierre?.motivo_rechazo || "No cumple barra mínima") : undefined;
+
+    let socialLinks: SourcedCandidate["socialLinks"] = undefined;
+    if (cand?.linkedin_url) {
+      socialLinks = {
+        portfolio: cand.linkedin_url
+      };
+    }
+
+    return {
+      id: pipe.claves_conexion.id_candidato,
+      pipeId: pipe.id,
+      name: cand?.nombre_completo || "Candidato Desconocido",
+      role: cand?.puesto || busq?.perfil_busqueda || "Developer",
+      client: busq?.cliente || "Cliente Genérico",
+      location: cand?.ubicacion || "Remoto España",
+      phase1State,
+      score,
+      lastChangeDate,
+      ttfme: pipe.f1_descubrimiento?.outreach?.fecha_envio ? "1.5d" : "--",
+      outreachVariation: (pipe.f1_descubrimiento?.outreach?.variante_enviada as "A" | "B") || "A",
+      customOutreachA: `Hola ${cand?.nombre_completo.split(" ")[0] || "Candidato"}, vi tu excelente perfil de ${cand?.puesto || "Developer"}...`,
+      customOutreachB: `Hola ${cand?.nombre_completo.split(" ")[0] || "Candidato"}, ¿te interesaría conocer una vacante?`,
+      blockReason,
+      missingField,
+      motivationNote: cand?.notas_iniciales || undefined,
+      socialLinks,
+      rejectionReason
+    };
+  });
+};
+
 // Global mockup active searches
+
 const ACTIVE_BUSQUEDAS = [
   { id: "REQ-001", client: "Telefónica S.A.", role: "Senior React Developer" },
   { id: "REQ-002", client: "SEAT S.A.", role: "Software Architect Rust" },
@@ -341,31 +437,78 @@ export default function DescubrimientoPage() {
   
   // States
   const [candidates, setCandidates] = useState<SourcedCandidate[]>([]);
-  const [candidatesLoaded, setCandidatesLoaded] = useState(false);
-
-  useEffect(() => {
-    const raw = localStorage.getItem("azul_ats_discovery_candidates");
-    if (raw) {
-      try {
-        setCandidates(JSON.parse(raw));
-      } catch (e) {
-        setCandidates(INITIAL_SOURCED_CANDIDATES);
-      }
-    } else {
-      setCandidates(INITIAL_SOURCED_CANDIDATES);
-      localStorage.setItem("azul_ats_discovery_candidates", JSON.stringify(INITIAL_SOURCED_CANDIDATES));
-    }
-    setCandidatesLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (candidatesLoaded) {
-      localStorage.setItem("azul_ats_discovery_candidates", JSON.stringify(candidates));
-    }
-  }, [candidates, candidatesLoaded]);
+  const [activeBusquedas, setActiveBusquedas] = useState<Busqueda[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSearch, setSelectedSearch] = useState("Todos");
+
+  const currentSearches = React.useMemo(() => {
+    return activeBusquedas.length > 0 
+      ? activeBusquedas.map(b => ({ id: b.id, client: b.cliente, role: b.perfil_busqueda }))
+      : ACTIVE_BUSQUEDAS;
+  }, [activeBusquedas]);
+
+  const fetchBackEndData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. Fetch searches
+      const searches = await getBusquedasAPI();
+      setActiveBusquedas(searches);
+
+      // 2. Fetch candidates
+      const candidatesRes = await getCandidatosAPI();
+      let candidatesList: Candidato[] = [];
+      if (candidatesRes.success && Array.isArray(candidatesRes.data)) {
+        candidatesList = candidatesRes.data;
+      }
+
+      // 3. Fetch pipelines
+      let pipeItems: PipelineItem[] = [];
+      if (selectedSearch === "Todos") {
+        if (searches.length > 0) {
+          const promises = searches.map(s => getPipelineAPI(s.id));
+          const results = await Promise.all(promises);
+          results.forEach(res => {
+            if (res.success && Array.isArray(res.data)) {
+              pipeItems = pipeItems.concat(res.data);
+            }
+          });
+        }
+      } else {
+        // Find matching search ID from selectedSearch string (client - role)
+        const match = searches.find(s => `${s.cliente} - ${s.perfil_busqueda}` === selectedSearch);
+        if (match) {
+          const res = await getPipelineAPI(match.id);
+          if (res.success && Array.isArray(res.data)) {
+            pipeItems = res.data;
+          }
+        }
+      }
+
+      // Map to SourcedCandidate
+      const mapped = mapPipelineToSourcedCandidates(pipeItems, candidatesList, searches);
+      setCandidates(mapped);
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || "Error al conectar con los servicios de backend para el pipeline.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackEndData();
+  }, [selectedSearch]);
+
+  useEffect(() => {
+    if (candidates.length > 0) {
+      localStorage.setItem("azul_ats_discovery_candidates", JSON.stringify(candidates));
+    }
+  }, [candidates]);
+
   const [copiedOutreachId, setCopiedOutreachId] = useState<string | null>(null);
   const [activeMetricHelp, setActiveMetricHelp] = useState<string | null>(null);
 
@@ -446,20 +589,55 @@ export default function DescubrimientoPage() {
     return null;
   }
 
+  if (loading && candidates.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#101415] flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 border-4 border-t-transparent border-[#6bd8cb] rounded-full animate-spin"></div>
+        <p className="text-xs text-[#879391] animate-pulse">Cargando base de datos del pipeline...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#101415] flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md p-6 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 space-y-4 shadow-xl">
+          <AlertCircle className="w-12 h-12 text-rose-400 mx-auto" />
+          <h2 className="text-lg font-bold text-white text-center">Error de Conexión</h2>
+          <p className="text-xs text-[#879391] leading-relaxed select-text">{error}</p>
+          <button 
+            onClick={fetchBackEndData} 
+            className="w-full py-2.5 rounded-xl bg-[#0d9488] hover:bg-[#0d9488]/80 text-white font-bold text-xs cursor-pointer transition-all"
+          >
+            Reintentar Conexión
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // --- Handlers for mock functionalities ---
 
+  const mapPhaseToBackendState = (phase: SourcedCandidate["phase1State"]): string => {
+    if (phase === "01_nuevo") return "01 - Nuevo en Revisión";
+    if (phase === "02_contactado") return "02 - Bloqueado / Pendiente";
+    if (phase === "03_bloqueado") return "03 - En Duda a Confirmar";
+    if (phase === "04_rechazado") return "04 - Rechazado en Fase Inicial";
+    return "01 - Nuevo en Revisión";
+  };
+
   // Move candidate to state helper
-  const handleTransitionState = (id: string, nextState: SourcedCandidate["phase1State"], customFieldUpdates: Partial<SourcedCandidate> = {}) => {
+  const handleTransitionState = async (id: string, nextState: SourcedCandidate["phase1State"], customFieldUpdates: Partial<SourcedCandidate> = {}) => {
+    // 1. Instantly update local state for optimistic rendering
+    const updates: Partial<SourcedCandidate> = { ...customFieldUpdates };
+    
     setCandidates((prev) => 
       prev.map((c) => {
         if (c.id === id) {
-          // Clear blocker details if leaving 03_bloqueado
-          const updates: Partial<SourcedCandidate> = { ...customFieldUpdates };
           if (c.phase1State === "03_bloqueado" && nextState !== "03_bloqueado") {
             updates.blockReason = undefined;
             updates.missingField = undefined;
           }
-          // Clear rejection reason if leaving 04_rechazado
           if (c.phase1State === "04_rechazado" && nextState !== "04_rechazado") {
             updates.rejectionReason = undefined;
           }
@@ -473,6 +651,43 @@ export default function DescubrimientoPage() {
         return c;
       })
     );
+
+    // 2. Persist mutation on the backend using the cached pipeId
+    const candidate = candidates.find((c) => c.id === id);
+    if (candidate && candidate.pipeId) {
+      try {
+        const payload: any = {
+          estado_actual: mapPhaseToBackendState(nextState)
+        };
+
+        const blockReason = customFieldUpdates.blockReason || updates.blockReason;
+        const rejectionReason = customFieldUpdates.rejectionReason || updates.rejectionReason;
+
+        if (nextState === "03_bloqueado") {
+          payload.cierre = {
+            motivo_rechazo: blockReason || "Falta información (cv/salario/ingles)",
+            fecha_cierre: new Date().toISOString()
+          };
+        } else if (nextState === "04_rechazado") {
+          payload.cierre = {
+            motivo_rechazo: rejectionReason || "Descartado en Fase Inicial",
+            fecha_cierre: new Date().toISOString()
+          };
+        } else {
+          payload.cierre = {
+            motivo_rechazo: null,
+            fecha_cierre: null
+          };
+        }
+
+        const res = await actualizarPipelineAPI(candidate.pipeId, payload);
+        if (!res.success) {
+          console.error("Fallo al actualizar el pipeline en el servidor:", res.message);
+        }
+      } catch (err) {
+        console.error("Error calling actualizarPipelineAPI:", err);
+      }
+    }
   };
 
   // Launch Rejection Flow
@@ -569,57 +784,110 @@ export default function DescubrimientoPage() {
   };
 
   // Parser LLM CV Upload Simulation
-  const handleIngestSubmit = (e: React.FormEvent) => {
+  const handleIngestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ingestCvText.trim()) return;
 
     setParsingCv(true);
 
-    const selectedSearchObj = ACTIVE_BUSQUEDAS.find((b) => b.id === ingestJobId);
+    const selectedSearchObj = currentSearches.find((b) => b.id === ingestJobId);
     const client = selectedSearchObj?.client || "Telefónica S.A.";
     const role = selectedSearchObj?.role || "Senior React Developer";
 
-    // Simulate LLM parsing process
-    setTimeout(() => {
-      const cvTextLower = ingestCvText.toLowerCase();
-      
-      let name = "Candidato Autoparsed";
-      if (cvTextLower.includes("diego") || cvTextLower.includes("javier")) {
-        name = "Javier Galdón";
-      } else if (cvTextLower.includes("lucia") || cvTextLower.includes("ana")) {
-        name = "Ana Belén Silva";
+    // Deduce name
+    const cvTextLower = ingestCvText.toLowerCase();
+    let name = "Candidato Autoparsed";
+    if (cvTextLower.includes("diego") || cvTextLower.includes("javier")) {
+      name = "Javier Galdón";
+    } else if (cvTextLower.includes("lucia") || cvTextLower.includes("ana")) {
+      name = "Ana Belén Silva";
+    } else {
+      const lines = ingestCvText.split("\n");
+      if (lines[0] && lines[0].length < 30) {
+        name = lines[0].trim();
       } else {
-        const lines = ingestCvText.split("\n");
-        if (lines[0] && lines[0].length < 30) {
-          name = lines[0];
-        } else {
-          name = "Clara Valenzuela";
-        }
+        name = "Clara Valenzuela";
+      }
+    }
+
+    const email = `${name.toLowerCase().replace(/\s+/g, '.').normalize("NFD").replace(/[\u0300-\u036f]/g, "")}@example.com`;
+    const score = 85 + Math.floor(Math.random() * 12);
+
+    try {
+      // 1. Create candidate via API
+      const form = new FormData();
+      form.append("nombre_completo", name);
+      form.append("email", email);
+      form.append("puesto", role);
+      form.append("linkedin_url", `https://linkedin.com/in/${name.toLowerCase().replace(/\s+/g, '-')}`);
+      form.append("acepta_privacidad", "true");
+      form.append("cv", new Blob([ingestCvText], { type: "application/pdf" }), "cv_parsed.pdf");
+      form.append("telefono_movil", "+34 600 000 000");
+      form.append("ubicacion", "Madrid / Remoto");
+      form.append("skills_principales", "React, TypeScript, CSS");
+      form.append("nivel_ingles", "B2");
+      form.append("otros_idiomas", "Español");
+      form.append("notas_iniciales", "CV extraído automáticamente usando Parser LLM de Azul ATS.");
+
+      const resCand = await crearCandidatoAPI(form);
+      if (!resCand.success || !resCand.data?.id) {
+        throw new Error(resCand.message || "Fallo al registrar candidato en el backend.");
+      }
+      
+      const newCandId = resCand.data.id;
+
+      // 2. Link candidate to search in pipeline
+      const resPipe = await crearPipelineAPI(ingestJobId, newCandId);
+      if (!resPipe.success || !resPipe.data?.id) {
+        throw new Error(resPipe.message || "Fallo al crear relación en el pipeline.");
       }
 
-      let score = 85 + Math.floor(Math.random() * 12);
+      const pipeId = resPipe.data.id;
 
+      // 3. Assemble and add to local state
       const newCand: SourcedCandidate = {
-        id: `C-${300 + candidates.length + 1}`,
+        id: newCandId,
+        pipeId: pipeId,
         name,
         role,
         client,
         location: "Madrid / Remoto",
         phase1State: "01_nuevo",
         score,
-        lastChangeDate: "Recién Ingestado",
+        lastChangeDate: "Ahora mismo",
         ttfme: "--",
         outreachVariation: "A",
         customOutreachA: `Hola ${name.split(" ")[0]}, analicé tu CV mediante nuestro parser avanzado LLM. Tu experiencia se alinea perfectamente con la posición en ${client}...`,
         customOutreachB: `Estimado/a ${name.split(" ")[0]}, ¿te gustaría comentar la vacante de ${role} en ${client}?`,
-        motivationNote: "CV extraído automáticamente usando Parser LLM de Azul ATS."
+        motivationNote: "CV extraído e insertado en el pipeline del backend."
       };
 
       setCandidates((prev) => [newCand, ...prev]);
+    } catch (err: any) {
+      console.error("Error durando ingestión del backend:", err);
+      // Fallback safe to mock local state so the recruiter is not blocked
+      const localId = `C-${300 + candidates.length + 1}`;
+      const newCand: SourcedCandidate = {
+        id: localId,
+        name,
+        role,
+        client,
+        location: "Madrid / Remoto",
+        phase1State: "01_nuevo",
+        score,
+        lastChangeDate: "Recién Ingestado (Mock)",
+        ttfme: "--",
+        outreachVariation: "A",
+        customOutreachA: `Hola ${name.split(" ")[0]}, analicé tu CV mediante nuestro parser avanzado LLM. Tu experiencia se alinea perfectamente con la posición en ${client}...`,
+        customOutreachB: `Estimado/a ${name.split(" ")[0]}, ¿te gustaría comentar la vacante de ${role} en ${client}?`,
+        motivationNote: `Ingestión simulada (${err.message || err})`
+      };
+      setCandidates((prev) => [newCand, ...prev]);
+    } finally {
       setParsingCv(false);
       setIsIngestOpen(false);
       setIngestCvText("");
-    }, 1800);
+    }
   };
 
   // Copy Outreach Message
@@ -672,7 +940,7 @@ export default function DescubrimientoPage() {
     if (!booleanKeywords.trim()) return;
     setIsGeneratingQueries(true);
     try {
-      const selectedReq = ACTIVE_BUSQUEDAS.find((b) => b.id === booleanJobId) || ACTIVE_BUSQUEDAS[1];
+      const selectedReq = currentSearches.find((b) => b.id === booleanJobId) || currentSearches[1];
       const resultObj = await generateBooleanQueryLive(
         booleanKeywords,
         booleanExclude,
@@ -705,7 +973,7 @@ export default function DescubrimientoPage() {
   };
 
   const handleSimulatedImport = () => {
-    const selectedSe = ACTIVE_BUSQUEDAS.find((b) => b.id === booleanJobId) || ACTIVE_BUSQUEDAS[1];
+    const selectedSe = currentSearches.find((b) => b.id === booleanJobId) || currentSearches[1];
     const client = selectedSe.client;
     const role = selectedSe.role;
 
@@ -1031,7 +1299,7 @@ export default function DescubrimientoPage() {
         <div className="flex gap-1.5 pt-2 border-t border-white/5">
           {/* Detalles button */}
           <Link
-            href={`/descubrimiento/${cad.id}`}
+            href={`/descubrimiento/${cad.pipeId || cad.id}`}
             className="px-2 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb] hover:text-[#101415] text-[9px] font-bold text-[#c4c1fb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0"
             title="Ver detalles completos del candidato"
           >
@@ -1498,7 +1766,7 @@ export default function DescubrimientoPage() {
                 className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] cursor-pointer w-full md:w-auto"
               >
                 <option value="Todos" className="bg-[#15181a]">Todas las Búsquedas</option>
-                {ACTIVE_BUSQUEDAS.map((b) => (
+                {currentSearches.map((b) => (
                   <option key={b.id} value={`${b.client} - ${b.role}`} className="bg-[#15181a] text-white">
                     {b.client} - {b.role}
                   </option>
@@ -1516,9 +1784,9 @@ export default function DescubrimientoPage() {
                   className="bg-white/5 border border-[#c4c1fb]/20 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] cursor-pointer w-full md:w-auto"
                 >
                   <option value="Todos" className="bg-[#15181a]">Todos los Estados</option>
-                  <option value="01_nuevo" className="bg-[#15181a]">01 - Nuevo (Para Revisión)</option>
-                  <option value="02_contactado" className="bg-[#15181a]">02 - Contactado (En Espera)</option>
-                  <option value="03_bloqueado" className="bg-[#15181a]">03 - Bloqueado / Pendiente</option>
+                  <option value="01_nuevo" className="bg-[#15181a]">01 - Nuevo en Revisión</option>
+                  <option value="02_contactado" className="bg-[#15181a]">02 - Bloqueado / Pendiente</option>
+                  <option value="03_bloqueado" className="bg-[#15181a]">03 - En Duda a Confirmar</option>
                   <option value="04_rechazado" className="bg-[#15181a]">04 - Rechazado en Fase Inicial</option>
                 </select>
               </div>
@@ -1589,7 +1857,7 @@ export default function DescubrimientoPage() {
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">01 - NUEVO (PARA REVISIÓN)</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">01 - NUEVO EN REVISION</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Sourced backlog inicial</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[#c4c1fb]">
@@ -1613,7 +1881,7 @@ export default function DescubrimientoPage() {
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">02 - CONTACTADO (EN ESPERA)</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">02 - BLOQUEADO / PENDIENTE</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Esperando respuesta outreach</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[#6bd8cb]">
@@ -1637,7 +1905,7 @@ export default function DescubrimientoPage() {
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">03 - BLOQUEADO / PENDIENTE</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">03 - EN DUDA A CONFIRMAR</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Dependencia o datos críticos</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-amber-400">
@@ -1661,7 +1929,7 @@ export default function DescubrimientoPage() {
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">04 - RECHAZADO (FASE INICIAL)</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">04 - RECHAZADO EN FASE INICIAL</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Descartes tempraneros</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-rose-500">
@@ -1747,13 +2015,13 @@ export default function DescubrimientoPage() {
                     let statusLabel = "";
                     let statusColor = "";
                     if (cad.phase1State === "01_nuevo") {
-                      statusLabel = "01 - Nuevo (Para Revisión)";
+                      statusLabel = "01 - Nuevo en Revisión";
                       statusColor = "text-indigo-400 bg-indigo-500/10 border-indigo-500/20";
                     } else if (cad.phase1State === "02_contactado") {
-                      statusLabel = "02 - Contactado (En Espera)";
+                      statusLabel = "02 - Bloqueado / Pendiente";
                       statusColor = "text-[#6bd8cb] bg-[#6bd8cb]/10 border-[#6bd8cb]/20";
                     } else if (cad.phase1State === "03_bloqueado") {
-                      statusLabel = "03 - Bloqueado / Pendiente";
+                      statusLabel = "03 - En Duda a Confirmar";
                       statusColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
                     } else if (cad.phase1State === "04_rechazado") {
                       statusLabel = "04 - Rechazado en Fase Inicial";
@@ -1845,7 +2113,7 @@ export default function DescubrimientoPage() {
                           <div className="flex items-center justify-center gap-2 text-[10px]">
                             {/* Detalles View Link */}
                             <Link
-                              href={`/descubrimiento/${cad.id}`}
+                              href={`/descubrimiento/${cad.pipeId || cad.id}`}
                               className="px-2.5 py-1 rounded border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-stone-900 transition-all flex items-center gap-1 text-[10px] cursor-pointer shrink-0"
                               title="Información detallada del candidato"
                             >
@@ -2044,7 +2312,7 @@ export default function DescubrimientoPage() {
                   onChange={(e) => setIngestJobId(e.target.value)}
                   className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none cursor-pointer focus:border-[#6bd8cb]"
                 >
-                  {ACTIVE_BUSQUEDAS.map((b) => (
+                  {currentSearches.map((b) => (
                     <option key={b.id} value={b.id} className="bg-[#15181a] text-white">
                       {b.id} - {b.role} ({b.client})
                     </option>
@@ -2393,7 +2661,7 @@ export default function DescubrimientoPage() {
                     onChange={(e) => setBooleanJobId(e.target.value)}
                     className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none cursor-pointer focus:border-[#c4c1fb]"
                   >
-                    {ACTIVE_BUSQUEDAS.map((b) => (
+                    {currentSearches.map((b) => (
                       <option key={b.id} value={b.id} className="bg-[#15181a] text-white">
                         {b.id} - {b.role} ({b.client})
                       </option>

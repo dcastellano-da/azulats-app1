@@ -30,8 +30,17 @@ import {
 } from "lucide-react";
 import { analyzeSemanticMatchLive, generateOutreachMessageLive, SemanticMatchResult } from "@/lib/gemini";
 
+// Backend API Actions
+import { getBusquedasAPI } from "@/actions/busquedas";
+import type { Busqueda } from "@/actions/busquedas";
+import { getCandidatosAPI, actualizarCandidatoAPI } from "@/actions/candidatos";
+import type { Candidato } from "@/actions/candidatos";
+import { getPipelineAPI, actualizarPipelineAPI } from "@/actions/pipeline";
+import type { PipelineItem } from "@/actions/pipeline";
+
 interface SourcedCandidate {
   id: string;
+  pipeId?: string;
   name: string;
   role: string;
   client: string;
@@ -156,6 +165,90 @@ const getDynamicMatchResult = (cad: SourcedCandidate): SemanticMatchResult => {
   };
 };
 
+const mapSinglePipelineToSourcedCandidate = (
+  pipe: PipelineItem | null,
+  cand: Candidato,
+  busq?: Busqueda
+): SourcedCandidate => {
+  let phase1State: SourcedCandidate["phase1State"] = "01_nuevo";
+  if (pipe) {
+    const stateStr = pipe.flujo?.estado_actual || "";
+    const lowerState = stateStr.toLowerCase();
+    if (lowerState.includes("01 -") || lowerState.includes("01_nuevo")) {
+      phase1State = "01_nuevo";
+    } else if (lowerState.includes("02 -") || lowerState.includes("02_contactado")) {
+      phase1State = "02_contactado";
+    } else if (lowerState.includes("03 -") || lowerState.includes("03_bloqueado")) {
+      phase1State = "03_bloqueado";
+    } else if (lowerState.includes("04 -") || lowerState.includes("04_rechazado") || lowerState.includes("descartado") || lowerState.includes("rechazado")) {
+      phase1State = "04_rechazado";
+    } else {
+      if (lowerState === "02_contactado") phase1State = "02_contactado";
+      else if (lowerState === "03_bloqueado") phase1State = "03_bloqueado";
+      else if (lowerState === "04_rechazado") phase1State = "04_rechazado";
+    }
+  }
+
+  let lastChangeDate = "Hace poco";
+  if (pipe?.flujo?.fecha_ultimo_cambio) {
+    const diffMs = Date.now() - new Date(pipe.flujo.fecha_ultimo_cambio).getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours < 1) {
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      lastChangeDate = diffMins <= 1 ? "Ahora mismo" : `Hace ${diffMins} min`;
+    } else if (diffHours < 24) {
+      lastChangeDate = `Hace ${diffHours} horas`;
+    } else {
+      const diffDays = Math.floor(diffHours / 24);
+      lastChangeDate = `Hace ${diffDays} ${diffDays === 1 ? "día" : "días"}`;
+    }
+  }
+
+  let blockReason = pipe?.cierre?.motivo_rechazo || undefined;
+  let missingField: SourcedCandidate["missingField"] = undefined;
+  if (phase1State === "03_bloqueado" && pipe) {
+    blockReason = pipe.cierre?.motivo_rechazo || "Falta información";
+    if (blockReason.toLowerCase().includes("cv")) {
+      missingField = "cv";
+    } else if (blockReason.toLowerCase().includes("salario") || blockReason.toLowerCase().includes("pretensión")) {
+      missingField = "salario";
+    } else if (blockReason.toLowerCase().includes("ingles") || blockReason.toLowerCase().includes("inglés")) {
+      missingField = "ingles";
+    }
+  }
+
+  const score = pipe?.f1_descubrimiento?.analisis_semantico?.fit_score ?? 80;
+  const rejectionReason = phase1State === "04_rechazado" ? (pipe?.cierre?.motivo_rechazo || "No cumple barra mínima") : undefined;
+
+  let socialLinks: SourcedCandidate["socialLinks"] = {
+    portfolio: cand.linkedin_url || ""
+  };
+
+  // Retrieve custom outreach variations from pipe if saved
+  const outreachInfo = (pipe?.f1_descubrimiento as any)?.outreach_custom || {};
+
+  return {
+    id: cand.id,
+    pipeId: pipe?.id,
+    name: cand.nombre_completo || "Candidato Desconocido",
+    role: cand.puesto || busq?.perfil_busqueda || "Developer",
+    client: busq?.cliente || "Cliente Genérico",
+    location: cand.ubicacion || "Remoto España",
+    phase1State,
+    score,
+    lastChangeDate,
+    ttfme: "4.2 días",
+    outreachVariation: (pipe?.f1_descubrimiento?.outreach?.variante_enviada || "A") as "A" | "B",
+    customOutreachA: outreachInfo.customOutreachA || `Hola ${cand.nombre_completo}, he visto tu experiencia como ${cand.puesto} y me ha parecido muy interesante para el rol en el que estamos trabajando...`,
+    customOutreachB: outreachInfo.customOutreachB || `Estimado/a ${cand.nombre_completo}, formo parte del equipo de talent sourcing. Observo que tienes un gran perfil técnico en ingeniería de software...`,
+    blockReason,
+    missingField,
+    motivationNote: cand.notas_iniciales || undefined,
+    socialLinks,
+    rejectionReason
+  };
+};
+
 export default function SourcedCandidateDetailPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
@@ -163,7 +256,9 @@ export default function SourcedCandidateDetailPage() {
 
   const [candidates, setCandidates] = useState<SourcedCandidate[]>([]);
   const [cand, setCand] = useState<SourcedCandidate | null>(null);
+  const [activePipelineItem, setActivePipelineItem] = useState<PipelineItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Edit Mode states
   const [isEditing, setIsEditing] = useState(false);
@@ -204,26 +299,103 @@ export default function SourcedCandidateDetailPage() {
     }
   }, [user, authLoading, router]);
 
-  // Load from localStorage
-  useEffect(() => {
-    const raw = localStorage.getItem("azul_ats_discovery_candidates");
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as SourcedCandidate[];
-        setCandidates(parsed);
-        const found = parsed.find(c => c.id === id);
-        if (found) {
-          setCand(found);
-          syncEditForm(found);
-        } else {
-          setCand(null);
+  // Fetch real data from backend
+  const fetchBackendData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // 1. Get active searches
+      const searchRes = await getBusquedasAPI();
+      let searchesList: Busqueda[] = Array.isArray(searchRes) ? searchRes : [];
+
+      // 2. Find this candidate's pipeline item in any of these searches using either pipeline ID or candidate ID
+      let foundPipeItem: PipelineItem | undefined;
+      let foundSearch: Busqueda | undefined;
+
+      if (searchesList.length > 0) {
+        const promises = searchesList.map(s => getPipelineAPI(s.id));
+        const results = await Promise.all(promises);
+        
+        // Search by pipeline ID first (url param id matches pipe item uuid)
+        for (let i = 0; i < results.length; i++) {
+          const res = results[i];
+          if (res.success && Array.isArray(res.data)) {
+            const item = res.data.find(p => p.id === id);
+            if (item) {
+              foundPipeItem = item;
+              foundSearch = searchesList[i];
+              break;
+            }
+          }
         }
-      } catch (e) {
-        console.error("Error reading localStorage", e);
+
+        // Fallback: search by candidate ID
+        if (!foundPipeItem) {
+          for (let i = 0; i < results.length; i++) {
+            const res = results[i];
+            if (res.success && Array.isArray(res.data)) {
+              const item = res.data.find(p => p.claves_conexion.id_candidato === id);
+              if (item) {
+                foundPipeItem = item;
+                foundSearch = searchesList[i];
+                break;
+              }
+            }
+          }
+        }
       }
+
+      // 3. Get Candidates
+      const candRes = await getCandidatosAPI();
+      if (!candRes.success || !candRes.data) {
+        throw new Error(candRes.message || "Error al obtener candidatos.");
+      }
+      const candidatesList = candRes.data as Candidato[];
+      
+      const candidateId = foundPipeItem ? foundPipeItem.claves_conexion.id_candidato : id;
+      const foundCandidate = candidatesList.find(c => c.id === candidateId);
+      
+      if (!foundCandidate) {
+        setCand(null);
+        setActivePipelineItem(null);
+        setLoading(false);
+        return;
+      }
+
+      // Map to SourcedCandidate
+      const sourced = mapSinglePipelineToSourcedCandidate(foundPipeItem || null, foundCandidate, foundSearch);
+      setCand(sourced);
+      setActivePipelineItem(foundPipeItem || null);
+      syncEditForm(sourced);
+      setCandidates([sourced]);
+    } catch (e: any) {
+      console.error("Error loading candidate from backend, falling back to localStorage:", e);
+      setError(e.message || "Error al cargar datos reales del candidato.");
+      
+      const raw = localStorage.getItem("azul_ats_discovery_candidates");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as SourcedCandidate[];
+          setCandidates(parsed);
+          const found = parsed.find(c => c.id === id || c.pipeId === id);
+          if (found) {
+            setCand(found);
+            syncEditForm(found);
+          }
+        } catch (_) {}
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [id]);
+  };
+
+  // Load from backend on init
+  useEffect(() => {
+    if (!authLoading && user) {
+      fetchBackendData();
+    }
+  }, [id, user, authLoading]);
 
   const syncEditForm = (c: SourcedCandidate) => {
     setEditName(c.name || "");
@@ -248,76 +420,247 @@ export default function SourcedCandidateDetailPage() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editName.trim() || !editRole.trim() || !editClient.trim()) {
       alert("El nombre, puesto y cliente son campos obligatorios.");
       return;
     }
 
-    const updated = candidates.map(c => {
-      if (c.id === id) {
-        return {
-          ...c,
-          name: editName.trim(),
-          role: editRole.trim(),
-          client: editClient.trim(),
-          location: editLocation.trim(),
-          motivationNote: editMotivation.trim(),
-          score: Number(editScore),
-          socialLinks: {
-            ...c.socialLinks,
-            github: editGithub.trim() || undefined,
-            portfolio: editPortfolio.trim() || undefined
-          },
-          blockReason: c.phase1State === "03_bloqueado" ? editBlockReason.trim() : c.blockReason,
-          rejectionReason: c.phase1State === "04_rechazado" ? editRejectionReason : c.rejectionReason,
-          lastChangeDate: "Recién editado"
-        };
-      }
-      return c;
-    });
+    try {
+      setLoading(true);
+      // 1. Update Candidate
+      const candPayload: Partial<Candidato> = {};
+      if (editName.trim() !== cand?.name) candPayload.nombre_completo = editName.trim();
+      if (editRole.trim() !== cand?.role) candPayload.puesto = editRole.trim();
+      if (editLocation.trim() !== cand?.location) candPayload.ubicacion = editLocation.trim();
+      if (editMotivation.trim() !== cand?.motivationNote) candPayload.notas_iniciales = editMotivation.trim();
+      if (editPortfolio.trim() !== cand?.socialLinks?.portfolio) candPayload.linkedin_url = editPortfolio.trim();
 
-    handleUpdateCandidatesList(updated);
-    setIsEditing(false);
+      if (cand && Object.keys(candPayload).length > 0) {
+        const res = await actualizarCandidatoAPI(cand.id, candPayload);
+        if (!res.success) {
+          throw new Error(res.message || "Error al actualizar la información del candidato.");
+        }
+      }
+
+      // 2. Update Pipeline
+      if (cand?.pipeId) {
+        const pipePayload: any = {
+          f1_descubrimiento: {
+            ...(cand as any).f1_descubrimiento,
+            analisis_semantico: {
+              ...(cand as any).f1_descubrimiento?.analisis_semantico,
+              fit_score: Number(editScore),
+              origen: "Gemini AI"
+            },
+            outreach: {
+              ...(cand as any).f1_descubrimiento?.outreach,
+              variante_enviada: cand.outreachVariation
+            },
+            outreach_custom: {
+              customOutreachA: cand.customOutreachA,
+              customOutreachB: cand.customOutreachB
+            }
+          }
+        };
+
+        if (cand.phase1State === "03_bloqueado") {
+          pipePayload.cierre = {
+            fecha_cierre: new Date().toISOString(),
+            motivo_rechazo: editBlockReason.trim()
+          };
+        } else if (cand.phase1State === "04_rechazado") {
+          pipePayload.cierre = {
+            fecha_cierre: new Date().toISOString(),
+            motivo_rechazo: editRejectionReason
+          };
+        }
+
+        const res = await actualizarPipelineAPI(cand.pipeId, pipePayload);
+        if (!res.success) {
+          throw new Error(res.message || "Error al actualizar el pipeline.");
+        }
+      }
+
+      // Update LocalStorage too
+      const raw = localStorage.getItem("azul_ats_discovery_candidates");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as SourcedCandidate[];
+          const updated = parsed.map(c => {
+            if (c.id === id) {
+              return {
+                ...c,
+                name: editName.trim(),
+                role: editRole.trim(),
+                client: editClient.trim(),
+                location: editLocation.trim(),
+                motivationNote: editMotivation.trim(),
+                score: Number(editScore),
+                socialLinks: {
+                  ...c.socialLinks,
+                  github: editGithub.trim() || undefined,
+                  portfolio: editPortfolio.trim() || undefined
+                },
+                blockReason: c.phase1State === "03_bloqueado" ? editBlockReason.trim() : c.blockReason,
+                rejectionReason: c.phase1State === "04_rechazado" ? editRejectionReason : c.rejectionReason,
+                lastChangeDate: "Recién editado"
+              };
+            }
+            return c;
+          });
+          localStorage.setItem("azul_ats_discovery_candidates", JSON.stringify(updated));
+          setCandidates(updated);
+        } catch (_) {}
+      }
+
+      await fetchBackendData();
+      setIsEditing(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Error al guardar los cambios.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleTransitionState = (newState: SourcedCandidate["phase1State"], params?: Partial<SourcedCandidate>) => {
-    const updated = candidates.map(c => {
-      if (c.id === id) {
-        return {
-          ...c,
-          phase1State: newState,
-          lastChangeDate: "Hace unos segundos",
-          ...params
-        };
+  const handleTransitionState = async (newState: SourcedCandidate["phase1State"], params?: Partial<SourcedCandidate>) => {
+    if (!cand) return;
+
+    const mapPhaseToBackendState = (phase: string) => {
+      switch (phase) {
+        case "01_nuevo":
+          return "01 - Nuevo en Revisión";
+        case "02_contactado":
+          return "02 - Bloqueado / Pendiente";
+        case "03_bloqueado":
+          return "03 - En Duda a Confirmar";
+        case "04_rechazado":
+          return "04 - Rechazado en Fase Inicial";
+        default:
+          return "01 - Nuevo en Revisión";
       }
-      return c;
-    });
-    handleUpdateCandidatesList(updated);
+    };
+
+    try {
+      setLoading(true);
+
+      // Update candidate's review state in master table
+      const candPayload: Partial<Candidato> = {};
+      if (newState === "04_rechazado") {
+        candPayload.estado_revision = "Descartado";
+      } else if (newState === "02_contactado") {
+        candPayload.estado_revision = "Seleccionado";
+      } else {
+        candPayload.estado_revision = "Pendiente";
+      }
+
+      if (params?.motivationNote) {
+        candPayload.notas_iniciales = params.motivationNote;
+      }
+      await actualizarCandidatoAPI(cand.id, candPayload);
+
+      // Update relation in pipeline
+      if (cand.pipeId) {
+        const payload: any = {
+          flujo: {
+            estado_actual: mapPhaseToBackendState(newState),
+            fecha_ultimo_cambio: new Date().toISOString()
+          }
+        };
+
+        if (newState === "03_bloqueado" || newState === "04_rechazado") {
+          const reason = params?.blockReason || params?.rejectionReason || "Cierre de revisión";
+          payload.cierre = {
+            fecha_cierre: new Date().toISOString(),
+            motivo_rechazo: reason
+          };
+        } else {
+          payload.cierre = {
+            fecha_cierre: null,
+            motivo_rechazo: null
+          };
+        }
+
+        await actualizarPipelineAPI(cand.pipeId, payload);
+      }
+
+      // Update LocalStorage too
+      const raw = localStorage.getItem("azul_ats_discovery_candidates");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as SourcedCandidate[];
+          const updated = parsed.map(c => {
+            if (c.id === id) {
+              return {
+                ...c,
+                phase1State: newState,
+                lastChangeDate: "Hace unos segundos",
+                ...params
+              };
+            }
+            return c;
+          });
+          localStorage.setItem("azul_ats_discovery_candidates", JSON.stringify(updated));
+          setCandidates(updated);
+        } catch (_) {}
+      }
+
+      await fetchBackendData();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Error al actualizar la transición del candidato.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Simulated Action: Enrich / Scrape digital footprint
-  const handleEnrichCandidate = () => {
+  const handleEnrichCandidate = async () => {
     if (!cand) return;
     setEnriching(true);
-    setTimeout(() => {
-      const updated = candidates.map(c => {
-        if (c.id === id) {
-          return {
-            ...c,
-            socialLinks: {
-              ...c.socialLinks,
-              github: c.socialLinks?.github || `https://github.com/${c.name.toLowerCase().replace(/ /g, "")}`,
-              portfolio: c.socialLinks?.portfolio || `https://${c.name.toLowerCase().replace(/ /g, "")}.dev`
+    try {
+      const linkedin = cand.socialLinks?.portfolio || `https://linkedin.com/in/${cand.name.toLowerCase().replace(/ /g, "-")}`;
+      
+      const payload: Partial<Candidato> = {
+        linkedin_url: linkedin
+      };
+
+      const res = await actualizarCandidatoAPI(cand.id, payload);
+      if (!res.success) {
+        throw new Error(res.message || "Error al guardar el enriquecimiento.");
+      }
+
+      // Local storage sync
+      const raw = localStorage.getItem("azul_ats_discovery_candidates");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as SourcedCandidate[];
+          const updated = parsed.map(c => {
+            if (c.id === id) {
+              return {
+                ...c,
+                socialLinks: {
+                  github: c.socialLinks?.github || `https://github.com/${c.name.toLowerCase().replace(/ /g, "")}`,
+                  portfolio: linkedin
+                }
+              };
             }
-          };
-        }
-        return c;
-      });
-      handleUpdateCandidatesList(updated);
+            return c;
+          });
+          localStorage.setItem("azul_ats_discovery_candidates", JSON.stringify(updated));
+          setCandidates(updated);
+        } catch (_) {}
+      }
+
+      await fetchBackendData();
+      alert("Huella digital enriquecida! Enlaces de LinkedIn y Github actualizados en el backend.");
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Error al enriquecer candidato.");
+    } finally {
       setEnriching(false);
-      alert("Huella digital enriquecida! Enlaces de portafolio y Github generados con Inteligencia Artificial.");
-    }, 1200);
+    }
   };
 
   // Simulated Action: Copy Outreach message template
@@ -328,18 +671,55 @@ export default function SourcedCandidateDetailPage() {
   };
 
   // Switch outreach variation template
-  const handleToggleOutreachVariation = () => {
+  const handleToggleOutreachVariation = async () => {
     if (!cand) return;
-    const updated = candidates.map(c => {
-      if (c.id === id) {
-        return {
-          ...c,
-          outreachVariation: (c.outreachVariation === "A" ? "B" : "A") as "A" | "B"
+    const newVariation: "A" | "B" = cand.outreachVariation === "A" ? "B" : "A";
+    
+    try {
+      setLoading(true);
+      if (cand.pipeId) {
+        const payload = {
+          f1_descubrimiento: {
+            ...(cand as any).f1_descubrimiento,
+            outreach: {
+              ...(cand as any).f1_descubrimiento?.outreach,
+              variante_enviada: newVariation,
+              fecha_envio: new Date().toISOString()
+            }
+          }
         };
+        const res = await actualizarPipelineAPI(cand.pipeId, payload);
+        if (!res.success) {
+          throw new Error(res.message || "Error al actualizar la variante de outreach.");
+        }
       }
-      return c;
-    });
-    handleUpdateCandidatesList(updated);
+
+      // Local storage sync
+      const raw = localStorage.getItem("azul_ats_discovery_candidates");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as SourcedCandidate[];
+          const updated = parsed.map(c => {
+            if (c.id === id) {
+              return {
+                ...c,
+                outreachVariation: newVariation
+              };
+            }
+            return c;
+          });
+          localStorage.setItem("azul_ats_discovery_candidates", JSON.stringify(updated));
+          setCandidates(updated);
+        } catch (_) {}
+      }
+
+      await fetchBackendData();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Error al cambiar la variante de outreach.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Launch Semantic Dialog analysis
@@ -358,6 +738,46 @@ export default function SourcedCandidateDetailPage() {
         fallbackInfo.score
       );
       setSemanticResult(liveResult);
+
+      if (cand.pipeId) {
+        const payload = {
+          f1_descubrimiento: {
+            ...(cand as any).f1_descubrimiento,
+            analisis_semantico: {
+              origen: liveResult.source || "Gemini AI",
+              fit_score: liveResult.score,
+              fortalezas: liveResult.positives,
+              debilidades: liveResult.negatives,
+              recomendaciones: liveResult.recommendations.join(". ")
+            }
+          }
+        };
+        const res = await actualizarPipelineAPI(cand.pipeId, payload);
+        if (res.success) {
+          console.log("[Semantic Match] Persistido en el backend de forma física.");
+        }
+      }
+
+      // Local storage sync
+      const raw = localStorage.getItem("azul_ats_discovery_candidates");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as SourcedCandidate[];
+          const updated = parsed.map(c => {
+            if (c.id === id) {
+              return {
+                ...c,
+                score: liveResult.score
+              };
+            }
+            return c;
+          });
+          localStorage.setItem("azul_ats_discovery_candidates", JSON.stringify(updated));
+          setCandidates(updated);
+        } catch (_) {}
+      }
+
+      await fetchBackendData();
     } catch (e) {
       console.error(e);
     } finally {
@@ -376,20 +796,55 @@ export default function SourcedCandidateDetailPage() {
         cand.client,
         cand.outreachVariation
       );
-      const updated = candidates.map(c => {
-        if (c.id === id) {
-          const isA = c.outreachVariation === "A";
-          return {
-            ...c,
-            customOutreachA: isA ? result.message : c.customOutreachA,
-            customOutreachB: !isA ? result.message : c.customOutreachB
-          };
+      const isA = cand.outreachVariation === "A";
+      const customA = isA ? result.message : cand.customOutreachA;
+      const customB = !isA ? result.message : cand.customOutreachB;
+
+      if (cand.pipeId) {
+        const payload = {
+          f1_descubrimiento: {
+            ...(cand as any).f1_descubrimiento,
+            outreach: {
+              ...(cand as any).f1_descubrimiento?.outreach,
+              variante_enviada: cand.outreachVariation,
+              fecha_envio: new Date().toISOString()
+            },
+            outreach_custom: {
+              customOutreachA: customA,
+              customOutreachB: customB
+            }
+          }
+        };
+        const res = await actualizarPipelineAPI(cand.pipeId, payload);
+        if (!res.success) {
+          throw new Error(res.message || "Error al persistir el outreach en el backend.");
         }
-        return c;
-      });
-      handleUpdateCandidatesList(updated);
-    } catch (e) {
+      }
+
+      // Local storage sync
+      const raw = localStorage.getItem("azul_ats_discovery_candidates");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as SourcedCandidate[];
+          const updated = parsed.map(c => {
+            if (c.id === id) {
+              return {
+                ...c,
+                customOutreachA: customA,
+                customOutreachB: customB
+              };
+            }
+            return c;
+          });
+          localStorage.setItem("azul_ats_discovery_candidates", JSON.stringify(updated));
+          setCandidates(updated);
+        } catch (_) {}
+      }
+
+      await fetchBackendData();
+    } catch (e: any) {
       console.error(e);
+      alert(e.message || "Error al generar outreach con IA.");
     } finally {
       setIsGeneratingOutreach(false);
     }
@@ -449,6 +904,7 @@ export default function SourcedCandidateDetailPage() {
     setRejectingId(null);
   };
 
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#101415] flex items-center justify-center text-white">
@@ -461,20 +917,33 @@ export default function SourcedCandidateDetailPage() {
     return (
       <div className="min-h-screen bg-[#101415] flex flex-col items-center justify-center text-white space-y-4">
         <AlertCircle className="w-12 h-12 text-rose-400" />
-        <h2 className="text-lg font-bold">Candidato no encontrado</h2>
-        <p className="text-xs text-[#879391]">El ID solicitado "{id}" no corresponde a un perfil registrado.</p>
-        <Link href="/descubrimiento" className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs hover:bg-[#6bd8cb] hover:text-black transition-all">
-          Volver a F1 Descubrimiento
-        </Link>
+        <h2 className="text-lg font-bold">{error ? "Error al cargar candidato" : "Candidato no encontrado"}</h2>
+        <p className="text-xs text-[#879391] max-w-md text-center">
+          {error || `El ID solicitado "${id}" no corresponde a un perfil registrado.`}
+        </p>
+        <div className="flex gap-2">
+          {error && (
+            <button 
+              onClick={() => fetchBackendData()}
+              className="px-4 py-2 bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 rounded-xl text-xs hover:bg-[#6bd8cb] hover:text-black transition-all font-bold"
+            >
+              Reintentar Conexión
+            </button>
+          )}
+          <Link href="/descubrimiento" className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs hover:bg-[#6bd8cb] hover:text-black transition-all">
+            Volver a F1 Descubrimiento
+          </Link>
+        </div>
       </div>
     );
   }
 
+
   const activeOutreachMsg = cand.outreachVariation === "A" ? cand.customOutreachA : cand.customOutreachB;
   const statusLabels = {
-    "01_nuevo": "01 - Nuevo (Para Revisión)",
-    "02_contactado": "02 - Contactado",
-    "03_bloqueado": "03 - Bloqueado / Pendientes",
+    "01_nuevo": "01 - Nuevo en Revisión",
+    "02_contactado": "02 - Bloqueado / Pendiente",
+    "03_bloqueado": "03 - En Duda a Confirmar",
     "04_rechazado": "04 - Rechazado en Fase Inicial"
   };
 
@@ -851,8 +1320,89 @@ export default function SourcedCandidateDetailPage() {
                   </div>
                 </div>
               )}
-
             </div>
+
+            {/* Sección de Datos de Pipeline */}
+            {activePipelineItem && (
+              <div className="glass-panel rounded-3xl p-6 border border-white/10 text-left space-y-5">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-4 border-b border-white/5">
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                      Datos del Pipeline de Reclutamiento
+                    </h3>
+                    <p className="text-[10px] text-[#879391] mt-0.5">
+                      Información técnica de la relación Candidato - Búsqueda
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono text-[#6bd8cb] bg-[#6bd8cb]/10 px-2.5 py-1 rounded-xl border border-[#6bd8cb]/20 font-bold self-start sm:self-auto">
+                    ID PIPELINE: {activePipelineItem.id}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block font-sans">ID Búsqueda Activa</span>
+                    <span className="font-mono text-white/80 select-all">{activePipelineItem.claves_conexion.id_busqueda}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block font-sans">ID Postulante</span>
+                    <span className="font-mono text-white/80 select-all">{activePipelineItem.claves_conexion.id_candidato}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block font-sans">Estado en Pipeline</span>
+                    <span className="text-emerald-400 font-bold block text-sm mt-0.5 font-sans">{activePipelineItem.flujo.estado_actual}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block font-sans">Última Modificación</span>
+                    <span className="text-white/80 block mt-0.5 font-sans">
+                      {activePipelineItem.flujo.fecha_ultimo_cambio 
+                        ? new Date(activePipelineItem.flujo.fecha_ultimo_cambio).toLocaleString() 
+                        : "No especificado"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Historial de transiciones de estado */}
+                {activePipelineItem.flujo.historial_estados && activePipelineItem.flujo.historial_estados.length > 0 ? (
+                  <div className="pt-4 border-t border-white/5 space-y-4">
+                    <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider block">
+                      Historial y Trazabilidad de Estados (SLA)
+                    </span>
+                    <div className="relative pl-6 border-l border-white/10 space-y-5 ml-2 pt-1 pb-1">
+                      {activePipelineItem.flujo.historial_estados.map((entry, idx) => (
+                        <div key={idx} className="relative space-y-1">
+                          
+                          {/* Punto conector */}
+                          <div className={`absolute -left-[29.5px] top-1 w-2.5 h-2.5 rounded-full border border-[#101415] shadow-sm ${
+                            idx === 0 
+                              ? "bg-emerald-400 ring-4 ring-emerald-400/20" 
+                              : "bg-[#879391]"
+                          }`}></div>
+                          
+                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1">
+                            <span className={`text-xs font-bold ${
+                              idx === 0 ? "text-white" : "text-white/60"
+                            }`}>
+                              {entry.estado}
+                            </span>
+                            <span className="text-[10px] text-[#879391] font-mono">
+                              {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-4 border-t border-white/5">
+                    <p className="text-[11px] text-[#879391] italic">
+                      No se registra historial previo de transiciones para esta postulación.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
 
           {/* Right Area: Interactive Actions Sidebar */}

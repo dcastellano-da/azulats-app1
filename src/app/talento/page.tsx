@@ -34,6 +34,8 @@ import SlideOver from "../components/SlideOver";
 import CandidatoForm from "../components/CandidatoForm";
 import ImportarIaModal from "../components/ImportarIaModal";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
+import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
+import { crearPipelineAPI } from "@/actions/pipeline";
 
 export default function TalentoPage() {
   const router = useRouter();
@@ -84,6 +86,77 @@ export default function TalentoPage() {
     loadCandidatos();
   };
 
+  // Search assignment modal state
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [activeSearches, setActiveSearches] = useState<Busqueda[]>([]);
+  const [selectedSearchId, setSelectedSearchId] = useState<string>("");
+  const [loadingSearches, setLoadingSearches] = useState(false);
+  const [selectedCandidateForSearch, setSelectedCandidateForSearch] = useState<Candidato | null>(null);
+  const [assigningSearch, setAssigningSearch] = useState(false);
+
+  const loadActiveSearchesForAssignment = async () => {
+    try {
+      setLoadingSearches(true);
+      const data = await getBusquedasAPI();
+      const openSearches = data.filter(b => b.estado_fase !== "Cerrada");
+      setActiveSearches(openSearches);
+      if (openSearches.length > 0) {
+        // Fallback to id (standard) or id_busqueda
+        setSelectedSearchId(openSearches[0].id || openSearches[0].id_busqueda || "");
+      }
+    } catch (err) {
+      console.error("Error al cargar búsquedas activas:", err);
+    } finally {
+      setLoadingSearches(false);
+    }
+  };
+
+  const handleConfirmAssignment = async () => {
+    if (!selectedCandidateForSearch || !selectedSearchId) return;
+    try {
+      setAssigningSearch(true);
+      // 1. Update candidate status to "Seleccionado"
+      const resCand = await actualizarCandidatoAPI(selectedCandidateForSearch.id, { 
+        estado_revision: "Seleccionado" 
+      });
+
+      if (!resCand.success) {
+        alert(`No se pudo actualizar el estado del postulante: ${resCand.message}`);
+        return;
+      }
+
+      // 2. Add Candidate to Pipeline
+      const resPipe = await crearPipelineAPI(selectedSearchId, selectedCandidateForSearch.id);
+      if (!resPipe.success) {
+        // Rollback candidate status on error
+        await actualizarCandidatoAPI(selectedCandidateForSearch.id, { 
+          estado_revision: selectedCandidateForSearch.estado_revision 
+        });
+        alert(`No se pudo agregar el postulante al pipeline de la búsqueda: ${resPipe.message}`);
+        return;
+      }
+
+      setToast({
+        type: "success",
+        message: `Postulante ${selectedCandidateForSearch.nombre_completo} transicionado e ingresado al pipeline.`
+      });
+      setTimeout(() => setToast(null), 5000);
+      
+      // Close modal and reset
+      setShowSearchModal(false);
+      setSelectedCandidateForSearch(null);
+      setSelectedSearchId("");
+      
+      // Re-fetch candidatos list to show updated column
+      loadCandidatos();
+    } catch (err) {
+      console.error("Error confirmando la asignación del candidato:", err);
+      alert("Hubo un error inesperado al realizar la asignación. Intente nuevamente.");
+    } finally {
+      setAssigningSearch(false);
+    }
+  };
+
   // Client-side authentication protection
   useEffect(() => {
     if (!authLoading && !user) {
@@ -129,6 +202,16 @@ export default function TalentoPage() {
 
   // Handle fast status change (interactive faders simulation)
   const handleUpdateStatus = (id: string, newStatus: Candidato["estado_revision"]) => {
+    if (newStatus === "Seleccionado") {
+      const cand = candidatos.find(c => c.id === id);
+      if (cand) {
+        setSelectedCandidateForSearch(cand);
+        loadActiveSearchesForAssignment();
+        setShowSearchModal(true);
+        return;
+      }
+    }
+
     // Optimistic Update
     const originalList = [...candidatos];
     setCandidatos(prev => 
@@ -223,6 +306,170 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
       default:
         return "bg-gray-400 shadow-gray-400/50";
     }
+  };
+
+  // Drag & Drop Handlers for Talent Kanban
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData("text/plain", id);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, targetStatus: Candidato["estado_revision"]) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/plain");
+    if (!id) return;
+    handleUpdateStatus(id, targetStatus);
+  };
+
+  // Helper Subcomponents
+  const RenderColumnEmptyText = ({ text }: { text: string }) => (
+    <div className="py-8 text-center text-xs text-white/20 italic border border-dashed border-white/5 rounded-2xl bg-white/[0.005]">
+      {text}
+    </div>
+  );
+
+  const RenderCandidateCard = ({ cand }: { cand: Candidato }) => {
+    return (
+      <div
+        draggable
+        onDragStart={(e) => handleDragStart(e, cand.id)}
+        className="group relative rounded-2xl border border-white/10 bg-[#15181a]/40 hover:bg-[#15181a]/95 hover:border-white/20 p-4 flex flex-col justify-between transition-all duration-300 hover:glow-effect hover:-translate-y-0.5 cursor-grab active:cursor-grabbing text-left space-y-3 relative overflow-hidden"
+      >
+        {/* Accent line */}
+        <div className="absolute top-0 left-6 right-6 h-[2px] bg-gradient-to-r from-transparent via-[#6bd8cb]/20 to-transparent group-hover:via-[#6bd8cb]/50 transition-all"></div>
+        
+        <div className="space-y-3">
+          {/* Card Header: name and State sphere */}
+          <div className="flex justify-between items-start">
+            <div className="space-y-1 max-w-[80%]">
+              <h3 className="text-xs font-extrabold text-white group-hover:text-[#6bd8cb] transition-colors leading-tight">
+                {cand.nombre_completo}
+              </h3>
+            </div>
+
+            {/* Sphere status */}
+            <div 
+              className={`w-3 h-3 rounded-full ${getStatusBubbleStyle(cand.estado_revision)} shadow-md animate-pulse shrink-0`} 
+              title={`Estado: ${cand.estado_revision}`}
+            />
+          </div>
+
+          {/* Body Content */}
+          <div className="space-y-2 pt-0.5 text-left">
+            <div>
+              <span className="text-[9px] text-white/50 uppercase tracking-widest font-bold block mb-0.5">
+                Puesto Postulado
+              </span>
+              <p className="text-[11px] font-bold text-[#c4c1fb] truncate">
+                {cand.puesto}
+              </p>
+            </div>
+
+            <div className="space-y-1 font-medium">
+              <a
+                href={`mailto:${cand.email}`}
+                className="flex items-center gap-1.5 text-[10px] text-[#879391] hover:text-[#6bd8cb] transition-colors cursor-pointer hover:underline"
+              >
+                <Mail className="w-3 h-3 shrink-0" />
+                <span className="truncate">{cand.email}</span>
+              </a>
+              
+              {cand.linkedin_url && (
+                <a
+                  href={cand.linkedin_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-[10px] text-[#6bd8cb] hover:underline"
+                >
+                  <span className="w-3 h-3 font-mono text-[8px] font-bold border border-[#6bd8cb]/30 rounded flex items-center justify-center bg-[#6bd8cb]/5">in</span>
+                  <span className="truncate">Ver Perfil LinkedIn</span>
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Card Footer Actions & Status selectors */}
+        <div className="pt-3 border-t border-white/5 space-y-3">
+          {/* Fast Interactive Status Mutation (DAW knobs/slider simulator) */}
+          <div>
+            <label className="text-[8px] text-[#879391] uppercase tracking-wider font-bold block mb-1.5">
+              Fader Estado (Mutar)
+            </label>
+            <div className="grid grid-cols-4 gap-1 p-0.5 bg-[#101415] border border-white/5 rounded-lg">
+              {(["Pendiente", "Revisado", "Seleccionado", "Descartado"] as const).map((est) => (
+                <button
+                  key={est}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleUpdateStatus(cand.id, est);
+                  }}
+                  title={`Fase: ${est}`}
+                  className={`py-0.5 rounded text-[8px] font-bold transition-all cursor-pointer ${
+                    cand.estado_revision === est
+                      ? est === "Pendiente" 
+                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                        : est === "Revisado"
+                        ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                        : est === "Seleccionado"
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                        : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                      : "text-white/20 hover:text-white/60 border border-transparent"
+                  }`}
+                >
+                  {est.substring(0, 3)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-1.5">
+            {/* View Details Link (opens DAW faders detail dashboard) */}
+            <Link
+              href={`/talento/${cand.id}`}
+              className="flex-grow flex items-center justify-center gap-1 px-2 py-1 rounded-xl text-[9px] font-bold text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer"
+            >
+              <span>Detalles</span>
+              <ChevronRight className="w-3 h-3" />
+            </Link>
+
+            {/* PDF CV Direct View button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewCv(cand.id, cand.url_cv);
+              }}
+              title="Ver Documento CV PDF"
+              className="px-2 py-1 rounded-xl text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30 transition-all cursor-pointer flex items-center justify-center font-bold"
+            >
+              <FileText className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Copy Candidate Info button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCopyCandidateData(cand);
+              }}
+              title="Copiar datos del postulante"
+              className={`px-2 py-1 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
+                copiedId === cand.id 
+                  ? "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/30" 
+                  : "text-[#c4c1fb] bg-white/5 border-white/10 hover:bg-[#c4c1fb]/10 hover:border-[#c4c1fb]/30"
+              }`}
+            >
+              {copiedId === cand.id 
+                ? <Check className="w-3.5 h-3.5" /> 
+                : <Copy className="w-3.5 h-3.5" />
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -473,136 +720,112 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
             </div>
           </div>
         ) : viewMode === "cards" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {filteredCandidatos.map((cand) => (
-              <div
-                key={cand.id}
-                className="group relative rounded-3xl border border-white/15 bg-white/[0.02] hover:bg-white/[0.04] p-5 flex flex-col justify-between transition-all duration-300 hover:glow-effect hover:-translate-y-1 block text-left"
-              >
-                {/* Accent line */}
-                <div className="absolute top-0 left-6 right-6 h-[2px] bg-gradient-to-r from-transparent via-[#6bd8cb]/20 to-transparent group-hover:via-[#6bd8cb]/50 transition-all"></div>
-                
-                <div className="space-y-4.5">
-                  {/* Card Header: name and State sphere */}
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-1 max-w-[80%]">
-                      <h3 className="text-sm font-extrabold text-white group-hover:text-[#6bd8cb] transition-colors leading-tight">
-                        {cand.nombre_completo}
-                      </h3>
-                    </div>
+          (() => {
+            const queuePendiente = filteredCandidatos.filter(c => c.estado_revision === "Pendiente");
+            const queueRevisado = filteredCandidatos.filter(c => c.estado_revision === "Revisado");
+            const queueSeleccionado = filteredCandidatos.filter(c => c.estado_revision === "Seleccionado");
+            const queueDescartado = filteredCandidatos.filter(c => c.estado_revision === "Descartado");
 
-                    {/* Sphere status */}
-                    <div 
-                      className={`w-3.5 h-3.5 rounded-full ${getStatusBubbleStyle(cand.estado_revision)} shadow-md animate-pulse`} 
-                      title={`Estado: ${cand.estado_revision}`}
-                    />
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fadeIn">
+                {/* COLUMN 1: PENDIENTE */}
+                <div 
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, "Pendiente")}
+                  className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-amber-500 text-left"
+                >
+                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-white tracking-wide uppercase">PENDIENTE</span>
+                      <span className="text-[10px] text-[#879391] mt-0.5">Postulaciones sin revisar</span>
+                    </div>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-amber-500">
+                      {queuePendiente.length}
+                    </span>
                   </div>
 
-                  {/* Body Content */}
-                  <div className="space-y-3 pt-1">
-                    <div>
-                      <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold block mb-1">
-                        Puesto Postulado
-                      </span>
-                      <p className="text-xs font-bold text-[#c4c1fb] truncate">
-                        {cand.puesto}
-                      </p>
-                    </div>
-
-                    <div className="space-y-1.5 font-medium text-left">
-                      <a
-                        href={`mailto:${cand.email}`}
-                        className="flex items-center gap-2 text-[11px] text-[#879391] hover:text-[#6bd8cb] transition-colors cursor-pointer hover:underline"
-                      >
-                        <Mail className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">{cand.email}</span>
-                      </a>
-                      
-                      {cand.linkedin_url && (
-                        <a
-                          href={cand.linkedin_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-[11px] text-[#6bd8cb] hover:underline"
-                        >
-                          <span className="w-3.5 h-3.5 font-mono text-[9px] font-bold border border-[#6bd8cb]/30 rounded flex items-center justify-center bg-[#6bd8cb]/5">in</span>
-                          <span className="truncate">Ver Perfil LinkedIn</span>
-                        </a>
-                      )}
-                    </div>
+                  <div className="flex-grow space-y-3.5 overflow-y-auto">
+                    {queuePendiente.map((cand) => (
+                      <RenderCandidateCard key={cand.id} cand={cand} />
+                    ))}
+                    {queuePendiente.length === 0 && <RenderColumnEmptyText text="Sin candidatos pendientes" />}
                   </div>
                 </div>
 
-                {/* Card Footer Actions & Status selectors */}
-                <div className="mt-5 pt-4 border-t border-white/10 space-y-4">
-                  {/* Fast Interactive Status Mutation (DAW knobs/slider simulator) */}
-                  <div>
-                    <label className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block mb-2">
-                      Fader Estado (Mutar)
-                    </label>
-                    <div className="grid grid-cols-4 gap-1 p-0.5 bg-[#101415] border border-white/5 rounded-lg">
-                      {(["Pendiente", "Revisado", "Seleccionado", "Descartado"] as const).map((est) => (
-                        <button
-                          key={est}
-                          onClick={() => handleUpdateStatus(cand.id, est)}
-                          title={`Fase: ${est}`}
-                          className={`py-1 rounded text-[8px] font-bold transition-all cursor-pointer ${
-                            cand.estado_revision === est
-                              ? est === "Pendiente" 
-                                ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                                : est === "Revisado"
-                                ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
-                                : est === "Seleccionado"
-                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                              : "text-white/20 hover:text-white/60 border border-transparent"
-                          }`}
-                        >
-                          {est.substring(0, 3)}
-                        </button>
-                      ))}
+                {/* COLUMN 2: REVISADO */}
+                <div 
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, "Revisado")}
+                  className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-indigo-500 text-left"
+                >
+                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-white tracking-wide uppercase">REVISADO</span>
+                      <span className="text-[10px] text-[#879391] mt-0.5">Evaluados preliminarmente</span>
                     </div>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-indigo-400">
+                      {queueRevisado.length}
+                    </span>
                   </div>
 
-                  <div className="flex gap-2">
-                    {/* View Details Link (opens DAW faders detail dashboard) */}
-                    <Link
-                      href={`/talento/${cand.id}`}
-                      className="flex-grow flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer"
-                    >
-                      <span>Detalles</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </Link>
+                  <div className="flex-grow space-y-3.5 overflow-y-auto">
+                    {queueRevisado.map((cand) => (
+                      <RenderCandidateCard key={cand.id} cand={cand} />
+                    ))}
+                    {queueRevisado.length === 0 && <RenderColumnEmptyText text="Sin candidatos revisados" />}
+                  </div>
+                </div>
 
-                    {/* PDF CV Direct View button */}
-                    <button
-                      onClick={() => handleViewCv(cand.id, cand.url_cv)}
-                      title="Ver Documento CV PDF"
-                      className="px-3 py-2 rounded-xl text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30 transition-all cursor-pointer flex items-center justify-center font-bold"
-                    >
-                      <FileText className="w-4.5 h-4.5" />
-                    </button>
+                {/* COLUMN 3: SELECCIONADO */}
+                <div 
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, "Seleccionado")}
+                  className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-emerald-500 text-left"
+                >
+                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-white tracking-wide uppercase">SELECCIONADO</span>
+                      <span className="text-[10px] text-[#879391] mt-0.5">Candidatos en búsquedas</span>
+                    </div>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-emerald-400">
+                      {queueSeleccionado.length}
+                    </span>
+                  </div>
 
-                    {/* Copy Candidate Info button */}
-                    <button
-                      onClick={() => handleCopyCandidateData(cand)}
-                      title="Copiar datos del postulante"
-                      className={`px-3 py-2 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
-                        copiedId === cand.id 
-                          ? "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/30" 
-                          : "text-[#c4c1fb] bg-white/5 border-white/10 hover:bg-[#c4c1fb]/10 hover:border-[#c4c1fb]/30"
-                      }`}
-                    >
-                      {copiedId === cand.id 
-                        ? <Check className="w-4.5 h-4.5" /> 
-                        : <Copy className="w-4.5 h-4.5" />
-                      }
-                    </button>
+                  <div className="flex-grow space-y-3.5 overflow-y-auto">
+                    {queueSeleccionado.map((cand) => (
+                      <RenderCandidateCard key={cand.id} cand={cand} />
+                    ))}
+                    {queueSeleccionado.length === 0 && <RenderColumnEmptyText text="Sin candidatos seleccionados" />}
+                  </div>
+                </div>
+
+                {/* COLUMN 4: DESCARTADO */}
+                <div 
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, "Descartado")}
+                  className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-rose-500 text-left"
+                >
+                  <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-white tracking-wide uppercase">DESCARTADO</span>
+                      <span className="text-[10px] text-[#879391] mt-0.5">Descartes y archivados</span>
+                    </div>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-rose-500">
+                      {queueDescartado.length}
+                    </span>
+                  </div>
+
+                  <div className="flex-grow space-y-3.5 overflow-y-auto">
+                    {queueDescartado.map((cand) => (
+                      <RenderCandidateCard key={cand.id} cand={cand} />
+                    ))}
+                    {queueDescartado.length === 0 && <RenderColumnEmptyText text="Sin candidatos descartados" />}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })()
         ) : (
           /* List view represented in a robust glassmorphism table overlay */
           <section className="glass-panel rounded-2xl overflow-hidden backdrop-blur-md border border-white/10 text-left">
@@ -748,6 +971,84 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
         onClose={() => setIsImportModalOpen(false)}
         onSuccess={handleImportSuccess}
       />
+
+      {/* Search Assignment Modal */}
+      {showSearchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md bg-[#161a1b]/95 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-md text-left flex flex-col space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-white">Asignar a Búsqueda Activa</h3>
+              <p className="text-xs text-[#879391] mt-1.5 leading-relaxed">
+                El postulante <span className="text-[#6bd8cb] font-semibold">{selectedCandidateForSearch?.nombre_completo}</span> pasará a "SELECCIONADO" e ingresará al pipeline de reclutamiento.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-white/70 uppercase tracking-wider">
+                Selecciona la Búsqueda
+              </label>
+              {loadingSearches ? (
+                <div className="flex items-center space-x-2 py-3">
+                  <div className="w-4 h-4 border-2 border-[#6bd8cb] border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-xs text-[#879391]">Cargando búsquedas abiertas...</span>
+                </div>
+              ) : activeSearches.length === 0 ? (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300">
+                  No hay búsquedas abiertas disponibles. Crea una búsqueda antes de transicionar al candidato.
+                </div>
+              ) : (
+                <select
+                  value={selectedSearchId}
+                  onChange={(e) => setSelectedSearchId(e.target.value)}
+                  className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] transition-colors"
+                >
+                  {activeSearches.map((busqueda) => {
+                    const searchId = busqueda.id || busqueda.id_busqueda || "";
+                    return (
+                      <option key={searchId} value={searchId}>
+                        {busqueda.perfil_busqueda} ({busqueda.cliente})
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-white/5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSearchModal(false);
+                  setSelectedCandidateForSearch(null);
+                  setSelectedSearchId("");
+                }}
+                disabled={assigningSearch}
+                className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-xs text-[#e0e3e5] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAssignment}
+                disabled={assigningSearch || activeSearches.length === 0 || !selectedSearchId}
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:opacity-40 text-black font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors"
+              >
+                {assigningSearch ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    <span>Procesando...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Confirmar Asignación</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating success toast notification */}
       {toast && (
