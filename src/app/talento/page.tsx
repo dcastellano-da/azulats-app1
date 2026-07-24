@@ -28,7 +28,14 @@ import {
   LayoutGrid,
   List,
   Compass,
-  Sparkles
+  Sparkles,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
+  Zap,
+  Grid3X3,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 import SlideOver from "../components/SlideOver";
 import CandidatoForm from "../components/CandidatoForm";
@@ -48,8 +55,36 @@ export default function TalentoPage() {
   const [selectedEstado, setSelectedEstado] = useState("Todos");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   
-  // View mode
+  // View mode & Fullscreen
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // Sorting state for List View
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else {
+        setSortField(null);
+        setSortDirection("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const renderSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-3 h-3 text-white/20 ml-1 inline-block" />;
+    }
+    return sortDirection === "asc" 
+      ? <ChevronUp className="w-3 h-3 text-[#6bd8cb] ml-1 inline-block" />
+      : <ChevronDown className="w-3 h-3 text-[#6bd8cb] ml-1 inline-block" />;
+  };
 
   useEffect(() => {
     const savedMode = localStorage.getItem("talento_view_mode");
@@ -60,6 +95,9 @@ export default function TalentoPage() {
 
   const handleToggleViewMode = (mode: "cards" | "list") => {
     setViewMode(mode);
+    if (mode === "cards") {
+      setSelectedEstado("Todos");
+    }
     localStorage.setItem("talento_view_mode", mode);
   };
   
@@ -234,7 +272,14 @@ export default function TalentoPage() {
   };
 
   const handleViewCv = (candId: string, urlCv: string) => {
-    if (!urlCv) return;
+    if (!urlCv) {
+      setToast({
+        type: "error",
+        message: "Este postulante no tiene un archivo CV adjunto."
+      });
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
     if (urlCv.startsWith("gs://")) {
       const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
       const token = match ? match[2] : "";
@@ -258,6 +303,8 @@ Ubicación: ${c.ubicacion || 'No especificada'}
 Habilidades Principales: ${c.skills_principales || 'Ninguna'}
 Inglés: ${c.nivel_ingles || 'No especificado'}
 Otros Idiomas: ${c.otros_idiomas || 'No especificados'}
+Resumen Profesional: ${c.resumen || 'No especificado'}
+Rubros: ${c.rubros || 'No especificado'}
 Estado de Revisión: ${c.estado_revision}
 Origen: ${c.origen}
 Fecha de Registro: ${formattedDate}
@@ -291,6 +338,53 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
       selectedEstado === "Todos" || c.estado_revision === selectedEstado;
 
     return matchesSearch && matchesEstado;
+  });
+
+  const sortedCandidatos = [...filteredCandidatos].sort((a, b) => {
+    if (!sortField) return 0;
+
+    let aVal: any = "";
+    let bVal: any = "";
+
+    switch (sortField) {
+      case "id":
+        aVal = a.id || "";
+        bVal = b.id || "";
+        break;
+      case "nombre":
+        aVal = a.nombre_completo || "";
+        bVal = b.nombre_completo || "";
+        break;
+      case "puesto":
+        aVal = a.puesto || "";
+        bVal = b.puesto || "";
+        break;
+      case "ubicacion":
+        aVal = a.ubicacion || "";
+        bVal = b.ubicacion || "";
+        break;
+      case "notas":
+        aVal = a.notas_iniciales || "";
+        bVal = b.notas_iniciales || "";
+        break;
+      case "estado":
+        aVal = a.estado_revision || "";
+        bVal = b.estado_revision || "";
+        break;
+      case "createdAt":
+        aVal = new Date(a.createdAt).getTime();
+        bVal = new Date(b.createdAt).getTime();
+        break;
+      default:
+        return 0;
+    }
+
+    if (typeof aVal === "string") {
+      const cmp = aVal.localeCompare(bVal);
+      return sortDirection === "asc" ? cmp : -cmp;
+    }
+
+    return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
   });
 
   const getStatusBubbleStyle = (status: Candidato["estado_revision"]) => {
@@ -389,6 +483,39 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
                 </a>
               )}
             </div>
+
+            {cand.rubros && (
+              <div className="pt-1.5 border-t border-white/5">
+                <span className="text-[8px] text-[#c4c1fb] uppercase tracking-wider font-extrabold block mb-0.5">
+                  Rubros / Industrias
+                </span>
+                <p className="text-[10px] text-white/70 font-semibold truncate" title={cand.rubros}>
+                  {cand.rubros}
+                </p>
+              </div>
+            )}
+
+            {cand.resumen && (
+              <div className="pt-1.5 border-t border-white/5 space-y-0.5">
+                <span className="text-[9px] text-[#6bd8cb] uppercase tracking-wider font-bold block">
+                  Resumen Profesional
+                </span>
+                <p className="text-[10px] text-[#879391] line-clamp-2 italic leading-relaxed" title={cand.resumen}>
+                  &quot;{cand.resumen}&quot;
+                </p>
+              </div>
+            )}
+
+            {cand.notas_iniciales && (
+              <div className="pt-1.5 border-t border-white/5 space-y-0.5">
+                <span className="text-[9px] text-[#c4c1fb] uppercase tracking-wider font-bold block">
+                  Notas de Reclutamiento
+                </span>
+                <p className="text-[10px] text-[#879391] line-clamp-2 italic leading-relaxed" title={cand.notas_iniciales}>
+                  &quot;{cand.notas_iniciales}&quot;
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -442,8 +569,12 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
                 e.stopPropagation();
                 handleViewCv(cand.id, cand.url_cv);
               }}
-              title="Ver Documento CV PDF"
-              className="px-2 py-1 rounded-xl text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30 transition-all cursor-pointer flex items-center justify-center font-bold"
+              title={cand.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
+              className={`px-2 py-1 rounded-xl transition-all cursor-pointer flex items-center justify-center font-bold ${
+                cand.url_cv
+                  ? "text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
+                  : "text-[#879391]/40 bg-white/5 border border-white/5 hover:bg-white/10"
+              }`}
             >
               <FileText className="w-3.5 h-3.5" />
             </button>
@@ -473,15 +604,16 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
   };
 
   return (
-    <div className="relative min-h-screen bg-[#101415] text-white p-6 md:p-8 space-y-8 overflow-x-hidden">
+    <div className={`relative min-h-screen bg-[#101415] text-white transition-all duration-300 overflow-x-hidden ${isFullScreen ? 'p-4' : 'p-6 md:p-8'}`}>
       {/* Background ambient radial blurs consistent with Stitch */}
       <div className="ambient-blur-1 top-20 left-20 pointer-events-none"></div>
       <div className="ambient-blur-2 bottom-32 right-32 pointer-events-none"></div>
 
-      <div className="relative z-10 max-w-7xl mx-auto space-y-8">
+      <div className={`relative z-10 mx-auto transition-all duration-300 ${isFullScreen ? 'max-w-none space-y-4 px-2' : 'max-w-7xl space-y-8'}`}>
         
         {/* Navigation Banner Header */}
-        <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 pb-6 border-b border-white/10">
+        {!isFullScreen && (
+          <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-6 pb-6 border-b border-white/10">
           <div className="flex justify-between items-center w-full lg:w-auto gap-4">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#0d9488] to-[#6bd8cb] flex items-center justify-center shadow-lg shadow-[#0d9488]/20">
@@ -495,7 +627,7 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
                   <span className="text-[10px] font-bold text-white/40">Fase 2: Postulantes</span>
                 </div>
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
-                  Postulantes & Candidatos
+                  Base de Postulantes
                 </h1>
               </div>
             </div>
@@ -614,6 +746,7 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
             </button>
           </div>
         </header>
+        )}
 
         {/* Filters control pane */}
         <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md flex flex-col md:flex-row gap-4 justify-between items-center">
@@ -628,47 +761,78 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
             />
           </div>
 
-          {/* Filter tabs container with Help Tooltip */}
-          <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-            <div className="flex gap-1.5 p-1 bg-[#101415] border border-white/10 rounded-xl overflow-x-auto w-full md:w-auto">
-              {["Todos", "Pendiente", "Revisado", "Seleccionado", "Descartado"].map((estado) => (
+          {/* Filter tabs container with View Mode & Maximizer */}
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+            {/* Status Dropdown Filter (only visible in Lista Detallada mode, matching Descubrimiento) */}
+            {viewMode === "list" && (
+              <div className="flex items-center gap-2 animate-fadeIn shrink-0">
+                <span className="text-xs text-[#c4c1fb] whitespace-nowrap font-medium hidden sm:inline">Estado:</span>
+                <select
+                  value={selectedEstado}
+                  onChange={(e) => setSelectedEstado(e.target.value)}
+                  className="bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs font-bold text-[#6bd8cb] focus:outline-none focus:border-[#6bd8cb] cursor-pointer appearance-none pr-8 bg-no-repeat transition-all shadow-inner"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236bd8cb'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                    backgroundPosition: 'right 0.65rem center',
+                    backgroundSize: '0.9rem'
+                  }}
+                >
+                  <option value="Todos" className="bg-[#15181a] text-white">Todos los Estados</option>
+                  <option value="Pendiente" className="bg-[#15181a] text-amber-400 font-semibold">Pendiente</option>
+                  <option value="Revisado" className="bg-[#15181a] text-indigo-400 font-semibold">Revisado</option>
+                  <option value="Seleccionado" className="bg-[#15181a] text-emerald-400 font-semibold">Seleccionado</option>
+                  <option value="Descartado" className="bg-[#15181a] text-rose-400 font-semibold">Descartado</option>
+                </select>
+              </div>
+            )}
+
+            {/* Toggle buttons for Kanban vs List view mode & Fullscreen matching Descubrimiento */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 select-none">
                 <button
-                  key={estado}
-                  onClick={() => setSelectedEstado(estado)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    selectedEstado === estado 
-                      ? "bg-[#6bd8cb]/10 text-[#6bd8cb] border border-[#6bd8cb]/20" 
-                      : "text-[#879391] hover:text-white border border-transparent"
+                  onClick={() => handleToggleViewMode("cards")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === "cards"
+                      ? "bg-[#6bd8cb] text-[#101415] shadow shadow-[#0d9488]/10"
+                      : "text-[#879391] hover:text-white"
                   }`}
                 >
-                  {estado}
+                  <Grid3X3 className="w-3.5 h-3.5" />
+                  <span>Kanban</span>
                 </button>
-              ))}
-            </div>
+                <button
+                  onClick={() => handleToggleViewMode("list")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === "list"
+                      ? "bg-[#6bd8cb] text-[#101415] shadow shadow-[#0d9488]/10"
+                      : "text-[#879391] hover:text-white"
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span>Lista Detallada</span>
+                </button>
+              </div>
 
-            {/* View Mode Toggle Buttons */}
-            <div className="flex gap-1 p-1 bg-[#101415] border border-white/10 rounded-xl shrink-0">
               <button
-                onClick={() => handleToggleViewMode("cards")}
-                title="Vista de Tarjetas"
-                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                  viewMode === "cards"
-                    ? "bg-[#6bd8cb]/10 text-[#6bd8cb]"
-                    : "text-[#879391] hover:text-white"
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  isFullScreen
+                    ? "bg-[#6bd8cb]/15 border-[#6bd8cb]/30 text-[#6bd8cb] hover:bg-[#6bd8cb]/25 shadow-sm"
+                    : "bg-white/5 border-white/10 text-[#c4c1fb]/80 hover:bg-white/10 hover:text-white"
                 }`}
+                title={isFullScreen ? "Restaurar vista normal" : "Maximizar pantalla"}
               >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleToggleViewMode("list")}
-                title="Vista de Lista"
-                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                  viewMode === "list"
-                    ? "bg-[#6bd8cb]/10 text-[#6bd8cb]"
-                    : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <List className="w-4 h-4" />
+                {isFullScreen ? (
+                  <>
+                    <Minimize2 className="w-3.5 h-3.5" />
+                    <span>Restaurar</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>Maximizar</span>
+                  </>
+                )}
               </button>
             </div>
 
@@ -833,26 +997,70 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-white/10 bg-[#161a1b]/60 text-xs font-bold tracking-wider text-[#c4c1fb]">
-                    <th className="py-4 px-6">ID</th>
-                    <th className="py-4 px-6">Candidato</th>
-                    <th className="py-4 px-6">Puesto</th>
-                    <th className="py-4 px-6">Ubicación</th>
-                    <th className="py-4 px-6">Habilidades Clave</th>
-                    <th className="py-4 px-6 text-center">Estado</th>
-                    <th className="py-4 px-6 text-right">Creado</th>
-                    <th className="py-4 px-6 text-center">Acciones</th>
+                    <th 
+                      onClick={() => handleSort("nombre")}
+                      className="py-4 px-6 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group"
+                    >
+                      <div className="flex items-center">
+                        <span>Candidato</span>
+                        {renderSortIcon("nombre")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort("puesto")}
+                      className="py-4 px-6 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group"
+                    >
+                      <div className="flex items-center">
+                        <span>Puesto</span>
+                        {renderSortIcon("puesto")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort("ubicacion")}
+                      className="py-4 px-6 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group"
+                    >
+                      <div className="flex items-center">
+                        <span>Ubicación</span>
+                        {renderSortIcon("ubicacion")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort("notas")}
+                      className="py-4 px-6 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[300px] md:min-w-[480px]"
+                    >
+                      <div className="flex items-center">
+                        <span>Notas Iniciales</span>
+                        {renderSortIcon("notas")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort("estado")}
+                      className="py-4 px-6 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group text-center"
+                    >
+                      <div className="flex items-center justify-center">
+                        <span>Estado</span>
+                        {renderSortIcon("estado")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort("createdAt")}
+                      className="py-4 px-6 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group text-right"
+                    >
+                      <div className="flex items-center justify-end">
+                        <span>Creado</span>
+                        {renderSortIcon("createdAt")}
+                      </div>
+                    </th>
+                    <th className="py-4 px-6 text-center select-none text-[#c4c1fb]/60">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 text-xs text-white">
-                  {filteredCandidatos.map((cand) => (
+                  {sortedCandidatos.map((cand) => (
                     <tr 
                       key={cand.id}
                       onClick={() => router.push(`/talento/${cand.id}`)}
                       className="group hover:bg-white/[0.04] transition-colors duration-250 cursor-pointer"
                     >
-                      <td className="py-4 px-6 font-mono text-[#879391]">
-                        {cand.id.substring(0, 8)}
-                      </td>
                       <td className="py-4 px-6 font-bold group-hover:text-[#6bd8cb] transition-colors">
                         <div>
                           <div className="text-white group-hover:text-[#6bd8cb] font-bold">{cand.nombre_completo}</div>
@@ -865,24 +1073,12 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
                       <td className="py-4 px-6 text-[#879391]">
                         {cand.ubicacion || <span className="italic opacity-30">No especificada</span>}
                       </td>
-                      <td className="py-4 px-6">
-                        <div className="flex flex-wrap gap-1.5 max-w-xs">
-                          {cand.skills_principales && cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).length > 0 ? (
-                            cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).slice(0, 3).map((tag, idx) => (
-                              <span
-                                key={idx}
-                                className="text-[9px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2 py-0.5 rounded border border-[#6bd8cb]/20"
-                              >
-                                {tag}
-                              </span>
-                            ))
+                      <td className="py-4 px-6 min-w-[300px] md:min-w-[480px] max-w-[520px]">
+                        <div className="text-[11px] text-[#879391] italic line-clamp-3 select-all leading-relaxed" title={cand.notas_iniciales || ""}>
+                          {cand.notas_iniciales ? (
+                            `"${cand.notas_iniciales}"`
                           ) : (
-                            <span className="text-[10px] text-white/30 italic">Sin skills</span>
-                          )}
-                          {cand.skills_principales && cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).length > 3 && (
-                            <span className="text-[9px] text-neutral-400 font-bold bg-white/5 border border-white/10 px-1 py-0.5 rounded">
-                              +{cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).length - 3}
-                            </span>
+                            <span className="opacity-30">Sin notas de reclutamiento</span>
                           )}
                         </div>
                       </td>
@@ -900,34 +1096,86 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
                         {new Date(cand.createdAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
                       </td>
                       <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1.5">
-                          <Link
-                            href={`/talento/${cand.id}`}
-                            className="px-2.5 py-1 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb] text-[#6bd8cb] hover:text-[#101415] border border-[#6bd8cb]/20 rounded-md text-[10px] font-extrabold transition-all cursor-pointer"
-                          >
-                            Detalle
-                          </Link>
-                          <button
-                            onClick={() => handleViewCv(cand.id, cand.url_cv)}
-                            title="Ver Documento CV PDF"
-                            className="p-1 rounded-md text-[#6bd8cb] hover:bg-[#6bd8cb]/10 transition-all cursor-pointer flex items-center justify-center border border-transparent hover:border-[#6bd8cb]/30"
-                          >
-                            <FileText className="w-4.5 h-4.5" />
-                          </button>
-                          <button
-                            onClick={() => handleCopyCandidateData(cand)}
-                            title="Copiar datos"
-                            className={`p-1 rounded-md border transition-all cursor-pointer ${
-                              copiedId === cand.id 
-                                ? "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/30" 
-                                : "text-[#c4c1fb] bg-white/5 border-white/10 hover:bg-[#c4c1fb]/10 hover:border-[#c4c1fb]/30"
-                            }`}
-                          >
-                            {copiedId === cand.id 
-                              ? <Check className="w-3.5 h-3.5" /> 
-                              : <Copy className="w-3.5 h-3.5" />
-                            }
-                          </button>
+                        <div className="flex items-center justify-center gap-2">
+                          {/* State Transition Button */}
+                          {cand.estado_revision === "Pendiente" && (
+                            <button
+                              onClick={() => handleUpdateStatus(cand.id, "Revisado")}
+                              title="Pasar a estado Revisado"
+                              className="px-2.5 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-sm shrink-0"
+                            >
+                              <Zap className="w-3 h-3 text-indigo-400" />
+                              <span>A Revisado</span>
+                            </button>
+                          )}
+
+                          {cand.estado_revision === "Revisado" && (
+                            <button
+                              onClick={() => handleUpdateStatus(cand.id, "Seleccionado")}
+                              title="Asignar a búsqueda y pasar a Seleccionado"
+                              className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-sm shrink-0"
+                            >
+                              <Zap className="w-3 h-3 text-emerald-400" />
+                              <span>A Seleccionado</span>
+                            </button>
+                          )}
+
+                          {cand.estado_revision === "Seleccionado" && (
+                            <button
+                              onClick={() => handleUpdateStatus(cand.id, "Descartado")}
+                              title="Descartar candidato"
+                              className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-sm shrink-0"
+                            >
+                              <Zap className="w-3 h-3 text-rose-400" />
+                              <span>A Descartado</span>
+                            </button>
+                          )}
+
+                          {cand.estado_revision === "Descartado" && (
+                            <button
+                              onClick={() => handleUpdateStatus(cand.id, "Pendiente")}
+                              title="Reactivar candidato a estado Pendiente"
+                              className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-sm shrink-0"
+                            >
+                              <Zap className="w-3 h-3 text-amber-400" />
+                              <span>Reactivar</span>
+                            </button>
+                          )}
+
+                          {/* Secondary actions: Detalle, CV, Copiar */}
+                          <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+                            <Link
+                              href={`/talento/${cand.id}`}
+                              className="px-2 py-1 bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 rounded-md text-[10px] font-bold transition-all cursor-pointer"
+                            >
+                              Detalle
+                            </Link>
+                            <button
+                              onClick={() => handleViewCv(cand.id, cand.url_cv)}
+                              title={cand.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
+                              className={`p-1 rounded-md transition-all cursor-pointer flex items-center justify-center border ${
+                                cand.url_cv
+                                  ? "text-[#6bd8cb] hover:bg-[#6bd8cb]/10 border-transparent hover:border-[#6bd8cb]/30"
+                                  : "text-[#879391]/40 border-transparent hover:bg-white/5"
+                              }`}
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleCopyCandidateData(cand)}
+                              title="Copiar datos"
+                              className={`p-1 rounded-md border transition-all cursor-pointer ${
+                                copiedId === cand.id 
+                                  ? "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/30" 
+                                  : "text-[#c4c1fb] bg-white/5 border-white/10 hover:bg-[#c4c1fb]/10 hover:border-[#c4c1fb]/30"
+                              }`}
+                            >
+                              {copiedId === cand.id 
+                                ? <Check className="w-3.5 h-3.5" /> 
+                                : <Copy className="w-3.5 h-3.5" />
+                              }
+                            </button>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -979,7 +1227,7 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
             <div>
               <h3 className="text-base font-bold text-white">Asignar a Búsqueda Activa</h3>
               <p className="text-xs text-[#879391] mt-1.5 leading-relaxed">
-                El postulante <span className="text-[#6bd8cb] font-semibold">{selectedCandidateForSearch?.nombre_completo}</span> pasará a "SELECCIONADO" e ingresará al pipeline de reclutamiento.
+                El postulante <span className="text-[#6bd8cb] font-semibold">{selectedCandidateForSearch?.nombre_completo}</span> pasará a &quot;SELECCIONADO&quot; e ingresará al pipeline de reclutamiento.
               </p>
             </div>
 

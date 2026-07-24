@@ -710,7 +710,7 @@ export default function EvaluacionPage() {
               onClick={() => setIsFullScreen(!isFullScreen)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                 isFullScreen
-                  ? "bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/25"
+                  ? "bg-[#6bd8cb]/15 border-[#6bd8cb]/30 text-[#6bd8cb] hover:bg-[#6bd8cb]/25 shadow-sm"
                   : "bg-white/5 border-white/10 text-[#c4c1fb]/80 hover:bg-white/10 hover:text-white"
               }`}
             >

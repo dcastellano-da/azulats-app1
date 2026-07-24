@@ -16,8 +16,18 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
   const [isDragActive, setIsDragActive] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [notasIniciales, setNotasIniciales] = useState("");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleClose = () => {
+    if (isProcessing) return;
+    setFile(null);
+    setFileError(null);
+    setErrorMessage(null);
+    setNotasIniciales("");
+    onClose();
+  };
 
   // Prevent background scroll when opened
   useEffect(() => {
@@ -113,6 +123,9 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
 
     const formData = new FormData();
     formData.append("cv", file);
+    if (notasIniciales.trim()) {
+      formData.append("notas_iniciales", notasIniciales.trim());
+    }
 
     try {
       const response = await importarCandidatoIA_API(formData);
@@ -134,7 +147,7 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
       {/* Backdrop overlay */}
       <div
         className="absolute inset-0 bg-[#000000]/70 backdrop-blur-sm transition-opacity duration-300"
-        onClick={isProcessing ? undefined : onClose}
+        onClick={handleClose}
       />
 
       {/* Modal box */}
@@ -147,7 +160,7 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
             <h3 className="text-base font-bold text-white tracking-tight">Importar con IA</h3>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isProcessing}
             className={`w-8 h-8 rounded-lg border border-white/5 bg-white/5 flex items-center justify-center text-[#c4c1fb] transition-all ${
               isProcessing ? "opacity-30 cursor-not-allowed" : "hover:bg-white/10 hover:text-white cursor-pointer"
@@ -225,6 +238,21 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
           )}
         </div>
 
+        {/* Campo: Notas Iniciales */}
+        <div className="flex flex-col text-left space-y-1">
+          <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase">
+            Notas Iniciales de Reclutamiento (Opcional)
+          </label>
+          <textarea
+            value={notasIniciales}
+            onChange={(e) => setNotasIniciales(e.target.value)}
+            placeholder="Añade anotaciones o detalles sobre este postulante..."
+            disabled={isProcessing}
+            rows={3}
+            className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder:text-white/30 resize-y min-h-[70px] disabled:opacity-50"
+          />
+        </div>
+
         {/* Global errors */}
         {errorMessage && (
           <div className="flex gap-2.5 p-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 text-rose-400 text-xs leading-relaxed text-left font-medium">
@@ -236,7 +264,7 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
         {/* Footer Actions */}
         <div className="flex gap-3 pt-2 justify-end">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isProcessing}
             className={`px-4.5 py-2.5 rounded-xl text-xs font-bold text-[#c4c1fb] border border-[#c4c1fb]/20 bg-white/5 transition-all ${
               isProcessing ? "opacity-30 cursor-not-allowed" : "hover:bg-white/10 cursor-pointer"

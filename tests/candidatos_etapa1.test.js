@@ -60,7 +60,9 @@ describe('Postulantes - Integración de Campos - Etapa 1 (Lectura)', () => {
               skills_principales: 'Figma, React, CSS Grid, Design Systems',
               nivel_ingles: 'Avanzado (C1)',
               otros_idiomas: 'Portugués (Intermedio)',
-              notas_iniciales: 'Excelente perfil para liderar el equipo de diseño.'
+              notas_iniciales: 'Excelente perfil para liderar el equipo de diseño.',
+              resumen: 'Diseñadora de interacción experta.',
+              rubros: 'Diseño, eCommerce'
             }
           ]
         })
@@ -80,6 +82,8 @@ describe('Postulantes - Integración de Campos - Etapa 1 (Lectura)', () => {
     assert.strictEqual(cand.nivel_ingles, 'Avanzado (C1)');
     assert.strictEqual(cand.otros_idiomas, 'Portugués (Intermedio)');
     assert.strictEqual(cand.notas_iniciales, 'Excelente perfil para liderar el equipo de diseño.');
+    assert.strictEqual(cand.resumen, 'Diseñadora de interacción experta.');
+    assert.strictEqual(cand.rubros, 'Diseño, eCommerce');
   });
 
   test('Debería mapear valores vacíos por defecto cuando los nuevos campos son nulos o vacíos en el backend', async () => {
@@ -101,7 +105,9 @@ describe('Postulantes - Integración de Campos - Etapa 1 (Lectura)', () => {
               skills_principales: null,
               nivel_ingles: null,
               otros_idiomas: null,
-              notas_iniciales: null
+              notas_iniciales: null,
+              resumen: null,
+              rubros: null
             }
           ]
         })
@@ -118,5 +124,7 @@ describe('Postulantes - Integración de Campos - Etapa 1 (Lectura)', () => {
     assert.strictEqual(cand.nivel_ingles, '');
     assert.strictEqual(cand.otros_idiomas, '');
     assert.strictEqual(cand.notas_iniciales, '');
+    assert.strictEqual(cand.resumen, '');
+    assert.strictEqual(cand.rubros, '');
   });
 });

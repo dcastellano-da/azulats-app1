@@ -20,6 +20,8 @@ export interface Candidato {
   nivel_ingles?: string | null;
   otros_idiomas?: string | null;
   notas_iniciales?: string | null;
+  resumen?: string | null;
+  rubros?: string | null;
 }
 
 export interface APIResponse {
@@ -102,7 +104,9 @@ export async function getCandidatosAPI(): Promise<APIResponse> {
         skills_principales: cand.skills_principales || "",
         nivel_ingles: cand.nivel_ingles || "",
         otros_idiomas: cand.otros_idiomas || "",
-        notas_iniciales: cand.notas_iniciales || ""
+        notas_iniciales: cand.notas_iniciales || "",
+        resumen: cand.resumen || "",
+        rubros: cand.rubros || ""
       }));
 
       return {
@@ -158,13 +162,15 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
     const ingles = formData.get("nivel_ingles")?.toString()?.trim() || "";
     const otrosIdiomas = formData.get("otros_idiomas")?.toString()?.trim() || "";
     const notas = formData.get("notas_iniciales")?.toString()?.trim() || "";
+    const resumen = formData.get("resumen")?.toString()?.trim() || "";
+    const rubros = formData.get("rubros")?.toString()?.trim() || "";
 
     // Server-side validation to enable robust 400 Bad Request simulation
-    if (!nombre || !email || !puesto || !cvFile) {
+    if (!nombre || !email || !puesto) {
       return {
         status: 400,
         success: false,
-        message: "Falta completar campos obligatorios del candidato (nombre_completo, email, puesto) o cargar su CV."
+        message: "Falta completar campos obligatorios del candidato (nombre_completo, email, puesto)."
       };
     }
 
@@ -181,7 +187,9 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
     
     // Construct clean FormData matching backend key names
     const apiFormData = new FormData();
-    apiFormData.append("cv", cvFile);
+    if (cvFile && typeof cvFile !== "string" && (cvFile as any).size > 0) {
+      apiFormData.append("cv", cvFile);
+    }
     apiFormData.append("nombre_completo", nombre);
     apiFormData.append("email", email);
     apiFormData.append("puesto_postulacion", puesto);
@@ -194,6 +202,8 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
     apiFormData.append("nivel_ingles", ingles);
     apiFormData.append("otros_idiomas", otrosIdiomas);
     apiFormData.append("notas_iniciales", notas);
+    apiFormData.append("resumen", resumen);
+    apiFormData.append("rubros", rubros);
 
     const response = await fetch(url, {
       method: "POST",
@@ -226,7 +236,9 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
         skills_principales: skills,
         nivel_ingles: ingles,
         otros_idiomas: otrosIdiomas,
-        notas_iniciales: notas
+        notas_iniciales: notas,
+        resumen: resumen,
+        rubros: rubros
       };
       
       return {
@@ -269,13 +281,13 @@ export async function actualizarCandidatoAPI(id: string, payload: Partial<Candid
     }
 
     // Mutability Matrix Safeguard: Do not allow unauthorized modifications
-    const forbiddenKeys: Array<keyof Candidato> = ["id", "acepta_privacidad", "origen", "url_cv", "createdAt"];
+    const forbiddenKeys: Array<keyof Candidato> = ["id", "acepta_privacidad", "origen", "url_cv", "createdAt", "puesto"];
     const containsForbidden = forbiddenKeys.some(key => key in payload);
     if (containsForbidden) {
       return {
         status: 400,
         success: false,
-        message: "Acceso denegado: Intento de modificar metadatos históricos inmitables (ID, Origen, Consentimiento, CV original)."
+        message: "Acceso denegado: Intento de modificar metadatos históricos inmutables (ID, Origen, Consentimiento, CV original, Puesto de postulación original)."
       };
     }
 
@@ -296,6 +308,8 @@ export async function actualizarCandidatoAPI(id: string, payload: Partial<Candid
     if (payload.nivel_ingles !== undefined) apiPayload.nivel_ingles = payload.nivel_ingles;
     if (payload.otros_idiomas !== undefined) apiPayload.otros_idiomas = payload.otros_idiomas;
     if (payload.notas_iniciales !== undefined) apiPayload.notas_iniciales = payload.notas_iniciales;
+    if (payload.resumen !== undefined) apiPayload.resumen = payload.resumen;
+    if (payload.rubros !== undefined) apiPayload.rubros = payload.rubros;
 
     const url = `${apiBaseUrl}/api/v1/candidatos/${id}`;
     console.log(`[Candidatos Action] PATCH a: ${url}`);
@@ -433,6 +447,11 @@ export async function importarCandidatoIA_API(formData: FormData): Promise<APIRe
     
     const apiFormData = new FormData();
     apiFormData.append("cv", cvFile);
+    
+    const notas = formData.get("notas_iniciales")?.toString()?.trim();
+    if (notas) {
+      apiFormData.append("notas_iniciales", notas);
+    }
 
     const response = await fetch(url, {
       method: "POST",

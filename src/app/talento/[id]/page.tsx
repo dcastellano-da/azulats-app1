@@ -22,7 +22,8 @@ import {
   Phone,
   MapPin,
   Globe,
-  Award
+  Award,
+  Pencil
 } from "lucide-react";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 
@@ -50,6 +51,8 @@ export default function CandidatoDetailPage() {
   const [editNivelIngles, setEditNivelIngles] = useState("");
   const [editOtrosIdiomas, setEditOtrosIdiomas] = useState("");
   const [editNotas, setEditNotas] = useState("");
+  const [editResumen, setEditResumen] = useState("");
+  const [editRubros, setEditRubros] = useState("");
 
   useEffect(() => {
     if (cand) {
@@ -62,6 +65,8 @@ export default function CandidatoDetailPage() {
       setEditNivelIngles(cand.nivel_ingles || "");
       setEditOtrosIdiomas(cand.otros_idiomas || "");
       setEditNotas(cand.notas_iniciales || "");
+      setEditResumen(cand.resumen || "");
+      setEditRubros(cand.rubros || "");
     }
   }, [cand]);
 
@@ -154,7 +159,13 @@ export default function CandidatoDetailPage() {
   };
 
   const handleViewCv = (candId: string, urlCv: string) => {
-    if (!urlCv) return;
+    if (!urlCv) {
+      setFeedback({
+        type: "error",
+        message: "Este postulante no posee un archivo CV adjunto."
+      });
+      return;
+    }
     if (urlCv.startsWith("gs://")) {
       const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
       const token = match ? match[2] : "";
@@ -198,7 +209,9 @@ export default function CandidatoDetailPage() {
           skills_principales: editSkills.trim(),
           nivel_ingles: editNivelIngles.trim(),
           otros_idiomas: editOtrosIdiomas.trim(),
-          notas_iniciales: editNotas.trim()
+          notas_iniciales: editNotas.trim(),
+          resumen: editResumen.trim(),
+          rubros: editRubros.trim()
         };
 
         const response = await actualizarCandidatoAPI(id, payload);
@@ -235,6 +248,8 @@ export default function CandidatoDetailPage() {
       setEditNivelIngles(cand.nivel_ingles || "");
       setEditOtrosIdiomas(cand.otros_idiomas || "");
       setEditNotas(cand.notas_iniciales || "");
+      setEditResumen(cand.resumen || "");
+      setEditRubros(cand.rubros || "");
     }
     setIsEditing(false);
     setFeedback(null);
@@ -253,6 +268,8 @@ Ubicación: ${cand.ubicacion || 'No especificada'}
 Habilidades Principales: ${cand.skills_principales || 'Ninguna'}
 Inglés: ${cand.nivel_ingles || 'No especificado'}
 Otros Idiomas: ${cand.otros_idiomas || 'No especificados'}
+Resumen Profesional: ${cand.resumen || 'No especificado'}
+Rubros: ${cand.rubros || 'No especificado'}
 Estado de Revisión: ${cand.estado_revision}
 Origen: ${cand.origen}
 Fecha de Registro: ${formattedDate}
@@ -310,7 +327,7 @@ Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
       <div className="relative z-10 max-w-7xl mx-auto space-y-6">
         
         {/* Navigation header */}
-        <header className="flex justify-between items-center pb-5 border-b border-white/10">
+        <header className="flex flex-wrap gap-4 justify-between items-center pb-5 border-b border-white/10">
           <Link
             href="/talento"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs text-[#c4c1fb] hover:bg-white/10 hover:text-white transition-all cursor-pointer font-bold"
@@ -319,12 +336,41 @@ Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
             <span>Volver a Postulantes</span>
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <span className="text-[10px] font-mono text-[#879391]">ID: {id}</span>
             <span className="text-white/20">•</span>
-            <span className="text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider hidden sm:inline-block">
               DAW Console Active
             </span>
+            <span className="text-white/20 hidden sm:inline-block">•</span>
+
+            {/* Global Edit Actions */}
+            {isEditing ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCancel}
+                  disabled={isPending}
+                  className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[10px] uppercase font-bold text-[#879391] hover:bg-neutral-800 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={isPending}
+                  className="px-4 py-1.5 rounded-xl bg-[#6bd8cb] text-[10px] uppercase font-bold text-[#101415] hover:bg-[#6bd8cb]/90 transition-all cursor-pointer font-bold disabled:opacity-50"
+                >
+                  {isPending ? "Guardando..." : "Guardar Cambios"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-4 py-1.5 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 text-[10px] uppercase font-bold text-[#6bd8cb] hover:bg-[#6bd8cb]/20 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span>Editar Ficha</span>
+              </button>
+            )}
           </div>
         </header>
 
@@ -378,7 +424,9 @@ Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
                         </div>
                         <div>
                           <label className="text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase block text-left">Puesto / Cargo</label>
-                          <p className="text-xs font-semibold text-white/55 bg-[#161a1b] px-3 py-1.5 rounded-xl border border-white/5 select-none">{cand.puesto} (Inmutable)</p>
+                          <p className="text-xs font-semibold text-white/55 bg-[#161a1b] px-3 py-1.5 rounded-xl border border-white/5 select-none" title="Dato histórico de postulación no editable">
+                            {cand.puesto} <span className="text-[9px] text-[#879391] font-mono ml-1">(Origen Inmutable)</span>
+                          </p>
                         </div>
                       </div>
                     ) : (
@@ -538,10 +586,14 @@ Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
                 <div className="flex gap-2 pt-2">
                   <button
                     onClick={() => cand && handleViewCv(cand.id, cand.url_cv)}
-                    className="flex-grow flex items-center justify-center gap-2 px-4.5 py-3 rounded-xl text-xs font-bold text-[#101415] bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 transition-all cursor-pointer"
+                    className={`flex-grow flex items-center justify-center gap-2 px-4.5 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      cand?.url_cv
+                        ? "text-[#101415] bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 shadow-md"
+                        : "text-[#879391] bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white"
+                    }`}
                   >
                     <FileText className="w-4 h-4" />
-                    <span>Ver CV Adjunto</span>
+                    <span>{cand?.url_cv ? "Ver CV Adjunto" : "Sin CV Adjunto"}</span>
                   </button>
 
                   <button
@@ -581,33 +633,6 @@ Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
                     <h3 className="text-xs font-extrabold uppercase tracking-widest font-sans">
                       Perfil Profesional e Idiomas
                     </h3>
-                  </div>
-
-                  {/* Mode Selector */}
-                  <div>
-                    {isEditing ? (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleCancel}
-                          className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[9px] uppercase font-bold text-[#879391] hover:bg-neutral-800 transition-all cursor-pointer"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          onClick={handleSave}
-                          className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] text-[9px] uppercase font-bold text-[#101415] hover:bg-[#6bd8cb]/90 transition-all cursor-pointer"
-                        >
-                          Guardar
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setIsEditing(true)}
-                        className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[9px] uppercase font-bold text-[#c4c1fb] hover:bg-white/10 transition-all cursor-pointer"
-                      >
-                        Editar Datos
-                      </button>
-                    )}
                   </div>
                 </div>
                 
@@ -649,8 +674,32 @@ Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
                       </div>
                     </div>
 
+                    {/* Resumen Profesional */}
+                    <div className="space-y-1 text-left">
+                      <label className="text-[9px] font-black uppercase text-white/40 tracking-wider">Resumen Profesional (AI / Extracto)</label>
+                      <textarea
+                        value={editResumen}
+                        onChange={(e) => setEditResumen(e.target.value)}
+                        placeholder="Escribe el resumen perfil aquí..."
+                        rows={3}
+                        className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none resize-y min-h-[60px]"
+                      />
+                    </div>
+
+                    {/* Rubros */}
+                    <div className="space-y-1 text-left">
+                      <label className="text-[9px] font-black uppercase text-white/40 tracking-wider">Rubros / Industrias</label>
+                      <input
+                        type="text"
+                        value={editRubros}
+                        onChange={(e) => setEditRubros(e.target.value)}
+                        placeholder="Ejemplo: Banca, Seguros, Telecom "
+                        className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                      />
+                    </div>
+
                     {/* Notes initiales */}
-                    <div className="space-y-1">
+                    <div className="space-y-1 text-left">
                       <label className="text-[9px] font-black uppercase text-white/40 tracking-wider">Anotaciones de Reclutamiento</label>
                       <textarea
                         value={editNotas}
@@ -699,9 +748,25 @@ Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
                       </div>
                     </div>
 
+                    {/* Resumen section */}
+                    <div className="p-4 rounded-2xl bg-[#101415]/60 border border-white/5 space-y-2">
+                      <span className="text-[9px] font-black uppercase text-[#6bd8cb] tracking-wider block">Resumen Profesional (IA)</span>
+                      <p className="text-xs text-white/80 font-medium leading-relaxed whitespace-pre-wrap">
+                        {cand.resumen || "Sin resumen profesional extraído o registrado."}
+                      </p>
+                    </div>
+
+                    {/* Rubros Section */}
+                    <div className="p-4 rounded-2xl bg-[#101415]/60 border border-white/5 space-y-1">
+                      <span className="text-[9px] font-black uppercase text-[#c4c1fb] tracking-wider block">Rubros y Sectores Clave</span>
+                      <p className="text-xs font-bold text-white leading-normal">
+                        {cand.rubros || "Sin especificar"}
+                      </p>
+                    </div>
+
                     {/* notes section */}
                     <div className="p-4 rounded-2xl bg-[#101415]/60 border border-white/5 space-y-2">
-                      <span className="text-[9px] font-black uppercase text-[#6bd8cb] tracking-wider block">Anotaciones de Reclutamiento</span>
+                       <span className="text-[9px] font-black uppercase text-[#c4c1fb] tracking-wider block">Anotaciones del Reclutador</span>
                       <p className="text-xs text-[#879391] font-medium leading-relaxed whitespace-pre-wrap">
                         {cand.notas_iniciales || "Sin anotaciones preliminares sobre el candidato."}
                       </p>

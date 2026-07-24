@@ -24,6 +24,8 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
   const [nivelIngles, setNivelIngles] = useState("");
   const [otrosIdiomas, setOtrosIdiomas] = useState("");
   const [notasIniciales, setNotasIniciales] = useState("");
+  const [resumen, setResumen] = useState("");
+  const [rubros, setRubros] = useState("");
 
   // File upload state
   const [file, setFile] = useState<File | null>(null);
@@ -108,14 +110,6 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
       return;
     }
 
-    if (!file) {
-      setFeedback({
-        type: "error",
-        message: "Debes cargar un archivo de currículum (PDF) para registrar al candidato."
-      });
-      return;
-    }
-
     if (!aceptaPrivacidad) {
       setFeedback({
         type: "error",
@@ -143,7 +137,9 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
     formData.append("puesto", puesto);
     formData.append("linkedin_url", linkedinUrl);
     formData.append("acepta_privacidad", aceptaPrivacidad ? "true" : "false");
-    formData.append("cv", file);
+    if (file) {
+      formData.append("cv", file);
+    }
 
     formData.append("telefono_movil", telefonoMovil);
     formData.append("ubicacion", ubicacion);
@@ -151,6 +147,8 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
     formData.append("nivel_ingles", nivelIngles);
     formData.append("otros_idiomas", otrosIdiomas);
     formData.append("notas_iniciales", notasIniciales);
+    formData.append("resumen", resumen);
+    formData.append("rubros", rubros);
 
     startTransition(async () => {
       try {
@@ -262,7 +260,7 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
       {/* Dropzone del Archivo CV PDF */}
       <div className="flex flex-col">
         <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-          Currículum Adjunto (PDF, Máx 5MB) <span className="text-red-400">*</span>
+          Currículum Adjunto (PDF, Máx 5MB) <span className="text-[#879391] font-normal lowercase">(opcional)</span>
         </label>
 
         <input
@@ -288,7 +286,7 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
             }`}
           >
             <Upload className="w-8 h-8 text-[#6bd8cb] mb-2 animate-pulse" />
-            <p className="text-xs font-bold text-white mb-0.5">Arrastra y suelta tu CV aquí</p>
+            <p className="text-xs font-bold text-white mb-0.5">Arrastra y suelta tu CV aquí (Opcional)</p>
             <p className="text-[10px] text-[#879391] font-medium">o haz clic para explorar en el ordenador</p>
             {fileError && (
               <div className="mt-3 flex items-center gap-1.5 text-red-400 text-[10px] font-semibold">
@@ -405,6 +403,36 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
           </div>
         </div>
 
+        {/* Resumen Profesional */}
+        <div className="relative">
+          <textarea
+            value={resumen}
+            onChange={(e) => setResumen(e.target.value)}
+            placeholder=" "
+            disabled={isPending}
+            rows={3}
+            className="peer w-full bg-white/5 border border-white/10 rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50 resize-y min-h-[70px]"
+          />
+          <label className="absolute left-4 top-1.5 text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-[#879391] peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-[#6bd8cb]">
+            Resumen Profesional (AI / Perfil)
+          </label>
+        </div>
+
+        {/* Rubros */}
+        <div className="relative">
+          <input
+            type="text"
+            value={rubros}
+            onChange={(e) => setRubros(e.target.value)}
+            placeholder=" "
+            disabled={isPending}
+            className="peer w-full bg-white/5 border border-[#3e445b] rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50"
+          />
+          <label className="absolute left-4 top-1.5 text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-[#879391] peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-[#6bd8cb]">
+            Rubros / Sectores (ej: Finanzas, Tecnología)
+          </label>
+        </div>
+
         {/* Notas Iniciales */}
         <div className="relative">
           <textarea
@@ -413,7 +441,7 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
             placeholder=" "
             disabled={isPending}
             rows={3}
-            className="peer w-full bg-white/5 border border-white/10 rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50 resize-y min-h-[70px]"
+            className="peer w-full bg-white/5 border border-[#3e445b] rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50 resize-y min-h-[70px]"
           />
           <label className="absolute left-4 top-1.5 text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-[#879391] peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-[#6bd8cb]">
             Notas Iniciales de Reclutamiento

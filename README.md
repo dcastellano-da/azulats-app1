@@ -20,7 +20,7 @@ azulats-app1/
 │   │   │   ├── KpiCards.tsx       # Tarjetas rápidas de indicadores (Volumen, Tiempos, Candidatos)
 │   │   │   ├── MetricsChart.tsx   # Gráfico de rendimiento de búsquedas históricas (Recharts)
 │   │   │   ├── SlideOver.tsx      # Slide-over contenedor lateral dinámico
-│   │   │   └── CandidatoForm.tsx  # Formulario del Postulante (PDF <5MB, floating labels, RGPD)
+│   │   │   └── CandidatoForm.tsx  # Formulario del Postulante (CV PDF <5MB opcional, floating labels, RGPD)
 │   │   ├── globals.css            # Estilos globales y tokens del Stitch Design System
 │   │   ├── layout.tsx             # Layout base, tipografía Google Font Manrope
 │   │   ├── dashboard/page.tsx     # Dashboard Gerencial con filtros temporales y de clientes
@@ -197,8 +197,53 @@ git commit -m "Texto del cambio"
 git push origin main
 ```
 
-----------------------------------------------------------------------------------------------------------------------------------------------
-### LOG DE CAMBIOS
+*   **24/07/2026:** Filtro de Estado por Desplegable en Vista de Lista (`/talento`):
+    *   **Visibilidad Condicional en Modo "Lista Detallada":** Los botones/controles de filtro de estado (`Todos`, `Pendiente`, `Revisado`, `Seleccionado`, `Descartado`) se configuraron para renderizarse **únicamente en el modo de vista "Lista Detallada"**, ocultándose automáticamente en la vista "Kanban" (donde todas las columnas de estados ya se presentan en paralelo).
+    *   **Menú Desplegable (Dropdown) Homologado con Descubrimiento:** Se transformaron los botones horizontales en un control `<select>` compacto con ícono de flecha personalizado, resaltando en todo momento el estado activo actual y desplegando las opciones con colores distintivos por fase (`Pendiente`, `Revisado`, `Seleccionado`, `Descartado`).
+    *   **Autorregulación de Filtros:** Al cambiar al modo Kanban, el filtro de estado se restablece automáticamente a *"Todos"* para asegurar la visibilidad completa de los tableros.
+
+*   **24/07/2026:** Rediseño del Botón de Pantalla Completa Activa ("Restaurar"):
+    *   **Mejora de UX en Modo Maximizado:** Se reemplazó el texto *"Salir"* en tono rojo por el término **"Restaurar"** con estilo esmeralda/turquesa de marca (`bg-[#6bd8cb]/15 border-[#6bd8cb]/30 text-[#6bd8cb]`), evitando falsas impresiones de salida de aplicación o acciones destructivas.
+    *   **Homologación Multipágina:** Cambio aplicado en `/talento`, `/descubrimiento`, `/evaluacion`, `/presentacion` y `/cierre`.
+
+*   **24/07/2026:** Homologación de Botones de Vista y Función "Maximizar" en Talento (`/talento`):
+    *   **Botones de Modo de Vista Homologados:** Se adoptó el diseño exacto de los botones selector de vista de la página `/descubrimiento`: cápsula `bg-white/5` con botones individuales *"Kanban"* (`Grid3X3`) y *"Lista Detallada"* (`List`) con resaltado esmeralda (`bg-[#6bd8cb] text-[#101415]`).
+    *   **Botón de Maximizar / Salir de Pantalla Completa:** Integración del control `Maximizar` (`Maximize2` / `Minimize2`) en el panel de filtros de `/talento`. Al activarlo, oculta el banner superior de navegación y expande el tablero Kanban y la tabla de Lista Detallada a pantalla completa (`max-w-none px-2`), aprovechando el 100% de la pantalla sin alterar el comportamiento responsivo en móviles ni tablets.
+
+*   **24/07/2026:** Actualización de Título del Módulo Talento (`/talento`):
+    *   **Actualización de Marca e Identidad Visual:** Se actualizó el título principal de la cabecera del módulo en `src/app/talento/page.tsx` pasando de *"Postulantes & Candidatos"* a **"Base de Postulantes"**.
+
+*   **24/07/2026:** Reubicación de Botón de Edición y Protección de "Puesto / Cargo" en Detalle (`/talento/[id]`):
+    *   **Reubicación Global del Botón de Edición:** Movido el botón "Editar Ficha" / "Guardar Cambios" / "Cancelar" desde la sub-sección de *Perfil Profesional e Idiomas* a la **barra superior global de navegación** del candidato (al lado del ID y consola DAW), dejando claro que la acción aplica a toda la ficha del postulante.
+    *   **Diagnóstico de Inmutabilidad Backend:** Se constató que la API REST del backend (`PATCH /api/v1/candidatos/:id`) rechaza modificaciones sobre `puesto_postulacion` por ser una propiedad histórica de origen (junto a `id`, `acepta_privacidad`, `origen`, `url_cv` y `createdAt`).
+    *   **Protección y Guardado Exitoso:** Se configuró el campo `Puesto / Cargo` como lectura de origen inmutable en la interfaz y en `actualizarCandidatoAPI`, permitiendo actualizar y guardar exitosamente todos los demás campos mutables (Nombre, Email, LinkedIn, Teléfono, Ubicación, Skills, Idiomas, Resumen, Rubros y Notas) sin errores 400.
+    *   **Pruebas e Integridad:** Verificación de la suite de pruebas unitarias (33/33 tests aprobados) y compilación limpia con `npm run build`.
+
+*   **24/07/2026:** Optimización de la Vista de Lista en Módulo Postulantes (`/talento`):
+    *   **Remoción de Columnas Redundantes:** Eliminación completa de las columnas "ID" y "Habilidades Clave" en la tabla en modo lista para simplificar la visualización y optimizar el espacio horizontal.
+    *   **Ampliación de Columna de Notas:** Duplicación del ancho de la columna "Notas Iniciales" (`min-w-[480px]`, `max-w-[520px]`) y aumento a 3 líneas de texto visibilizado (`line-clamp-3`), optimizando la lectura directa sin romper el diseño responsivo gracias al contenedor con desplazamiento horizontal suave (`overflow-x-auto`).
+    *   **Aislamiento de Notas Iniciales:** La columna "Resumen y Notas" fue renombrada a "Notas Iniciales" y adaptada para mostrar únicamente la anotación directa del reclutador (`notas_iniciales`), removiendo la mezcla de resúmenes y rubros.
+    *   **Ordenamiento Dinámico en Cabeceras (Estilo Módulo Descubrimiento):** Implementación de la funcionalidad de ordenación bidireccional (ascendente/descendente) en todas las columnas navegables (`Candidato`, `Puesto`, `Ubicación`, `Notas Iniciales`, `Estado` y `Creado`) mediante clic interactivo e indicadores visuales de `ArrowUpDown`, `ChevronUp` y `ChevronDown`.
+    *   **Botones Explícitos de Transición en Columna "Acciones":** Integración de botones destacados de cambio de estado rápido (`A Revisado`, `A Seleccionado`, `A Descartado`, `Reactivar`) con estilos visuales diferenciados que guardan las mutaciones al instante contra el backend, preservando las acciones secundarias de Detalle, CV y Copiar datos.
+    *   **Pruebas e Integridad del Sistema:** Verificación completa de la suite de pruebas unitarias (33/33 tests aprobados) y compilación limpia en TypeScript sin incidencias (`npm run build`).
+
+*   **24/07/2026:** Flexibilización de Alta de Postulante (CV PDF Opcional):
+    *   **Servicios REST (`src/actions/candidatos.ts`):** Modificación de la Server Action `crearCandidatoAPI` para eliminar la exigencia obligatoria del binario de CV en la validación del servidor. El payload `FormData` omite la clave `cv` si no se adjunta archivo, enviando correctamente la petición al backend.
+    *   **Formulario de Alta (`CandidatoForm.tsx`):** Actualización de la interfaz en la función "Alta de Postulante" en `/talento` para remover el asterisco obligatorio (`*`) y actualizar las etiquetas a `(opcional)`. El envío del formulario ya no bloquea al usuario si no se proporciona un archivo PDF.
+    *   **Control de Impacto Visual en la App (`/talento` y `/talento/[id]`):** En las tarjetas Kanban, en la tabla de listado y en la ficha de detalle, el botón "Ver CV" se ajusta dinámicamente: para postulantes sin CV se deshabilita la previsualización y se despliega una notificación informativa reactiva ("Este postulante no tiene un archivo CV adjunto"), garantizando que no existan errores ni enlaces rotos.
+    *   **Pruebas Automatizadas (`tests/candidatos_etapa2.test.js`):** Nueva prueba unitaria para validar la creación exitosa de un postulante sin archivo adjunto a través de `crearCandidatoAPI`, aprobando el 100% de la suite de tests (33/33 tests).
+
+*   **24/07/2026 (Fase 2):** Integración completa de Resumen Profesional (`resumen`) y Rubros (`rubros`):
+    *   **Alta Manual e Importación IA:** Modificación del formulario manual (`CandidatoForm.tsx`) para incluir campos independientes para y capturar la información en la creación manual de los candidatos de `resumen` y `rubros`.
+    *   **Priorización de Entrada del Reclutador:** Modificación en las rutas del backend (`azulats-service1`) para priorizar la entrada manual del usuario (`req.body.notas_iniciales`) evitando que sea reemplazada por texto de IA, el cual ahora se guarda separadamente en `resumen` y `rubros`.
+    *   **Visualización y Edición en detalle / listado:** Visualización y edición en `/talento` (tanto en tarjetas Kanban como en la tabla de listado) y en `/talento/[id]` diferenciándolos de `notas_iniciales` y dándoles estilos visuales específicos.
+    *   **Pruebas unitarias:** Actualización de las suites de pruebas automatizadas (`tests/candidatos_etapa1.test.js` y `tests/candidatos_etapa2.test.js`) aprobadas con 100% de éxito.
+
+*   **24/07/2026:** Integración completa de Notas Iniciales (`notas_iniciales`):
+    *   **Alta Manual e Importación IA:** Incorporación del campo `notas_iniciales` en el formulario manual (`CandidatoForm.tsx`) y en el modal de importación por IA (`ImportarIaModal.tsx`), enviando la información estructuradamente mediante `importarCandidatoIA_API`.
+    *   **Visualización en Tablero y Lista:** Se muestra el nuevo campo tanto en el Grid de tarjetas Kanban (truncando el texto con tooltip en hover) como en una columna dedicada de la tabla de listado en `/talento`.
+    *   **Dashboard y Fichas de Detalle:** El campo es editable y persistido correctamente con las Server Actions unificadas de candidatos.
+    *   **Pruebas e Integridad:** Nueva suite de pruebas automatizadas en `candidatos_etapa2.test.js` para certificar el paso limpio de notas desde importación por IA, manteniendo 100% de éxito en compilación de producción de Next.js.
 
 *   **22/07/2026:** Rediseño Kanban, Asignación Activa de Búsquedas, Ruteo por ID de Pipeline y Renombramiento de Estados:
     *   **Tablero Kanban en Talento:** Rediseño de la vista principal del módulo de talentos `/talento` para organizar a los candidatos en 4 columnas: PENDIENTE, REVISADO, SELECCIONADO y DESCARTADO, soportando Drag & Drop nativo.
