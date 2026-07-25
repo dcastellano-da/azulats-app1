@@ -26,7 +26,9 @@ import {
   Sparkles,
   Send,
   Save,
-  X
+  X,
+  FileText,
+  ChevronsRight
 } from "lucide-react";
 import { analyzeSemanticMatchLive, generateOutreachMessageLive, SemanticMatchResult } from "@/lib/gemini";
 
@@ -55,6 +57,7 @@ interface SourcedCandidate {
   blockReason?: string;
   missingField?: "cv" | "salario" | "ingles";
   motivationNote?: string;
+  recruiterNotes?: string;
   socialLinks?: {
     github?: string;
     stackoverflow?: string;
@@ -244,6 +247,7 @@ const mapSinglePipelineToSourcedCandidate = (
     blockReason,
     missingField,
     motivationNote: cand.notas_iniciales || undefined,
+    recruiterNotes: pipe?.f1_descubrimiento?.notas_reclutador || undefined,
     socialLinks,
     rejectionReason
   };
@@ -267,6 +271,7 @@ export default function SourcedCandidateDetailPage() {
   const [editClient, setEditClient] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [editMotivation, setEditMotivation] = useState("");
+  const [editRecruiterNotes, setEditRecruiterNotes] = useState("");
   const [editScore, setEditScore] = useState(80);
   const [editGithub, setEditGithub] = useState("");
   const [editPortfolio, setEditPortfolio] = useState("");
@@ -291,6 +296,48 @@ export default function SourcedCandidateDetailPage() {
   const [triageOpen, setTriageOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ sender: "bot" | "user"; text: string }[]>([]);
   const [chatInput, setChatInput] = useState("");
+
+  // Phase 2 Advance Modal State
+  const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
+  const [isAdvancingPhase, setIsAdvancingPhase] = useState(false);
+
+  const confirmAdvancePhaseAction = async () => {
+    if (!cand) return;
+    setIsAdvancingPhase(true);
+    try {
+      if (activePipelineItem?.id) {
+        const now = new Date().toISOString();
+        const nuevoEstado = "05_screening";
+        const historialActualizado = [
+          { estado: nuevoEstado, timestamp: now },
+          ...(activePipelineItem.flujo.historial_estados || [])
+        ];
+        await actualizarPipelineAPI(activePipelineItem.id, {
+          flujo: {
+            estado_actual: nuevoEstado,
+            fecha_ultimo_cambio: now,
+            historial_estados: historialActualizado
+          }
+        });
+        // Actualizar state local para reflejar el historial inmediatamente
+        setActivePipelineItem(prev => prev ? {
+          ...prev,
+          flujo: {
+            ...prev.flujo,
+            estado_actual: nuevoEstado,
+            fecha_ultimo_cambio: now,
+            historial_estados: historialActualizado
+          }
+        } : null);
+      }
+      setCand(prev => prev ? { ...prev, phase1State: "05_screening" as any } : null);
+      setIsAdvanceModalOpen(false);
+    } catch (err: any) {
+      console.error("Error al avanzar fase:", err);
+    } finally {
+      setIsAdvancingPhase(false);
+    }
+  };
 
   // Auth Guard
   useEffect(() => {
@@ -403,6 +450,7 @@ export default function SourcedCandidateDetailPage() {
     setEditClient(c.client || "");
     setEditLocation(c.location || "");
     setEditMotivation(c.motivationNote || "");
+    setEditRecruiterNotes(c.recruiterNotes || "");
     setEditScore(c.score || 80);
     setEditGithub(c.socialLinks?.github || "");
     setEditPortfolio(c.socialLinks?.portfolio || "");
@@ -448,6 +496,7 @@ export default function SourcedCandidateDetailPage() {
         const pipePayload: any = {
           f1_descubrimiento: {
             ...(cand as any).f1_descubrimiento,
+            notas_reclutador: editRecruiterNotes.trim(),
             analisis_semantico: {
               ...(cand as any).f1_descubrimiento?.analisis_semantico,
               fit_score: Number(editScore),
@@ -496,6 +545,7 @@ export default function SourcedCandidateDetailPage() {
                 client: editClient.trim(),
                 location: editLocation.trim(),
                 motivationNote: editMotivation.trim(),
+                recruiterNotes: editRecruiterNotes.trim(),
                 score: Number(editScore),
                 socialLinks: {
                   ...c.socialLinks,
@@ -1111,8 +1161,29 @@ export default function SourcedCandidateDetailPage() {
 
                 {/* Sourcing notes & block metrics */}
                 <div className="space-y-4">
+                  {/* Recruiter Notes / Notas Descubrimiento (Destacado Visualmente) */}
                   <div className="space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Notas de Sourcing / Motivación</span>
+                    <span className="text-[10px] uppercase tracking-wider text-[#6bd8cb] font-bold block flex items-center gap-1">
+                      <FileText className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                      Notas Descubrimiento
+                    </span>
+                    {isEditing ? (
+                      <textarea
+                        value={editRecruiterNotes}
+                        onChange={(e) => setEditRecruiterNotes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe notas de descubrimiento para esta fase..."
+                        className="bg-[#6bd8cb]/5 border border-[#6bd8cb]/30 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none resize-none"
+                      />
+                    ) : (
+                      <div className="p-3 bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 rounded-xl text-xs text-white leading-relaxed font-medium shadow-sm">
+                        {cand.recruiterNotes ? cand.recruiterNotes : <span className="italic text-[#879391]">Sin notas de descubrimiento asignadas.</span>}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Notas iniciales</span>
                     {isEditing ? (
                       <textarea
                         value={editMotivation}
@@ -1434,10 +1505,11 @@ export default function SourcedCandidateDetailPage() {
                   {cand.phase1State === "01_nuevo" && (
                     <button
                       onClick={() => handleTransitionState("02_contactado")}
-                      className="px-3.5 py-2.5 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 hover:bg-[#6bd8cb] hover:text-stone-950 text-[#6bd8cb] font-bold text-xs flex items-center justify-center gap-1 hover:shadow transition-all cursor-pointer"
+                      title="A 02 - Bloqueado / Pendiente"
+                      className="px-3.5 py-2.5 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 hover:bg-[#6bd8cb] hover:text-stone-950 text-[#6bd8cb] font-bold text-xs flex items-center justify-center gap-1.5 hover:shadow transition-all cursor-pointer"
                     >
-                      <span>Marcar como Contactado</span>
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronsRight className="w-4 h-4 shrink-0" />
+                      <span>Avanzar estado</span>
                     </button>
                   )}
 
@@ -1447,41 +1519,47 @@ export default function SourcedCandidateDetailPage() {
                         blockReason: "Esperando confirmación pretensiones de sueldo y CV",
                         missingField: "salario"
                       })}
-                      className="px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500 hover:text-stone-950 text-amber-400 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
+                      title="A 03 - En Duda a Confirmar"
+                      className="px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500 hover:text-stone-950 text-amber-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
-                      <span>Bloquear Candidatura</span>
+                      <ChevronsRight className="w-4 h-4 shrink-0" />
+                      <span>Avanzar estado</span>
                     </button>
                   )}
 
                   {cand.phase1State === "03_bloqueado" && (
                     <button
-                      onClick={handleOpenTriage}
-                      className="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 shadow"
+                      onClick={() => handleTransitionState("04_rechazado", {
+                        rejectionReason: "Falta de información en aclaración"
+                      })}
+                      title="A 04 - Rechazado en Fase Inicial"
+                      className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
-                      <MessageSquare className="w-4 h-4" />
-                      <span>Resolver con Triage Bot</span>
+                      <ChevronsRight className="w-4 h-4 shrink-0" />
+                      <span>Avanzar estado</span>
                     </button>
                   )}
 
                   {cand.phase1State === "04_rechazado" && (
                     <button
                       onClick={() => handleTransitionState("01_nuevo")}
-                      className="px-3.5 py-2.5 rounded-xl bg-[#6bd8cb]/15 border border-[#6bd8cb]/20 text-[#6bd8cb] hover:bg-[#6bd8cb] hover:text-stone-950 font-bold text-xs text-center transition-all cursor-pointer"
+                      title="A 01 - Nuevo en Revisión"
+                      className="px-3.5 py-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
-                      Reactivar en Backlog (Nuevo)
+                      <ChevronsRight className="w-4 h-4 shrink-0" />
+                      <span>Avanzar estado</span>
                     </button>
                   )}
 
-                  {(cand.phase1State === "02_contactado" || cand.phase1State === "01_nuevo") && (
-                    <button
-                      onClick={() => alert(`El candidato ${cand.name} ha avanzado a Fase 2 (Evaluación Interna - Módulo de Selección).`)}
-                      className="px-3.5 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/20 hover:bg-emerald-500 hover:text-stone-950 text-emerald-400 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
-                      title="Avanzar candidato a Filtrados Fase 2"
-                    >
-                      <UserCheck className="w-4 h-4" />
-                      <span>Avanzar a Selección (Fase 2)</span>
-                    </button>
-                  )}
+                  {/* Action: Transfer / Move beyond phase 1 (Disponible desde cualquier estado) */}
+                  <button
+                    onClick={() => setIsAdvanceModalOpen(true)}
+                    className="px-3.5 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/20 hover:bg-emerald-500 hover:text-stone-950 text-emerald-400 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all"
+                    title="Avanzar a Fase 2 Evaluación"
+                  >
+                    <UserCheck className="w-4 h-4 shrink-0" />
+                    <span>Avanzar Fase</span>
+                  </button>
 
                   {cand.phase1State !== "04_rechazado" && (
                     <button
@@ -1730,7 +1808,80 @@ export default function SourcedCandidateDetailPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
 
+      {/* Modal Emergente Mejorado: Confirmar Cambio de Fase a Evaluación */}
+      {isAdvanceModalOpen && cand && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+          <div 
+            className="relative w-full max-w-md bg-[#15181a] border border-[#6bd8cb]/30 rounded-3xl p-6 shadow-2xl space-y-5 text-left animate-scaleUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header badge & close button */}
+            <div className="flex justify-between items-start">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#6bd8cb]/20 to-[#0d9488]/30 border border-[#6bd8cb]/40 flex items-center justify-center text-[#6bd8cb] shadow-lg shadow-[#6bd8cb]/10">
+                <UserCheck className="w-6 h-6" />
+              </div>
+              <button
+                onClick={() => setIsAdvanceModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center cursor-pointer transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content text */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold text-[#6bd8cb] uppercase tracking-wider bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded-full border border-[#6bd8cb]/20 inline-block">
+                Promoción de Pipeline
+              </span>
+              <h3 className="text-lg font-extrabold text-white tracking-tight">
+                ¿Avanzar a Fase 2 (Evaluación Interna)?
+              </h3>
+              <p className="text-xs text-[#879391] leading-relaxed">
+                Estás a punto de avanzar el expediente de <strong className="text-white">{cand.name}</strong> a <strong className="text-[#6bd8cb]">Fase 2 (Evaluación Interna - Módulo de Selección)</strong>.
+              </p>
+            </div>
+
+            {/* Candidate Card Summary */}
+            <div className="p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] flex items-center justify-between text-xs">
+              <div>
+                <span className="font-bold text-white block">{cand.name}</span>
+                <span className="text-[10px] text-[#879391]">{cand.role} • {cand.client}</span>
+              </div>
+              <span className="px-2.5 py-1 text-[9px] font-bold rounded-full bg-[#6bd8cb]/15 text-[#6bd8cb] border border-[#6bd8cb]/30 font-mono">
+                Fit {cand.score}%
+              </span>
+            </div>
+
+            {/* Action Buttons: Cancelar & Confirmar */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/5">
+              <button
+                onClick={() => setIsAdvanceModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold text-xs cursor-pointer transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmAdvancePhaseAction}
+                disabled={isAdvancingPhase}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6bd8cb] to-[#0d9488] text-stone-950 hover:opacity-90 font-black text-xs cursor-pointer transition-all shadow-lg shadow-[#6bd8cb]/20 flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isAdvancingPhase ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Avanzando...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="w-4 h-4" />
+                    <span>Confirmar y Avanzar</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

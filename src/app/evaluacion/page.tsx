@@ -41,27 +41,135 @@ import {
   AlertTriangle,
   PlayCircle,
   Eye,
-  Camera
+  Camera,
+  ChevronsRight
 } from "lucide-react";
 import { 
   EvaluacionCandidate, 
   INITIAL_EVALUACION_CANDIDATES, 
   calculateEvaluacionKPIs 
 } from "@/lib/evaluacion";
+import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
+import { getCandidatosAPI, Candidato } from "@/actions/candidatos";
+import { getPipelineAPI, PipelineItem, actualizarPipelineAPI } from "@/actions/pipeline";
 
-const ACTIVE_BUSQUEDAS = [
-  { id: "b1", client: "Inditex S.A.", role: "Frontend Dev (React/Node)" },
-  { id: "b2", client: "Telefónica S.A.", role: "Product Manager Tech" },
-  { id: "b3", client: "SEAT S.A.", role: "Software Architect Rust" },
-  { id: "b4", client: "Banco Santander", role: "SecOps Specialist" }
-];
+const generateDefaultToolsDetails = (candName: string, role: string, score: number) => {
+  const isRust = role.toLowerCase().includes("rust") || role.toLowerCase().includes("architect");
+  const isSenior = role.toLowerCase().includes("lead") || role.toLowerCase().includes("senior") || role.toLowerCase().includes("architect");
+  
+  return {
+    sintetizador: {
+      pros: [
+        `Sólida trayectoria alineada con la posición de ${role}.`,
+        "Capacidad comunicativa fluida en entornos multiculturales.",
+        "Buen desempeño demostrado en la resolución de problemas técnicos complejos."
+      ],
+      contras: [
+        "Requiere breve período de adaptación a las herramientas internas específicas del cliente."
+      ],
+      riesgos: [
+        "Disponibilidad sujeta a preaviso de 15 días en su empresa actual."
+      ]
+    },
+    inconsistencias: {
+      hasGaps: false,
+      gaps: [],
+      overlaps: []
+    },
+    preguntas: [
+      `¿Cómo abordas la optimización y escalabilidad en arquitecturas para ${role}?`,
+      "Describe un proyecto donde tuviste que tomar decisiones críticas bajo presión.",
+      "¿Cuál es tu enfoque para la entrega continua y colaboración con equipos de producto?"
+    ],
+    validador: {
+      ip: "185.220.101.5",
+      location: "España / Remoto",
+      envStatus: "Ambiente limpio verificado. Sin señales de software no autorizado.",
+      verificationStatus: "success" as const
+    },
+    copilot: {
+      activeSession: true,
+      difficultyLevel: isSenior ? ("Senior" as const) : ("Middle" as const),
+      completionRate: Math.min(100, score + 5),
+      effortScore: Math.round(((score / 20) + Number.EPSILON) * 10) / 10,
+      languageUsed: isRust ? "Rust / WebAssembly" : "TypeScript / React",
+      summary: `${candName} completó la sesión de Live Coding con un desempeño sólido (${score}% fit score). Código limpio y estructurado.`
+    }
+  };
+};
+
+const mapPipelineToEvaluacionCandidates = (
+  pipelineItems: PipelineItem[],
+  candidatosList: Candidato[],
+  busquedasList: Busqueda[]
+): EvaluacionCandidate[] => {
+  const candMap = new Map(candidatosList.map(c => [c.id, c]));
+  const busqMap = new Map(busquedasList.map(b => [b.id, b]));
+
+  const result: EvaluacionCandidate[] = [];
+
+  for (const pipe of pipelineItems) {
+    const cand = candMap.get(pipe.claves_conexion?.id_candidato);
+    const busq = busqMap.get(pipe.claves_conexion?.id_busqueda);
+
+    const stateStr = (pipe.flujo?.estado_actual || "").toLowerCase();
+    
+    let currentPhase: EvaluacionCandidate["currentPhase"] = "05_screening";
+    if (stateStr.includes("05") || stateStr.includes("screening")) {
+      currentPhase = "05_screening";
+    } else if (stateStr.includes("06") || stateStr.includes("assessment") || stateStr.includes("prueba")) {
+      currentPhase = "06_assessment";
+    } else if (stateStr.includes("07") || stateStr.includes("descartado")) {
+      currentPhase = "07_descartado_interno";
+    } else {
+      currentPhase = "05_screening";
+    }
+
+    const candName = cand?.nombre_completo || "Candidato";
+    const role = cand?.puesto || busq?.perfil_busqueda || "Especialista Tech";
+    const client = busq?.cliente || "Cliente";
+    const location = cand?.ubicacion || "España / Remoto";
+    const score = pipe.f1_descubrimiento?.analisis_semantico?.fit_score ?? pipe.evaluacion?.puntaje_tecnico ?? 85;
+    const entryDate = pipe.flujo?.fecha_ultimo_cambio || pipe.createdAt || new Date().toISOString();
+    const email = cand?.email || "candidato@email.com";
+    const contactNumber = cand?.telefono_movil || "+34 600 000 000";
+    const recruiterNotes = pipe.f1_descubrimiento?.notas_reclutador || cand?.notas_iniciales || undefined;
+
+    result.push({
+      id: cand?.id || pipe.claves_conexion?.id_candidato || pipe.id,
+      pipeId: pipe.id,
+      name: candName,
+      role,
+      client,
+      location,
+      score,
+      currentPhase,
+      entryDate,
+      cNPS: 9,
+      lastActivity: pipe.flujo?.fecha_ultimo_cambio 
+        ? `Último cambio: ${new Date(pipe.flujo.fecha_ultimo_cambio).toLocaleDateString("es-ES")}` 
+        : "Registro sincronizado desde backend",
+      experienceYears: 5,
+      contactNumber,
+      email,
+      recruiterNotes,
+      toolsDetails: generateDefaultToolsDetails(candName, role, score)
+    });
+  }
+
+  return result;
+};
 
 export default function EvaluacionPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   
   // States
+  const [activeBusquedas, setActiveBusquedas] = useState<Busqueda[]>([]);
   const [candidates, setCandidates] = useState<EvaluacionCandidate[]>([]);
+  const [dataLoading, setDataLoading] = useState<boolean>(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSearch, setSelectedSearch] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -87,10 +195,67 @@ export default function EvaluacionPage() {
   const [isSimulatingValidadorCheck, setIsSimulatingValidadorCheck] = useState(false);
   const [simulatedValidadorSuccess, setSimulatedValidadorSuccess] = useState<boolean | null>(null);
 
-  // Initialize
+  // Phase 3 Advance Modal State
+  const [candidateToAdvance, setCandidateToAdvance] = useState<EvaluacionCandidate | null>(null);
+  const [isAdvancingPhase, setIsAdvancingPhase] = useState(false);
+
+  // Fetch backend data
+  const fetchBackendData = async () => {
+    setDataLoading(true);
+    setDataError(null);
+    try {
+      // 1. Fetch active searches
+      const searchesList = await getBusquedasAPI();
+      setActiveBusquedas(searchesList);
+
+      // 2. Fetch candidates
+      const candidatesRes = await getCandidatosAPI();
+      let candidatesList: Candidato[] = [];
+      if (candidatesRes.success && Array.isArray(candidatesRes.data)) {
+        candidatesList = candidatesRes.data;
+      }
+
+      // 3. Fetch pipelines
+      let pipeItems: PipelineItem[] = [];
+      if (selectedSearch === "Todos") {
+        if (searchesList.length > 0) {
+          const promises = searchesList.map(s => getPipelineAPI(s.id));
+          const results = await Promise.all(promises);
+          results.forEach(res => {
+            if (res.success && Array.isArray(res.data)) {
+              pipeItems = pipeItems.concat(res.data);
+            }
+          });
+        } else {
+          const res = await getPipelineAPI("REQ-001");
+          if (res.success && Array.isArray(res.data)) {
+            pipeItems = res.data;
+          }
+        }
+      } else {
+        const match = searchesList.find(s => `${s.cliente} - ${s.perfil_busqueda}` === selectedSearch);
+        if (match) {
+          const res = await getPipelineAPI(match.id);
+          if (res.success && Array.isArray(res.data)) {
+            pipeItems = res.data;
+          }
+        }
+      }
+
+      // Map to EvaluacionCandidate[]
+      const mapped = mapPipelineToEvaluacionCandidates(pipeItems, candidatesList, searchesList);
+      setCandidates(mapped);
+    } catch (err: any) {
+      console.error("Error al obtener datos de evaluacion del backend:", err);
+      setDataError(err.message || "Error al conectar con los servicios backend del pipeline.");
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setCandidates(INITIAL_EVALUACION_CANDIDATES);
-  }, []);
+    fetchBackendData();
+  }, [selectedSearch]);
 
   // Client-side auth redirect
   useEffect(() => {
@@ -115,12 +280,31 @@ export default function EvaluacionPage() {
   const kpis = calculateEvaluacionKPIs(candidates);
   
   // State transition
-  const handleTransitionState = (id: string, targetPhase: EvaluacionCandidate["currentPhase"]) => {
+  const handleTransitionState = async (id: string, targetPhase: EvaluacionCandidate["currentPhase"]) => {
+    const targetCandidate = candidates.find(c => c.id === id);
+    const label = getPhaseLabel(targetPhase);
+
     setCandidates((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, currentPhase: targetPhase, lastActivity: `Estado cambiado a ${getPhaseLabel(targetPhase)}` } : c))
+      prev.map((c) => (c.id === id ? { ...c, currentPhase: targetPhase, lastActivity: `Estado cambiado a ${label}` } : c))
     );
     if (activeCandidate && activeCandidate.id === id) {
-      setActiveCandidate((prev) => prev ? { ...prev, currentPhase: targetPhase } : null);
+      setActiveCandidate((prev) => prev ? { ...prev, currentPhase: targetPhase, lastActivity: `Estado cambiado a ${label}` } : null);
+    }
+
+    if (targetCandidate?.pipeId) {
+      try {
+        const res = await actualizarPipelineAPI(targetCandidate.pipeId, {
+          flujo: {
+            estado_actual: targetPhase,
+            fecha_ultimo_cambio: new Date().toISOString()
+          }
+        });
+        if (!res.success) {
+          console.warn("[Evaluacion] Warning al actualizar pipeline en backend:", res.message);
+        }
+      } catch (err) {
+        console.error("[Evaluacion] Error al actualizar pipeline en backend:", err);
+      }
     }
   };
 
@@ -129,6 +313,44 @@ export default function EvaluacionPage() {
       case "05_screening": return "05 - Screening (Entrevista Inicial)";
       case "06_assessment": return "06 - Prueba / Assessment Técnico";
       case "07_descartado_interno": return "07 - Descartado (Interno)";
+    }
+  };
+
+  // Trigger phase advance modal
+  const handleAdvancePhase = (cad: EvaluacionCandidate) => {
+    setCandidateToAdvance(cad);
+  };
+
+  const confirmAdvancePhaseAction = async () => {
+    if (!candidateToAdvance) return;
+    setIsAdvancingPhase(true);
+    try {
+      if (candidateToAdvance.pipeId) {
+        const now = new Date().toISOString();
+        const nuevoEstado = "08_presentado_cliente";
+        const res = await actualizarPipelineAPI(candidateToAdvance.pipeId, {
+          flujo: {
+            estado_actual: nuevoEstado,
+            fecha_ultimo_cambio: now,
+            historial_estados: [
+              { estado: nuevoEstado, timestamp: now }
+            ]
+          }
+        });
+        if (res.success) {
+          setCandidates((prev) => prev.filter((c) => c.id !== candidateToAdvance.id));
+          if (activeCandidate?.id === candidateToAdvance.id) {
+            setActiveCandidate(null);
+          }
+        }
+      } else {
+        setCandidates((prev) => prev.filter((c) => c.id !== candidateToAdvance.id));
+      }
+      setCandidateToAdvance(null);
+    } catch (err: any) {
+      console.error("Error al avanzar candidato a Fase 3:", err);
+    } finally {
+      setIsAdvancingPhase(false);
     }
   };
 
@@ -653,9 +875,9 @@ export default function EvaluacionPage() {
                 className="bg-[#101415]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] cursor-pointer w-full md:w-auto"
               >
                 <option value="Todos" className="bg-[#15181a]">Todas las Búsquedas</option>
-                {ACTIVE_BUSQUEDAS.map((b) => (
-                  <option key={b.id} value={`${b.client} - ${b.role}`} className="bg-[#15181a] text-white">
-                    {b.client} - {b.role}
+                {activeBusquedas.map((b) => (
+                  <option key={b.id} value={`${b.cliente} - ${b.perfil_busqueda}`} className="bg-[#15181a] text-white">
+                    {b.cliente} - {b.perfil_busqueda}
                   </option>
                 ))}
               </select>
@@ -729,6 +951,29 @@ export default function EvaluacionPage() {
           </div>
         </section>
 
+        {/* Loading and Error Feedback Banners */}
+        {dataLoading && (
+          <div className="p-4 rounded-xl border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 text-[#6bd8cb] text-xs flex items-center justify-center gap-2 animate-pulse">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span>Sincronizando pipeline de evaluación con los servicios backend...</span>
+          </div>
+        )}
+
+        {dataError && (
+          <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs flex justify-between items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+              <span>{dataError}</span>
+            </div>
+            <button
+              onClick={() => fetchBackendData()}
+              className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/30 rounded-lg font-bold text-[10px] uppercase cursor-pointer"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
         {/* View Mode Content */}
         {viewMode === "kanban" ? (
           /* Kanban Board layout */
@@ -752,7 +997,7 @@ export default function EvaluacionPage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "05_screening").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onAdvancePhase={handleAdvancePhase} onDragStart={handleDragStart} />
                 ))}
                 {countScreening === 0 && <EmptyColumnText text="Ningún programado" />}
               </div>
@@ -776,7 +1021,7 @@ export default function EvaluacionPage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "06_assessment").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onAdvancePhase={handleAdvancePhase} onDragStart={handleDragStart} />
                 ))}
                 {countAssessment === 0 && <EmptyColumnText text="Ningún assessment activo" />}
               </div>
@@ -800,7 +1045,7 @@ export default function EvaluacionPage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "07_descartado_interno").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onAdvancePhase={handleAdvancePhase} onDragStart={handleDragStart} />
                 ))}
                 {countDescartados === 0 && <EmptyColumnText text="Ningún descarte" />}
               </div>
@@ -822,19 +1067,22 @@ export default function EvaluacionPage() {
                   <th className="px-5 py-4 cursor-pointer hover:text-white" onClick={() => toggleSort("phase")}>
                     Estado actual {renderSortIcon("phase")}
                   </th>
+                  <th className="px-5 py-4">
+                    Notas Reclutador
+                  </th>
                   <th className="px-5 py-4 cursor-pointer hover:text-white text-center" onClick={() => toggleSort("cnps")}>
                     cNPS {renderSortIcon("cnps")}
                   </th>
                   <th className="px-5 py-4 cursor-pointer hover:text-white text-center" onClick={() => toggleSort("score")}>
                     Fit Score {renderSortIcon("score")}
                   </th>
-                  <th className="px-5 py-4 text-right">Diagnóstico Avanzado</th>
+                  <th className="px-5 py-4 text-right">Acciones & Diagnóstico</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-medium">
                 {sortedListCandidates.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-[#879391] bg-white/5">
+                    <td colSpan={7} className="px-5 py-8 text-center text-[#879391] bg-white/5">
                       No se encontraron candidatos evaluados que coincidan con los criterios establecidos.
                     </td>
                   </tr>
@@ -864,6 +1112,16 @@ export default function EvaluacionPage() {
                           {getPhaseLabel(cad.currentPhase).substring(5)}
                         </span>
                       </td>
+                      <td className="py-4 px-5 min-w-[240px] max-w-[300px]">
+                        {cad.recruiterNotes ? (
+                          <div className="p-2 rounded-lg bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] text-[10px] leading-snug font-medium shadow-sm flex items-start gap-1.5">
+                            <FileText className="w-3.5 h-3.5 text-[#6bd8cb] shrink-0 mt-0.5" />
+                            <span className="text-white font-medium line-clamp-3">{cad.recruiterNotes}</span>
+                          </div>
+                        ) : (
+                          <span className="text-[#879391]/50 text-[10px] italic">Sin notas de evaluación</span>
+                        )}
+                      </td>
                       <td className="px-5 py-4 text-center font-mono font-bold text-sm text-[#c4c1fb]">
                         {cad.cNPS !== undefined ? cad.cNPS : "-"}
                       </td>
@@ -873,16 +1131,89 @@ export default function EvaluacionPage() {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <button
-                          onClick={() => {
-                            setActiveCandidate(cad);
-                            setActiveTab("general");
-                          }}
-                          className="px-3.5 py-1.5 text-[10px] font-black rounded-xl bg-gradient-to-tr from-[#9b5de5]/25 to-[#c4c1fb]/15 border border-[#c4c1fb]/20 text-[#c4c1fb] hover:bg-[#c4c1fb] hover:text-[#101415] hover:shadow-lg transition-all cursor-pointer inline-flex items-center gap-1.5"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Lanzar Herramientas IA</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5 text-[10px] flex-wrap">
+                          {/* Detalles button */}
+                          <button
+                            onClick={() => {
+                              setActiveCandidate(cad);
+                              setActiveTab("general");
+                            }}
+                            className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                            title="Ver expediente y detalles completos"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Detalles</span>
+                          </button>
+
+                          {/* Diagnóstico IA */}
+                          <button
+                            onClick={() => {
+                              setActiveCandidate(cad);
+                              setActiveTab("sintetizador");
+                            }}
+                            className="px-2.5 py-1 rounded border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                            title="Diagnóstico Motor IA"
+                          >
+                            <Cpu className="w-3.5 h-3.5 text-[#6bd8cb] animate-pulse" />
+                            <span>Diagnóstico IA</span>
+                          </button>
+
+                          {/* Avanzar estado */}
+                          {cad.currentPhase === "05_screening" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "06_assessment")}
+                              title="Avanzar estado a 06 - Assessment Técnico"
+                              className="px-2.5 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-stone-950 transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                              <span>Avanzar estado</span>
+                            </button>
+                          )}
+
+                          {cad.currentPhase === "06_assessment" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "05_screening")}
+                              title="Volver estado a 05 - Screening"
+                              className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold hover:bg-amber-500 hover:text-stone-950 transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                              <span>Volver a Screen</span>
+                            </button>
+                          )}
+
+                          {cad.currentPhase === "07_descartado_interno" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "05_screening")}
+                              title="Reactivar candidato a 05 - Screening"
+                              className="px-2.5 py-1 rounded bg-indigo-500/15 border border-indigo-500/20 text-indigo-400 font-bold hover:bg-indigo-500 hover:text-white transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                              <span>Reactivar</span>
+                            </button>
+                          )}
+
+                          {/* Avanzar Fase (Fase 3: Cliente) */}
+                          <button
+                            onClick={() => handleAdvancePhase(cad)}
+                            className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500 hover:text-stone-950 transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                            title="Avanzar a Fase 3 (Presentación al Cliente)"
+                          >
+                            <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                            <span>Avanzar Fase</span>
+                          </button>
+
+                          {/* Rechazar / Descartar */}
+                          {cad.currentPhase !== "07_descartado_interno" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "07_descartado_interno")}
+                              className="px-2 py-1 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-rose-400 font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                              title="Descartar internamente"
+                            >
+                              <Ban className="w-3.5 h-3.5 shrink-0" />
+                              <span>Rechazar</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1428,6 +1759,80 @@ export default function EvaluacionPage() {
         </div>
       )}
 
+      {/* Modal Emergente Mejorado: Confirmar Cambio de Fase a Cliente (Fase 3) */}
+      {candidateToAdvance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+          <div 
+            className="relative w-full max-w-md bg-[#15181a] border border-[#6bd8cb]/30 rounded-3xl p-6 shadow-2xl space-y-5 text-left animate-scaleUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header badge & close button */}
+            <div className="flex justify-between items-start">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#6bd8cb]/20 to-[#0d9488]/30 border border-[#6bd8cb]/40 flex items-center justify-center text-[#6bd8cb] shadow-lg shadow-[#6bd8cb]/10">
+                <UserCheck className="w-6 h-6" />
+              </div>
+              <button
+                onClick={() => setCandidateToAdvance(null)}
+                className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center cursor-pointer transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content text */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold text-[#6bd8cb] uppercase tracking-wider bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded-full border border-[#6bd8cb]/20 inline-block">
+                Promoción de Pipeline
+              </span>
+              <h3 className="text-lg font-extrabold text-white tracking-tight">
+                ¿Avanzar a Fase 3 (Presentación al Cliente)?
+              </h3>
+              <p className="text-xs text-[#879391] leading-relaxed">
+                Estás a punto de promocionar el expediente de <strong className="text-white">{candidateToAdvance.name}</strong> a <strong className="text-[#6bd8cb]">Fase 3 (Cliente / Presentación)</strong>.
+              </p>
+            </div>
+
+            {/* Candidate Card Summary */}
+            <div className="p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] flex items-center justify-between text-xs">
+              <div>
+                <span className="font-bold text-white block">{candidateToAdvance.name}</span>
+                <span className="text-[10px] text-[#879391]">{candidateToAdvance.role} • {candidateToAdvance.client}</span>
+              </div>
+              <span className="px-2.5 py-1 text-[9px] font-bold rounded-full bg-[#6bd8cb]/15 text-[#6bd8cb] border border-[#6bd8cb]/30 font-mono">
+                Fit {candidateToAdvance.score}%
+              </span>
+            </div>
+
+            {/* Action Buttons: Cancelar & Confirmar */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/5">
+              <button
+                onClick={() => setCandidateToAdvance(null)}
+                className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold text-xs cursor-pointer transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmAdvancePhaseAction}
+                disabled={isAdvancingPhase}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6bd8cb] to-[#0d9488] text-stone-950 hover:opacity-90 font-black text-xs cursor-pointer transition-all shadow-lg shadow-[#6bd8cb]/20 flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isAdvancingPhase ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Avanzando...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="w-4 h-4" />
+                    <span>Confirmar y Avanzar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -1437,11 +1842,13 @@ function KanbanCard({
   cad, 
   onSelect, 
   onTransition,
+  onAdvancePhase,
   onDragStart 
 }: { 
   cad: EvaluacionCandidate; 
   onSelect: (cad: EvaluacionCandidate) => void;
   onTransition: (id: string, phase: EvaluacionCandidate["currentPhase"]) => void;
+  onAdvancePhase: (cad: EvaluacionCandidate) => void;
   onDragStart: (e: React.DragEvent, id: string) => void;
 }) {
   const getWipTimerStatus = (entryIso: string) => {
@@ -1490,6 +1897,17 @@ function KanbanCard({
         </div>
       </div>
 
+      {/* Recruiter Notes / Notas Evaluación (Destacado y POR ENCIMA de Actividad Reciente) */}
+      {cad.recruiterNotes && (
+        <div className="text-[9px] leading-relaxed p-2 rounded-lg bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 text-[#6bd8cb] shadow-sm">
+          <div className="flex items-center gap-1 uppercase font-bold text-[8px] mb-0.5 text-[#6bd8cb]">
+            <FileText className="w-3 h-3 text-[#6bd8cb] shrink-0" />
+            <span>NOTAS RECLUTADOR:</span>
+          </div>
+          <p className="font-semibold text-white/90">{cad.recruiterNotes}</p>
+        </div>
+      )}
+
       {/* Screening brief details */}
       <div className="p-2 rounded bg-black/40 border border-white/5 space-y-1">
         <span className="text-[8px] font-bold tracking-wider text-white/40 uppercase block">Actividad Reciente</span>
@@ -1507,41 +1925,71 @@ function KanbanCard({
         <span>Abrir Diagnóstico IA</span>
       </button>
 
-      {/* Footer controls quick shifts */}
-      <div className="flex gap-1.5 pt-2 border-t border-white/5">
+      {/* Footer controls quick shifts: Detalles, Avanzar estado, Avanzar Fase, Rechazar */}
+      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
+        {/* Detalles button */}
+        <button
+          onClick={() => onSelect(cad)}
+          className="px-2 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb] hover:text-[#101415] text-[9px] font-bold text-[#c4c1fb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+          title="Ver expediente y detalles completos del candidato"
+        >
+          <Eye className="w-3 h-3 shrink-0" />
+          <span>Detalles</span>
+        </button>
+
+        {/* Avanzar estado button */}
         {cad.currentPhase === "05_screening" && (
           <button
             onClick={() => onTransition(cad.id, "06_assessment")}
-            className="px-2 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 hover:bg-[#6bd8cb]/35 text-[#6bd8cb] font-bold text-[9px] flex items-center justify-center gap-0.5 flex-grow cursor-pointer"
+            title="Avanzar estado a 06 - Assessment Técnico"
+            className="px-2 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 hover:bg-[#6bd8cb]/35 text-[#6bd8cb] font-bold text-[9px] flex items-center justify-center gap-1 flex-grow cursor-pointer whitespace-nowrap"
           >
-            <span>Assessment</span>
-            <ChevronRight className="w-3 h-3" />
+            <ChevronsRight className="w-3 h-3 shrink-0" />
+            <span>Avanzar estado</span>
           </button>
         )}
 
         {cad.currentPhase === "06_assessment" && (
           <button
             onClick={() => onTransition(cad.id, "05_screening")}
-            className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/25 text-amber-400 font-bold text-[9px] flex items-center justify-center gap-0.5 flex-grow cursor-pointer"
+            title="Volver estado a 05 - Screening"
+            className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/25 text-amber-400 font-bold text-[9px] flex items-center justify-center gap-1 flex-grow cursor-pointer whitespace-nowrap"
           >
+            <ChevronsRight className="w-3 h-3 shrink-0" />
             <span>Volver a Screen</span>
           </button>
         )}
 
-        {cad.currentPhase !== "07_descartado_interno" ? (
-          <button
-            onClick={() => onTransition(cad.id, "07_descartado_interno")}
-            className="p-1 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-rose-400 text-[9px] transition-all flex items-center justify-center cursor-pointer shrink-0"
-            title="Descartar candidado en evaluación"
-          >
-            <Ban className="w-3 h-3" />
-          </button>
-        ) : (
+        {cad.currentPhase === "07_descartado_interno" && (
           <button
             onClick={() => onTransition(cad.id, "05_screening")}
-            className="px-2 py-1 rounded bg-[#6bd8cb]/15 border border-[#6bd8cb]/20 text-[#6bd8cb] hover:bg-[#6bd8cb] hover:text-stone-950 font-bold text-[9px] flex-grow text-center transition-all cursor-pointer"
+            title="Reactivar candidato a 05 - Screening"
+            className="px-2 py-1 rounded bg-indigo-500/15 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white font-bold text-[9px] flex items-center justify-center gap-1 flex-grow text-center transition-all cursor-pointer whitespace-nowrap"
           >
-            Reactivar en Backlog
+            <ChevronsRight className="w-3 h-3 shrink-0" />
+            <span>Reactivar</span>
+          </button>
+        )}
+
+        {/* Avanzar Fase (Fase 3: Cliente / Presentación) */}
+        <button
+          onClick={() => onAdvancePhase(cad)}
+          className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-stone-950 font-bold text-[9px] flex items-center justify-center gap-1 flex-grow cursor-pointer transition-all whitespace-nowrap"
+          title="Avanzar a Fase 3 (Presentación al Cliente)"
+        >
+          <UserCheck className="w-3.5 h-3.5 shrink-0" />
+          <span>Avanzar Fase</span>
+        </button>
+
+        {/* Discard button */}
+        {cad.currentPhase !== "07_descartado_interno" && (
+          <button
+            onClick={() => onTransition(cad.id, "07_descartado_interno")}
+            className="px-2 py-1 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-rose-400 text-[9px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+            title="Descartar internamente"
+          >
+            <Ban className="w-3 h-3 shrink-0" />
+            <span>Rechazar</span>
           </button>
         )}
       </div>

@@ -444,7 +444,7 @@ export default function CandidatoForm({ onSuccess, onClose, onSubmittingChange }
             className="peer w-full bg-white/5 border border-[#3e445b] rounded-xl px-4 pt-5 pb-2 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder-transparent font-medium disabled:opacity-50 resize-y min-h-[70px]"
           />
           <label className="absolute left-4 top-1.5 text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase transition-all pointer-events-none peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-xs peer-placeholder-shown:text-[#879391] peer-focus:top-1.5 peer-focus:text-[9px] peer-focus:text-[#6bd8cb]">
-            Notas Iniciales de Reclutamiento
+            Notas iniciales
           </label>
         </div>
       </div>

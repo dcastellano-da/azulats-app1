@@ -273,7 +273,7 @@ Rubros: ${cand.rubros || 'No especificado'}
 Estado de Revisión: ${cand.estado_revision}
 Origen: ${cand.origen}
 Fecha de Registro: ${formattedDate}
-Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
+Notas iniciales: ${cand.notas_iniciales || 'Ninguna'}`;
 
     navigator.clipboard.writeText(textToCopy)
       .then(() => {
@@ -686,6 +686,18 @@ Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
                       />
                     </div>
 
+                    {/* Notes iniciales */}
+                    <div className="space-y-1 text-left p-3 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+                      <label className="text-[9px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1">📌 Notas iniciales</label>
+                      <textarea
+                        value={editNotas}
+                        onChange={(e) => setEditNotas(e.target.value)}
+                        placeholder="Escribe anotaciones iniciales aquí..."
+                        rows={3}
+                        className="w-full bg-[#101415] border border-amber-500/30 rounded-xl px-3 py-1.5 text-xs text-amber-100 focus:border-amber-400 focus:outline-none resize-y min-h-[60px]"
+                      />
+                    </div>
+
                     {/* Rubros */}
                     <div className="space-y-1 text-left">
                       <label className="text-[9px] font-black uppercase text-white/40 tracking-wider">Rubros / Industrias</label>
@@ -695,18 +707,6 @@ Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
                         onChange={(e) => setEditRubros(e.target.value)}
                         placeholder="Ejemplo: Banca, Seguros, Telecom "
                         className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
-                      />
-                    </div>
-
-                    {/* Notes initiales */}
-                    <div className="space-y-1 text-left">
-                      <label className="text-[9px] font-black uppercase text-white/40 tracking-wider">Anotaciones de Reclutamiento</label>
-                      <textarea
-                        value={editNotas}
-                        onChange={(e) => setEditNotas(e.target.value)}
-                        placeholder="Escribe anotaciones iniciales aquí..."
-                        rows={3}
-                        className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none resize-y min-h-[60px]"
                       />
                     </div>
                   </div>
@@ -756,19 +756,21 @@ Notas de Reclutamiento: ${cand.notas_iniciales || 'Ninguna'}`;
                       </p>
                     </div>
 
+                    {/* NOTAS DEL POSTULANTE (Destacado Visiblemente y ANTES de Rubros) */}
+                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-left space-y-2 shadow-lg">
+                      <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                        📌 Notas iniciales
+                      </span>
+                      <p className="text-xs text-amber-100 font-medium leading-relaxed whitespace-pre-wrap italic select-text">
+                        {cand.notas_iniciales ? `"${cand.notas_iniciales}"` : <span className="opacity-40 not-italic">Sin anotaciones preliminares sobre el candidato.</span>}
+                      </p>
+                    </div>
+
                     {/* Rubros Section */}
                     <div className="p-4 rounded-2xl bg-[#101415]/60 border border-white/5 space-y-1">
                       <span className="text-[9px] font-black uppercase text-[#c4c1fb] tracking-wider block">Rubros y Sectores Clave</span>
                       <p className="text-xs font-bold text-white leading-normal">
                         {cand.rubros || "Sin especificar"}
-                      </p>
-                    </div>
-
-                    {/* notes section */}
-                    <div className="p-4 rounded-2xl bg-[#101415]/60 border border-white/5 space-y-2">
-                       <span className="text-[9px] font-black uppercase text-[#c4c1fb] tracking-wider block">Anotaciones del Reclutador</span>
-                      <p className="text-xs text-[#879391] font-medium leading-relaxed whitespace-pre-wrap">
-                        {cand.notas_iniciales || "Sin anotaciones preliminares sobre el candidato."}
                       </p>
                     </div>
                   </>

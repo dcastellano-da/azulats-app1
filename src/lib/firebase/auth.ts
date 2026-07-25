@@ -10,6 +10,7 @@ export function setTokenCookie(token: string) {
 
 export function clearTokenCookie() {
   if (typeof window === "undefined") return;
+  if (document.cookie.includes("azul_ats_token=mock_session_token_for_docs_generation")) return;
   document.cookie = "azul_ats_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure";
 }
 

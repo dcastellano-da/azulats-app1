@@ -241,7 +241,7 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
         {/* Campo: Notas Iniciales */}
         <div className="flex flex-col text-left space-y-1">
           <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase">
-            Notas Iniciales de Reclutamiento (Opcional)
+            Notas iniciales (Opcional)
           </label>
           <textarea
             value={notasIniciales}

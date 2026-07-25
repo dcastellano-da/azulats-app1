@@ -308,7 +308,7 @@ Rubros: ${c.rubros || 'No especificado'}
 Estado de Revisión: ${c.estado_revision}
 Origen: ${c.origen}
 Fecha de Registro: ${formattedDate}
-Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
+Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
 
     navigator.clipboard.writeText(textToCopy)
       .then(() => {
@@ -484,6 +484,20 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
               )}
             </div>
 
+            {/* NOTAS DEL POSTULANTE (Destacado Visiblemente y ANTES de Rubros / Industrias) */}
+            <div className="pt-2 border-t border-white/5 space-y-1">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-left space-y-1 shadow-sm">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                    📌 Notas iniciales
+                  </span>
+                </div>
+                <p className="text-[10.5px] text-amber-100/90 font-medium leading-relaxed italic line-clamp-3 select-text" title={cand.notas_iniciales || "Sin notas"}>
+                  {cand.notas_iniciales ? `"${cand.notas_iniciales}"` : <span className="opacity-40 not-italic">Sin notas registradas</span>}
+                </p>
+              </div>
+            </div>
+
             {cand.rubros && (
               <div className="pt-1.5 border-t border-white/5">
                 <span className="text-[8px] text-[#c4c1fb] uppercase tracking-wider font-extrabold block mb-0.5">
@@ -502,17 +516,6 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
                 </span>
                 <p className="text-[10px] text-[#879391] line-clamp-2 italic leading-relaxed" title={cand.resumen}>
                   &quot;{cand.resumen}&quot;
-                </p>
-              </div>
-            )}
-
-            {cand.notas_iniciales && (
-              <div className="pt-1.5 border-t border-white/5 space-y-0.5">
-                <span className="text-[9px] text-[#c4c1fb] uppercase tracking-wider font-bold block">
-                  Notas de Reclutamiento
-                </span>
-                <p className="text-[10px] text-[#879391] line-clamp-2 italic leading-relaxed" title={cand.notas_iniciales}>
-                  &quot;{cand.notas_iniciales}&quot;
                 </p>
               </div>
             )}
@@ -1078,7 +1081,7 @@ Notas de Reclutamiento: ${c.notas_iniciales || 'Ninguna'}`;
                           {cand.notas_iniciales ? (
                             `"${cand.notas_iniciales}"`
                           ) : (
-                            <span className="opacity-30">Sin notas de reclutamiento</span>
+                            <span className="opacity-30">Sin notas iniciales</span>
                           )}
                         </div>
                       </td>

@@ -1,5 +1,6 @@
 export interface EvaluacionCandidate {
   id: string;
+  pipeId?: string;
   name: string;
   role: string;
   client: string;
@@ -12,6 +13,7 @@ export interface EvaluacionCandidate {
   experienceYears: number;
   contactNumber: string;
   email: string;
+  recruiterNotes?: string;
   toolsDetails: {
     sintetizador: {
       pros: string[];
@@ -58,6 +60,7 @@ export const INITIAL_EVALUACION_CANDIDATES: EvaluacionCandidate[] = [
     experienceYears: 4.5,
     contactNumber: "+34 654 987 321",
     email: "alejandro.sanz@gmail.com",
+    recruiterNotes: "Candidato con perfil sobresaliente. Muy buena disposición para entrevista técnica.",
     toolsDetails: {
       sintetizador: {
         pros: [

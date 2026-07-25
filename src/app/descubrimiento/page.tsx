@@ -39,7 +39,9 @@ import {
   ChevronUp,
   ChevronDown,
   Maximize2,
-  Minimize2
+  Minimize2,
+  ChevronsRight,
+  X
 } from "lucide-react";
 import { analyzeSemanticMatchLive, generateBooleanQueryLive, SemanticMatchResult } from "@/lib/gemini";
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
@@ -65,6 +67,7 @@ interface SourcedCandidate {
   blockReason?: string;
   missingField?: "cv" | "salario" | "ingles";
   motivationNote?: string;
+  recruiterNotes?: string;
   socialLinks?: {
     github?: string;
     stackoverflow?: string;
@@ -308,6 +311,7 @@ const mapPipelineToSourcedCandidates = (
       blockReason,
       missingField,
       motivationNote: cand?.notas_iniciales || undefined,
+      recruiterNotes: pipe.f1_descubrimiento?.notas_reclutador || undefined,
       socialLinks,
       rejectionReason
     };
@@ -339,7 +343,8 @@ const INITIAL_SOURCED_CANDIDATES: SourcedCandidate[] = [
       outreachVariation: "A",
       customOutreachA: "Hola Diego, vi tu excelente trabajo en el repositorio de WebAssembly para sistemas embebidos de SEAT. Nos entusiasma tu perfil para liderar la arquitectura en...",
       customOutreachB: "Hola Diego, estamos buscando un Arquitecto Rust para SEAT. ¿Te interesaría conocer los detalles del puesto?",
-      motivationNote: "Interesado en metodologías ágiles y arquitecturas edge de baja latencia."
+      motivationNote: "Interesado en metodologías ágiles y arquitecturas edge de baja latencia.",
+      recruiterNotes: "Candidato con perfil sobresaliente. Muy buena disposición para entrevista técnica."
     },
     {
       id: "C-302",
@@ -355,6 +360,7 @@ const INITIAL_SOURCED_CANDIDATES: SourcedCandidate[] = [
       customOutreachA: "Hola María, tu investigación sobre diseño centrado en el usuario de retail digital es asombrosa. En Inditex queremos invitarte a liderar el... ",
       customOutreachB: "Hola María, hay una posición abierta de UX Research Lead en Inditex. ¿Hablamos esta semana?",
       motivationNote: "Especialista en e-commerce y testeos A/B a gran escala.",
+      recruiterNotes: "Respuesta rápida al contacto inicial. Solicita modalidad 100% remota.",
       socialLinks: {
         portfolio: "https://mariabelmonte.design"
       }
@@ -375,6 +381,7 @@ const INITIAL_SOURCED_CANDIDATES: SourcedCandidate[] = [
       blockReason: "Falta pretensión salarial",
       missingField: "salario",
       motivationNote: "Lidera comunidades locales de Cassandra y Kafka.",
+      recruiterNotes: "Falta pretensión salarial exacta. Pendiente de llamada de triage.",
       socialLinks: {
         github: "https://github.com/ctejera-data",
         stackoverflow: "https://stackoverflow.com/users/ctejera"
@@ -395,7 +402,8 @@ const INITIAL_SOURCED_CANDIDATES: SourcedCandidate[] = [
       customOutreachB: "Hola Marta, ¿qué tal? Vimos tu experiencia como DevOps en finanzas. Nos gustaría ver si encajas en el equipo de Cloud de Santander. ¿Revisamos?",
       blockReason: "Falta CV PDF actualizado",
       missingField: "cv",
-      motivationNote: "Certificada en GCP Cloud Security Professional y CKA."
+      motivationNote: "Certificada en GCP Cloud Security Professional y CKA.",
+      recruiterNotes: "Experiencia en DevOps comprobada. Solicitado CV actualizado."
     },
     {
       id: "C-305",
@@ -411,7 +419,8 @@ const INITIAL_SOURCED_CANDIDATES: SourcedCandidate[] = [
       customOutreachA: "Hola Alberto, tu perfil en microservicios Django encaja excelente con el backend de logística de Mercadona. Te gustaría...",
       customOutreachB: "Hola Alberto, buscamos desarrollador backend Django para Mercadona. ¿Tienes interés en escuchar la oferta?",
       rejectionReason: "Presupuesto",
-      motivationNote: "Pretensiones salariales fuera de rango (65.000€ vs tope de 52.000€)."
+      motivationNote: "Pretensiones salariales fuera de rango (65.000€ vs tope de 52.000€).",
+      recruiterNotes: "Expectativa salarial (65k) supera presupuesto máximo de la vacante (52k)."
     },
     {
       id: "C-306",
@@ -427,7 +436,8 @@ const INITIAL_SOURCED_CANDIDATES: SourcedCandidate[] = [
       customOutreachA: "Hola Lucía, vi tu app móvil open-source de reserva de billetes. En Amadeus estamos estructurando el equipo NextGen Mobile y...",
       customOutreachB: "Hola Lucía, ¿te interesa un cambio? Buscamos desarrollador React Native en Amadeus España. Avísame si comentamos.",
       rejectionReason: "Nivel de Inglés",
-      motivationNote: "El puesto exige nivel C1 fluido conversación. Candidata cuenta con B1/B2."
+      motivationNote: "El puesto exige nivel C1 fluido conversación. Candidata cuenta con B1/B2.",
+      recruiterNotes: "Nivel de inglés intermedio (B1/B2), no alcanza requerimiento C1."
     }
 ];
 
@@ -545,6 +555,37 @@ export default function DescubrimientoPage() {
   const [semanticCandidate, setSemanticCandidate] = useState<SourcedCandidate | null>(null);
   const [isAnalyzingSemantic, setIsAnalyzingSemantic] = useState(false);
   const [semanticResult, setSemanticResult] = useState<SemanticMatchResult | null>(null);
+
+  // Phase 2 Advance Modal State
+  const [candidateToAdvance, setCandidateToAdvance] = useState<SourcedCandidate | null>(null);
+  const [isAdvancingPhase, setIsAdvancingPhase] = useState(false);
+
+  const confirmAdvancePhaseAction = async () => {
+    if (!candidateToAdvance) return;
+    setIsAdvancingPhase(true);
+    try {
+      const now = new Date().toISOString();
+      const nuevoEstado = "05_screening";
+      const payload = {
+        flujo: {
+          estado_actual: nuevoEstado,
+          fecha_ultimo_cambio: now,
+          historial_estados: [
+            { estado: nuevoEstado, timestamp: now }
+          ]
+        }
+      };
+      if (candidateToAdvance.pipeId) {
+        await actualizarPipelineAPI(candidateToAdvance.pipeId, payload);
+      }
+      setCandidates(prev => prev.filter(c => c.id !== candidateToAdvance.id));
+      setCandidateToAdvance(null);
+    } catch (err: any) {
+      console.error("Error al avanzar candidato a Fase 2:", err);
+    } finally {
+      setIsAdvancingPhase(false);
+    }
+  };
 
   // List View and Status Filter State
   const [viewMode, setViewMode] = useState<"kanban" | "lista">("kanban");
@@ -1092,8 +1133,8 @@ export default function DescubrimientoPage() {
       valA = a.phase1State.toLowerCase();
       valB = b.phase1State.toLowerCase();
     } else if (sortField === "notes") {
-      const noteA = (a.blockReason || a.missingField || a.motivationNote || "").toLowerCase();
-      const noteB = (b.blockReason || b.missingField || b.motivationNote || "").toLowerCase();
+      const noteA = (a.recruiterNotes || a.motivationNote || "").toLowerCase();
+      const noteB = (b.recruiterNotes || b.motivationNote || "").toLowerCase();
       valA = noteA;
       valB = noteB;
     }
@@ -1145,8 +1186,7 @@ export default function DescubrimientoPage() {
         className="p-4 rounded-xl border border-white/10 bg-[#15181a]/40 hover:bg-[#15181a]/95 hover:border-white/20 transition-all duration-200 group flex flex-col space-y-3.5 relative overflow-hidden cursor-grab active:cursor-grabbing"
       >
         {/* Top fit assessment & metadata info */}
-        <div className="flex justify-between items-start">
-          <span className="text-[9px] font-mono text-[#879391]">{cad.id}</span>
+        <div className="flex justify-end items-center">
           <div className="flex items-center gap-1.5">
             {/* Last Change Timer Icon */}
             <span className="text-[9px] text-[#879391] flex items-center gap-1">
@@ -1184,11 +1224,22 @@ export default function DescubrimientoPage() {
           </div>
         </div>
 
+        {/* Recruiter Notes / Notas Descubrimiento (Destacado y POR ENCIMA de Notas Iniciales) */}
+        {cad.recruiterNotes && (
+          <div className="text-[9px] leading-relaxed p-2 rounded-lg bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 text-[#6bd8cb] shadow-sm">
+            <div className="flex items-center gap-1 uppercase font-bold text-[8px] mb-0.5 text-[#6bd8cb]">
+              <FileText className="w-3 h-3 text-[#6bd8cb] shrink-0" />
+              <span>NOTAS DESCUBRIMIENTO:</span>
+            </div>
+            <p className="font-semibold text-white/90">{cad.recruiterNotes}</p>
+          </div>
+        )}
+
         {/* Motivation and auto parsed details */}
         {cad.motivationNote && (
           <div className="text-[9px] leading-relaxed p-2 rounded bg-white/5 border border-white/5 text-[#879391]">
             <span className="text-white/40 block uppercase font-bold text-[8px] mb-0.5">
-              Notas de Sourcing:
+              Notas iniciales:
             </span>
             <p className="italic">"{cad.motivationNote}"</p>
           </div>
@@ -1296,11 +1347,11 @@ export default function DescubrimientoPage() {
         </div>
 
         {/* Foot card actions */}
-        <div className="flex gap-1.5 pt-2 border-t border-white/5">
+        <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
           {/* Detalles button */}
           <Link
             href={`/descubrimiento/${cad.pipeId || cad.id}`}
-            className="px-2 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb] hover:text-[#101415] text-[9px] font-bold text-[#c4c1fb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0"
+            className="px-2 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb] hover:text-[#101415] text-[9px] font-bold text-[#c4c1fb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
             title="Ver detalles completos del candidato"
           >
             <span>Detalles</span>
@@ -1310,7 +1361,7 @@ export default function DescubrimientoPage() {
             <button
               onClick={() => handleEnrichCandidate(cad.id, cad.name)}
               disabled={enrichingId === cad.id}
-              className="px-2 py-1 flex-grow rounded border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 hover:bg-[#6bd8cb] hover:text-[#101415] disabled:bg-white/5 disabled:text-[#879391] text-[9px] font-bold text-[#6bd8cb] transition-all flex items-center justify-center gap-1 cursor-pointer"
+              className="px-2 py-1 flex-grow rounded border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 hover:bg-[#6bd8cb] hover:text-[#101415] disabled:bg-white/5 disabled:text-[#879391] text-[9px] font-bold text-[#6bd8cb] transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
             >
               <RefreshCw className={`w-3 h-3 ${enrichingId === cad.id ? "animate-spin" : ""}`} />
               <span>{enrichingId === cad.id ? "Scraping..." : "Enriquecer"}</span>
@@ -1321,10 +1372,11 @@ export default function DescubrimientoPage() {
           {cad.phase1State === "01_nuevo" && (
             <button
               onClick={() => handleTransitionState(cad.id, "02_contactado")}
-              className="px-2 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 hover:bg-[#6bd8cb]/35 text-[#6bd8cb] font-bold text-[9px] flex items-center justify-center gap-0.5 flex-grow cursor-pointer"
+              title="A 02 - Bloqueado / Pendiente"
+              className="px-2 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 hover:bg-[#6bd8cb]/35 text-[#6bd8cb] font-bold text-[9px] flex items-center justify-center gap-1 flex-grow cursor-pointer whitespace-nowrap"
             >
-              <span>Contactar</span>
-              <ChevronRight className="w-3 h-3" />
+              <ChevronsRight className="w-3 h-3 shrink-0" />
+              <span>Avanzar estado</span>
             </button>
           )}
 
@@ -1334,31 +1386,33 @@ export default function DescubrimientoPage() {
                 blockReason: "Esperando confirmación pretensiones de sueldo y CV",
                 missingField: "salario"
               })}
-              className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/25 text-amber-400 font-bold text-[9px] flex items-center justify-center gap-0.5 flex-grow cursor-pointer"
+              title="A 03 - En Duda a Confirmar"
+              className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/25 text-amber-400 font-bold text-[9px] flex items-center justify-center gap-1 flex-grow cursor-pointer whitespace-nowrap"
             >
-              <span>Bloquear</span>
+              <ChevronsRight className="w-3 h-3 shrink-0" />
+              <span>Avanzar estado</span>
             </button>
           )}
 
-          {/* Action: Transfer / Move beyond phase 1 */}
-          {(cad.phase1State === "02_contactado" || cad.phase1State === "01_nuevo") && (
-            <button
-              onClick={() => alert(`El candidato ${cad.name} ha avanzado a Fase 2 (Evaluación Interna - Módulo Selección).`)}
-              className="px-1.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-stone-950 font-bold text-[9px] flex items-center justify-center gap-0.5 shrink-0 cursor-pointer"
-              title="Avanzar candidato a Filtrados Fase 2"
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-            </button>
-          )}
+          {/* Action: Transfer / Move beyond phase 1 (Disponible desde cualquier estado) */}
+          <button
+            onClick={() => setCandidateToAdvance(cad)}
+            className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-stone-950 font-bold text-[9px] flex items-center justify-center gap-1 flex-grow cursor-pointer transition-all whitespace-nowrap"
+            title="Avanzar a Fase 2 Evaluación"
+          >
+            <UserCheck className="w-3.5 h-3.5 shrink-0" />
+            <span>Avanzar Fase</span>
+          </button>
 
           {/* Discard early candidate */}
           {cad.phase1State !== "04_rechazado" && (
             <button
               onClick={() => triggerRejectionFlow(cad.id)}
-              className="p-1 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-red-400 text-[9px] transition-all flex items-center justify-center cursor-pointer"
+              className="px-2 py-1 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-red-400 text-[9px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
               title="Rechazar en Fase Inicial"
             >
-              <Ban className="w-3 h-3" />
+              <Ban className="w-3 h-3 shrink-0" />
+              <span>Rechazar</span>
             </button>
           )}
 
@@ -1366,9 +1420,11 @@ export default function DescubrimientoPage() {
           {cad.phase1State === "04_rechazado" && (
             <button
               onClick={() => handleTransitionState(cad.id, "01_nuevo")}
-              className="px-2 py-1 rounded bg-[#6bd8cb]/15 border border-[#6bd8cb]/20 text-[#6bd8cb] hover:bg-[#6bd8cb] hover:text-stone-950 font-bold text-[9px] flex-grow text-center transition-all cursor-pointer"
+              title="A 01 - Nuevo en Revisión"
+              className="px-2 py-1 rounded bg-indigo-500/15 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white font-bold text-[9px] flex items-center justify-center gap-1 flex-grow text-center transition-all cursor-pointer whitespace-nowrap"
             >
-              Reactivar en Backlog
+              <ChevronsRight className="w-3 h-3 shrink-0" />
+              <span>Avanzar estado</span>
             </button>
           )}
         </div>
@@ -1743,10 +1799,10 @@ export default function DescubrimientoPage() {
         )}
 
         {/* Filter controls panel */}
-        <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md flex flex-col xl:flex-row gap-4 justify-between items-center text-left">
-          <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-center">
+        <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md flex flex-col 2xl:flex-row gap-4 justify-between items-center text-left flex-wrap">
+          <div className="flex flex-col md:flex-row flex-wrap gap-3 w-full 2xl:w-auto items-center">
             {/* Search Input */}
-            <div className="relative w-full md:max-w-xs xl:w-72">
+            <div className="relative w-full md:max-w-xs 2xl:w-72">
               <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-[#879391]" />
               <input
                 type="text"
@@ -1794,7 +1850,7 @@ export default function DescubrimientoPage() {
           </div>
 
           {/* Toggle buttons for Kanban vs List view mode & Fullscreen */}
-          <div className="flex items-center gap-3 w-full md:w-auto justify-center">
+          <div className="flex items-center flex-wrap gap-3 w-full 2xl:w-auto justify-center 2xl:justify-end shrink-0">
             <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 select-none">
               <button
                 onClick={() => setViewMode("kanban")}
@@ -1991,7 +2047,7 @@ export default function DescubrimientoPage() {
                     </th>
                     <th 
                       onClick={() => handleSort("status")}
-                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group"
+                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[190px] max-w-[210px]"
                     >
                       <div className="flex items-center">
                         <span>Estado</span>
@@ -2000,10 +2056,10 @@ export default function DescubrimientoPage() {
                     </th>
                     <th 
                       onClick={() => handleSort("notes")}
-                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group"
+                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[260px] max-w-[320px]"
                     >
                       <div className="flex items-center">
-                        <span>Notas / Gaps</span>
+                        <span>NOTAS DESCUBRIMIENTO</span>
                         {renderSortIcon("notes")}
                       </div>
                     </th>
@@ -2081,30 +2137,22 @@ export default function DescubrimientoPage() {
                           </div>
                         </td>
 
-                        {/* Status */}
-                        <td className="py-4 px-5">
-                          <span className={`px-2.5 py-1 rounded-full border text-[9px] font-bold ${statusColor}`}>
+                        {/* Status (Proporcionado 190px-210px) */}
+                        <td className="py-4 px-5 min-w-[190px] max-w-[210px]">
+                          <span className={`px-2.5 py-1 rounded-full border text-[9px] font-bold inline-block ${statusColor}`}>
                             {statusLabel}
                           </span>
                         </td>
 
-                        {/* Gaps/Notes */}
-                        <td className="py-4 px-5 max-w-[200px] truncate">
-                          {cad.phase1State === "03_bloqueado" ? (
-                            <div className="flex items-center gap-1 text-amber-200">
-                              <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                              <span className="italic text-[10px] truncate">"{cad.blockReason}"</span>
-                            </div>
-                          ) : cad.phase1State === "04_rechazado" ? (
-                            <div className="flex flex-col text-left">
-                              <span className="text-rose-400 font-mono text-[9px] uppercase tracking-wide">
-                                Descartado: {cad.rejectionReason}
-                              </span>
+                        {/* Notas Descubrimiento (Proporcionado 260px-320px) */}
+                        <td className="py-4 px-5 min-w-[260px] max-w-[320px]">
+                          {cad.recruiterNotes ? (
+                            <div className="p-2 rounded-lg bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] text-[10px] leading-snug font-medium shadow-sm flex items-start gap-1.5">
+                              <FileText className="w-3.5 h-3.5 text-[#6bd8cb] shrink-0 mt-0.5" />
+                              <span className="text-white font-medium line-clamp-3">{cad.recruiterNotes}</span>
                             </div>
                           ) : (
-                            <span className="text-[#879391] italic text-[9.5px]">
-                              {cad.motivationNote ? `"${cad.motivationNote}"` : "--"}
-                            </span>
+                            <span className="text-[#879391]/50 text-[10px] italic">Sin notas de descubrimiento</span>
                           )}
                         </td>
 
@@ -2132,9 +2180,11 @@ export default function DescubrimientoPage() {
                             {cad.phase1State === "01_nuevo" && (
                               <button
                                 onClick={() => handleTransitionState(cad.id, "02_contactado")}
-                                className="px-2 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-stone-950 transition-all text-[10px] cursor-pointer"
+                                title="A 02 - Bloqueado / Pendiente"
+                                className="px-2.5 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1"
                               >
-                                Contactar
+                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                                <span>Avanzar estado</span>
                               </button>
                             )}
 
@@ -2144,48 +2194,56 @@ export default function DescubrimientoPage() {
                                   blockReason: "Esperando confirmación pretensiones de sueldo y CV",
                                   missingField: "salario"
                                 })}
-                                className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold hover:bg-amber-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer"
+                                title="A 03 - En Duda a Confirmar"
+                                className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold hover:bg-amber-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1"
                               >
-                                Bloquear
+                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                                <span>Avanzar estado</span>
                               </button>
                             )}
 
                             {cad.phase1State === "03_bloqueado" && (
                               <button
-                                onClick={() => openTriageDialog(cad)}
-                                className="px-2 py-1 rounded bg-amber-500 text-stone-950 font-bold hover:bg-amber-400 transition-all text-[10px] flex items-center gap-0.5 cursor-pointer"
+                                onClick={() => handleTransitionState(cad.id, "04_rechazado", {
+                                  rejectionReason: "Falta de información en aclaración"
+                                })}
+                                title="A 04 - Rechazado en Fase Inicial"
+                                className="px-2.5 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold hover:bg-rose-500 hover:text-white transition-all text-[10px] cursor-pointer flex items-center gap-1"
                               >
-                                <MessageSquare className="w-3.5 h-3.5" />
-                                <span>Triage</span>
+                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                                <span>Avanzar estado</span>
                               </button>
                             )}
 
                             {cad.phase1State === "04_rechazado" && (
                               <button
                                 onClick={() => handleTransitionState(cad.id, "01_nuevo")}
-                                className="px-2 py-1 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold hover:bg-indigo-500 hover:text-white transition-all text-[10px] cursor-pointer"
+                                title="A 01 - Nuevo en Revisión"
+                                className="px-2.5 py-1 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold hover:bg-indigo-500 hover:text-white transition-all text-[10px] cursor-pointer flex items-center gap-1"
                               >
-                                Reactivar
+                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                                <span>Avanzar estado</span>
                               </button>
                             )}
 
-                            {(cad.phase1State === "01_nuevo" || cad.phase1State === "02_contactado") && (
-                              <button
-                                onClick={() => alert(`El candidato ${cad.name} ha avanzado a Fase 2 (Evaluación Interna).`)}
-                                className="p-1 px-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-stone-950 transition-all cursor-pointer"
-                                title="Avanzar candidato a Filtrados Fase 2"
-                              >
-                                <UserCheck className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                            {/* Action: Transfer / Move beyond phase 1 (Disponible para todas las filas) */}
+                            <button
+                              onClick={() => setCandidateToAdvance(cad)}
+                              className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                              title="Avanzar a Fase 2 Evaluación"
+                            >
+                              <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                              <span>Avanzar Fase</span>
+                            </button>
 
                             {cad.phase1State !== "04_rechazado" && (
                               <button
                                 onClick={() => triggerRejectionFlow(cad.id)}
-                                className="p-1.5 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-red-400 transition-all cursor-pointer"
-                                title="Rechazar Candidate"
+                                className="px-2 py-1 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-red-400 font-bold transition-all text-[10px] cursor-pointer flex items-center gap-1"
+                                title="Rechazar Candidato"
                               >
-                                <Ban className="w-3.5 h-3.5" />
+                                <Ban className="w-3.5 h-3.5 shrink-0" />
+                                <span>Rechazar</span>
                               </button>
                             )}
                           </div>
@@ -2760,6 +2818,80 @@ export default function DescubrimientoPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Emergente Mejorado: Confirmar Cambio de Fase a Evaluación */}
+      {candidateToAdvance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+          <div 
+            className="relative w-full max-w-md bg-[#15181a] border border-[#6bd8cb]/30 rounded-3xl p-6 shadow-2xl space-y-5 text-left animate-scaleUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header badge & close button */}
+            <div className="flex justify-between items-start">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#6bd8cb]/20 to-[#0d9488]/30 border border-[#6bd8cb]/40 flex items-center justify-center text-[#6bd8cb] shadow-lg shadow-[#6bd8cb]/10">
+                <UserCheck className="w-6 h-6" />
+              </div>
+              <button
+                onClick={() => setCandidateToAdvance(null)}
+                className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center cursor-pointer transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content text */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold text-[#6bd8cb] uppercase tracking-wider bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded-full border border-[#6bd8cb]/20 inline-block">
+                Promoción de Pipeline
+              </span>
+              <h3 className="text-lg font-extrabold text-white tracking-tight">
+                ¿Avanzar a Fase 2 (Evaluación Interna)?
+              </h3>
+              <p className="text-xs text-[#879391] leading-relaxed">
+                Estás a punto de avanzar el expediente de <strong className="text-white">{candidateToAdvance.name}</strong> a <strong className="text-[#6bd8cb]">Fase 2 (Evaluación Interna - Módulo de Selección)</strong>.
+              </p>
+            </div>
+
+            {/* Candidate Card Summary */}
+            <div className="p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] flex items-center justify-between text-xs">
+              <div>
+                <span className="font-bold text-white block">{candidateToAdvance.name}</span>
+                <span className="text-[10px] text-[#879391]">{candidateToAdvance.role} • {candidateToAdvance.client}</span>
+              </div>
+              <span className="px-2.5 py-1 text-[9px] font-bold rounded-full bg-[#6bd8cb]/15 text-[#6bd8cb] border border-[#6bd8cb]/30 font-mono">
+                Fit {candidateToAdvance.score}%
+              </span>
+            </div>
+
+            {/* Action Buttons: Cancelar & Confirmar */}
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/5">
+              <button
+                onClick={() => setCandidateToAdvance(null)}
+                className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold text-xs cursor-pointer transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmAdvancePhaseAction}
+                disabled={isAdvancingPhase}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#6bd8cb] to-[#0d9488] text-stone-950 hover:opacity-90 font-black text-xs cursor-pointer transition-all shadow-lg shadow-[#6bd8cb]/20 flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isAdvancingPhase ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Avanzando...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="w-4 h-4" />
+                    <span>Confirmar y Avanzar</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
