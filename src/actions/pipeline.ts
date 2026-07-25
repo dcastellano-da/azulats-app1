@@ -2,6 +2,14 @@
 
 import { cookies } from "next/headers";
 
+export interface Reunion {
+  id_reunion: string;
+  fecha_hora: string;
+  link_reunion?: string | null;
+  objetivo?: string | null;
+  notas?: string | null;
+}
+
 export interface PipelineItem {
   id: string;
   claves_conexion: {
@@ -15,6 +23,7 @@ export interface PipelineItem {
   };
   f1_descubrimiento?: {
     notas_reclutador?: string | null;
+    reuniones?: Reunion[] | null;
     analisis_semantico?: {
       origen?: string;
       fit_score?: number;
@@ -31,31 +40,38 @@ export interface PipelineItem {
     notas_reclutador?: string | null;
     puntaje_tecnico?: number | null;
     feedback_cliente?: string | null;
+    reuniones?: Reunion[] | null;
   } | null;
   evaluacion?: {
     notas_reclutador?: string | null;
     puntaje_tecnico?: number | null;
     feedback_cliente?: string | null;
+    reuniones?: Reunion[] | null;
   } | null;
   f3_presentacion?: {
     notas_reclutador?: string | null;
     feedback_cliente?: string | null;
+    reuniones?: Reunion[] | null;
   } | null;
   presentacion?: {
     notas_reclutador?: string | null;
     feedback_cliente?: string | null;
+    reuniones?: Reunion[] | null;
   } | null;
   f3_cliente?: {
     notas_reclutador?: string | null;
     feedback_cliente?: string | null;
+    reuniones?: Reunion[] | null;
   } | null;
   f4_cierre?: {
     notas_reclutador?: string | null;
+    reuniones?: Reunion[] | null;
   } | null;
   cierre?: {
     fecha_cierre?: string | null;
     motivo_rechazo?: string | null;
     notas_reclutador?: string | null;
+    reuniones?: Reunion[] | null;
   } | null;
   createdAt: string;
   updatedAt: string;
