@@ -16,7 +16,7 @@ describe('Módulo de Cierre (F4 Cierre) - Capa de Lógica y Datos', () => {
     assert.strictEqual(typeof first.client, 'string');
     assert.strictEqual(typeof first.score, 'number');
     assert.ok(
-      ['11_oferta_extendida', '12_contratado', '13_rechazado_cliente', '14_candidato_se_baja'].includes(first.currentPhase),
+      ['12_oferta_extendida', '13_contratado', '14_rechazado_cliente', '15_candidato_se_baja'].includes(first.currentPhase),
       'Fase actual no válida'
     );
     
@@ -42,7 +42,7 @@ describe('Módulo de Cierre (F4 Cierre) - Capa de Lógica y Datos', () => {
         client: 'Client-1',
         location: 'Madrid',
         score: 90,
-        currentPhase: '11_oferta_extendida', // Active Negos
+        currentPhase: '12_oferta_extendida', // Active Negos
         entryDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
         offerDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
         lastActivity: 'Negotiating',
@@ -65,7 +65,7 @@ describe('Módulo de Cierre (F4 Cierre) - Capa de Lógica y Datos', () => {
         client: 'Client-1',
         location: 'Madrid',
         score: 95,
-        currentPhase: '12_contratado', // Hired candidate
+        currentPhase: '13_contratado', // Hired candidate
         entryDate: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
         offerDate: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
         closedDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Latency = 24 hours
@@ -89,7 +89,7 @@ describe('Módulo de Cierre (F4 Cierre) - Capa de Lógica y Datos', () => {
         client: 'Client-1',
         location: 'Madrid',
         score: 80,
-        currentPhase: '13_rechazado_cliente', // Lost candidate
+        currentPhase: '14_rechazado_cliente', // Lost candidate
         entryDate: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
         offerDate: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
         closedDate: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(), // Latency = 36 hours
@@ -113,7 +113,7 @@ describe('Módulo de Cierre (F4 Cierre) - Capa de Lógica y Datos', () => {
         client: 'Client-2',
         location: 'Madrid',
         score: 85,
-        currentPhase: '14_candidato_se_baja', // Drop-out
+        currentPhase: '15_candidato_se_baja', // Drop-out
         entryDate: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
         offerDate: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
         closedDate: new Date(Date.now() - 66 * 60 * 60 * 1000).toISOString(), // Latency = 30 hours
@@ -134,12 +134,12 @@ describe('Módulo de Cierre (F4 Cierre) - Capa de Lógica y Datos', () => {
 
     const kpis = calculateCierreKPIs(controlledCandidates);
 
-    // 1. Active Closing WIP Count: only TC-C1 is '11_oferta_extendida'
+    // 1. Active Closing WIP Count: only TC-C1 is '12_oferta_extendida'
     assert.strictEqual(kpis.activeClosingWipCount, 1);
     assert.strictEqual(kpis.isWipOverloaded, false);
 
     // 2. Offer Acceptance Rate (OAR) = Hired(12) / (Hired(12) + DropOut(14)) * 100
-    // TC-C2 is '12_contratado' (1), TC-C4 is '14_candidato_se_baja' (1).
+    // TC-C2 is '13_contratado' (1), TC-C4 is '15_candidato_se_baja' (1).
     // OAR = 1 / (1 + 1) * 100 = 50%
     assert.strictEqual(kpis.offerAcceptanceRate, 50);
 
@@ -162,7 +162,7 @@ describe('Módulo de Cierre (F4 Cierre) - Capa de Lógica y Datos', () => {
       client: 'Inditex S.A.',
       location: 'Madrid',
       score: 80,
-      currentPhase: '11_oferta_extendida', // All active WIP
+      currentPhase: '12_oferta_extendida', // All active WIP
       entryDate: new Date().toISOString(),
       offerDate: new Date().toISOString(),
       lastActivity: 'Interviewing',

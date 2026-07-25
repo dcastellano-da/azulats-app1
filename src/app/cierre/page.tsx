@@ -49,20 +49,22 @@ import {
 import { 
   CierreCandidate, 
   INITIAL_CIERRE_CANDIDATES, 
-  calculateCierreKPIs 
+  calculateCierreKPIs,
+  mapPipelineToCierreCandidates
 } from "@/lib/cierre";
-
-const ACTIVE_BUSQUEDAS = [
-  { id: "b1", client: "Inditex S.A.", role: "Frontend Dev (React/Node)" },
-  { id: "b2", client: "Telefónica S.A.", role: "Product Manager Tech" },
-  { id: "b3", client: "SEAT S.A.", role: "Software Architect Rust" },
-  { id: "b4", client: "Banco Santander", role: "SecOps Specialist" }
-];
+import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
+import { getCandidatosAPI, Candidato } from "@/actions/candidatos";
+import { getPipelineAPI, PipelineItem, actualizarPipelineAPI } from "@/actions/pipeline";
 
 export default function CierrePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   
+  // Backend States
+  const [activeBusquedas, setActiveBusquedas] = useState<Busqueda[]>([]);
+  const [dataLoading, setDataLoading] = useState<boolean>(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+
   // States
   const [candidates, setCandidates] = useState<CierreCandidate[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -109,10 +111,63 @@ export default function CierrePage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Initialize
+  // Fetch backend data
+  const fetchBackendData = async () => {
+    setDataLoading(true);
+    setDataError(null);
+    try {
+      // 1. Fetch active searches
+      const searchesList = await getBusquedasAPI();
+      setActiveBusquedas(searchesList);
+
+      // 2. Fetch candidates
+      const candidatesRes = await getCandidatosAPI();
+      let candidatesList: Candidato[] = [];
+      if (candidatesRes.success && Array.isArray(candidatesRes.data)) {
+        candidatesList = candidatesRes.data;
+      }
+
+      // 3. Fetch pipelines
+      let pipeItems: PipelineItem[] = [];
+      if (selectedSearch === "Todos") {
+        if (searchesList.length > 0) {
+          const promises = searchesList.map(s => getPipelineAPI(s.id));
+          const results = await Promise.all(promises);
+          results.forEach(res => {
+            if (res.success && Array.isArray(res.data)) {
+              pipeItems = pipeItems.concat(res.data);
+            }
+          });
+        } else {
+          const res = await getPipelineAPI("REQ-001");
+          if (res.success && Array.isArray(res.data)) {
+            pipeItems = res.data;
+          }
+        }
+      } else {
+        const match = searchesList.find(s => `${s.cliente} - ${s.perfil_busqueda}` === selectedSearch);
+        if (match) {
+          const res = await getPipelineAPI(match.id);
+          if (res.success && Array.isArray(res.data)) {
+            pipeItems = res.data;
+          }
+        }
+      }
+
+      // Map to CierreCandidate[]
+      const mapped = mapPipelineToCierreCandidates(pipeItems, candidatesList, searchesList);
+      setCandidates(mapped);
+    } catch (err: any) {
+      console.error("Error al obtener datos de cierre del backend:", err);
+      setDataError(err.message || "Error al conectar con los servicios backend del pipeline.");
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setCandidates(INITIAL_CIERRE_CANDIDATES);
-  }, []);
+    fetchBackendData();
+  }, [selectedSearch]);
 
   // Client-side auth redirect
   useEffect(() => {
@@ -120,6 +175,10 @@ export default function CierrePage() {
       router.push("/login");
     }
   }, [user, authLoading, router]);
+
+  const handleViewDetails = (cad: CierreCandidate) => {
+    router.push(`/cierre/${cad.pipeId || cad.id}`);
+  };
 
   // Load simulator values when candidate is activated
   useEffect(() => {
@@ -149,20 +208,23 @@ export default function CierrePage() {
   const kpis = calculateCierreKPIs(candidates);
   
   // State transition
-  const handleTransitionState = (id: string, targetPhase: CierreCandidate["currentPhase"]) => {
+  const handleTransitionState = async (id: string, targetPhase: CierreCandidate["currentPhase"]) => {
+    const targetCandidate = candidates.find(c => c.id === id);
+    const label = getPhaseLabel(targetPhase);
+    const nowIso = new Date().toISOString();
+
     setCandidates((prev) =>
       prev.map((c) => {
         if (c.id === id) {
-          const nowIso = new Date().toISOString();
           let closedDate: string | undefined = undefined;
-          if (targetPhase !== "11_oferta_extendida") {
+          if (targetPhase !== "12_oferta_extendida") {
             closedDate = nowIso;
           }
           return { 
             ...c, 
             currentPhase: targetPhase, 
             closedDate, 
-            lastActivity: `Estado cambiado a ${getPhaseLabel(targetPhase)}` 
+            lastActivity: `Estado cambiado a ${label}` 
           };
         }
         return c;
@@ -171,23 +233,44 @@ export default function CierrePage() {
     if (activeCandidate && activeCandidate.id === id) {
       setActiveCandidate((prev) => {
         if (!prev) return null;
-        const nowIso = new Date().toISOString();
         return { 
           ...prev, 
           currentPhase: targetPhase, 
-          closedDate: targetPhase !== "11_oferta_extendida" ? nowIso : undefined 
+          closedDate: targetPhase !== "12_oferta_extendida" ? nowIso : undefined 
         };
       });
     }
-    triggerToast(`Candidato reubicado a la columna de ${getPhaseLabel(targetPhase).substring(5)}`);
+    triggerToast(`Candidato reubicado a la columna de ${label.substring(5)}`);
+
+    if (targetCandidate?.pipeId) {
+      try {
+        const payload: any = {
+          flujo: {
+            estado_actual: targetPhase,
+            fecha_ultimo_cambio: nowIso
+          }
+        };
+        if (targetPhase !== "12_oferta_extendida") {
+          payload.cierre = {
+            fecha_cierre: nowIso
+          };
+        }
+        const res = await actualizarPipelineAPI(targetCandidate.pipeId, payload);
+        if (!res.success) {
+          console.warn("[Cierre] Warning al actualizar pipeline en backend:", res.message);
+        }
+      } catch (err) {
+        console.error("[Cierre] Error al actualizar pipeline en backend:", err);
+      }
+    }
   };
 
   const getPhaseLabel = (phase: CierreCandidate["currentPhase"]) => {
     switch (phase) {
-      case "11_oferta_extendida": return "11 - Oferta Extendida / Negociación";
-      case "12_contratado": return "12 - Contratado (Won)";
-      case "13_rechazado_cliente": return "13 - Rechazado por Cliente (Lost)";
-      case "14_candidato_se_baja": return "14 - Candidato se baja (Drop-out)";
+      case "12_oferta_extendida": return "12 - Oferta Extendida / Negociación";
+      case "13_contratado": return "13 - Contratado (Won)";
+      case "14_rechazado_cliente": return "14 - Rechazado por Cliente (Lost)";
+      case "15_candidato_se_baja": return "15 - Candidato se baja (Drop-out)";
     }
   };
 
@@ -488,9 +571,9 @@ export default function CierrePage() {
   const sortedListCandidates = [...filteredCandidates].sort(sortCandidates);
 
   // Column counts
-  const countNego = candidates.filter((c) => c.currentPhase === "11_oferta_extendida").length;
-  const countWon = candidates.filter((c) => c.currentPhase === "12_contratado").length;
-  const countInactive = candidates.filter((c) => c.currentPhase === "13_rechazado_cliente" || c.currentPhase === "14_candidato_se_baja").length;
+  const countNego = candidates.filter((c) => c.currentPhase === "12_oferta_extendida").length;
+  const countWon = candidates.filter((c) => c.currentPhase === "13_contratado").length;
+  const countInactive = candidates.filter((c) => c.currentPhase === "14_rechazado_cliente" || c.currentPhase === "15_candidato_se_baja").length;
 
   return (
     <div className={`relative min-h-screen bg-[#101415] text-white p-6 md:p-8 space-y-8 overflow-x-hidden transition-all duration-350 ${isFullScreen ? 'p-4' : ''}`}>
@@ -626,6 +709,32 @@ export default function CierrePage() {
             </Link>
           </div>
         </header>
+
+        {/* Backend loading / error indicator */}
+        {dataLoading && (
+          <div className="p-3 rounded-xl border border-[#6bd8cb]/20 bg-[#6bd8cb]/10 text-[#6bd8cb] text-xs flex items-center gap-2.5 animate-fadeIn">
+            <div className="w-4 h-4 border-2 border-[#6bd8cb] border-t-transparent rounded-full animate-spin"></div>
+            <span>Sincronizando pipeline y postulantes desde servicios backend...</span>
+          </div>
+        )}
+
+        {dataError && (
+          <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs flex justify-between items-center gap-3 animate-fadeIn text-left">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+              <div>
+                <span className="font-bold">Error Backend: </span>
+                {dataError}
+              </div>
+            </div>
+            <button 
+              onClick={() => fetchBackendData()} 
+              className="px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-[10px] uppercase cursor-pointer"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
 
         {/* Warning Indicator limits if WIP overloaded */}
         {kpis.isWipOverloaded && !isWipWarningDismissed && (
@@ -834,7 +943,7 @@ export default function CierrePage() {
                     Conteo total de perfiles que recibieron formalmente el contrato o carta de oferta y están en interacciones semanales/diarias previas a la decisión final. Límite ideal recomendado &le; 5.
                   </p>
                   <p className="text-[7.5px] text-[#c4c1fb] font-mono tracking-tight pt-1">
-                    Cálculo: Conteo directo de candidatos en fase '11_oferta_extendida'.
+                    Cálculo: Conteo directo de candidatos en fase '12_oferta_extendida'.
                   </p>
                 </div>
               </div>
@@ -866,9 +975,9 @@ export default function CierrePage() {
                 className="bg-[#101415]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer w-full md:w-auto font-bold"
               >
                 <option value="Todos" className="bg-[#15181a]">Todas las Búsquedas</option>
-                {ACTIVE_BUSQUEDAS.map((b) => (
-                  <option key={b.id} value={`${b.client} - ${b.role}`} className="bg-[#15181a] text-white">
-                    {b.client} - {b.role}
+                {activeBusquedas.map((b) => (
+                  <option key={b.id} value={`${b.cliente} - ${b.perfil_busqueda}`} className="bg-[#15181a] text-white">
+                    {b.cliente} - {b.perfil_busqueda}
                   </option>
                 ))}
               </select>
@@ -884,10 +993,10 @@ export default function CierrePage() {
                   className="bg-[#101415]/60 border border-[#c4c1fb]/20 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer w-full md:w-auto font-bold"
                 >
                   <option value="Todos" className="bg-[#15181a]">Todas las Fases</option>
-                  <option value="11_oferta_extendida" className="bg-[#15181a]">11 - Oferta Extendida</option>
-                  <option value="12_contratado" className="bg-[#15181a]">12 - Contratado</option>
-                  <option value="13_rechazado_cliente" className="bg-[#15181a]">13 - Rechazado por Cliente</option>
-                  <option value="14_candidato_se_baja" className="bg-[#15181a]">14 - Candidato se baja</option>
+                  <option value="12_oferta_extendida" className="bg-[#15181a]">12 - Oferta Extendida</option>
+                  <option value="13_contratado" className="bg-[#15181a]">13 - Contratado</option>
+                  <option value="14_rechazado_cliente" className="bg-[#15181a]">14 - Rechazado por Cliente</option>
+                  <option value="15_candidato_se_baja" className="bg-[#15181a]">15 - Candidato se baja</option>
                 </select>
               </div>
             )}
@@ -936,7 +1045,7 @@ export default function CierrePage() {
               ) : (
                 <>
                   <Maximize2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Pantalla Completa</span>
+                  <span className="hidden sm:inline">Maximizar</span>
                 </>
               )}
             </button>
@@ -951,12 +1060,12 @@ export default function CierrePage() {
             {/* COLUMN 1: Oferta Extendida / Negociación */}
             <div 
               onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, "11_oferta_extendida")}
+              onDrop={(e) => handleDrop(e, "12_oferta_extendida")}
               className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-amber-500 text-left"
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">11 - Oferta Extendida / Negociación</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">12 - Oferta Extendida / Negociación</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Propuestas en revisión final</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-amber-500 font-mono">
@@ -965,8 +1074,8 @@ export default function CierrePage() {
               </div>
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
-                {filteredCandidates.filter(c => c.currentPhase === "11_oferta_extendida").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                {filteredCandidates.filter(c => c.currentPhase === "12_oferta_extendida").map((cad) => (
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
                 ))}
                 {countNego === 0 && <EmptyColumnText text="Ninguna propuesta activa" />}
               </div>
@@ -975,12 +1084,12 @@ export default function CierrePage() {
             {/* COLUMN 2: Contratado (Won) */}
             <div 
               onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, "12_contratado")}
+              onDrop={(e) => handleDrop(e, "13_contratado")}
               className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-emerald-500 text-left"
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">12 - Contratado (Won)</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">13 - Contratado (Won)</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Firmados y en pre-onboarding</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-emerald-400 font-mono">
@@ -989,8 +1098,8 @@ export default function CierrePage() {
               </div>
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
-                {filteredCandidates.filter(c => c.currentPhase === "12_contratado").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                {filteredCandidates.filter(c => c.currentPhase === "13_contratado").map((cad) => (
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
                 ))}
                 {countWon === 0 && <EmptyColumnText text="Ninguna contratación" />}
               </div>
@@ -999,7 +1108,7 @@ export default function CierrePage() {
             {/* COLUMN 3: Inactivos (Rejected / Dropped-out) */}
             <div 
               onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, "13_rechazado_cliente")} // Default transition to reject
+              onDrop={(e) => handleDrop(e, "14_rechazado_cliente")} // Default transition to reject
               className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-rose-500 text-left"
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
@@ -1013,8 +1122,8 @@ export default function CierrePage() {
               </div>
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
-                {filteredCandidates.filter(c => c.currentPhase === "13_rechazado_cliente" || c.currentPhase === "14_candidato_se_baja").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                {filteredCandidates.filter(c => c.currentPhase === "14_rechazado_cliente" || c.currentPhase === "15_candidato_se_baja").map((cad) => (
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
                 ))}
                 {countInactive === 0 && <EmptyColumnText text="Ningún finalizado inactivo" />}
               </div>
@@ -1071,8 +1180,8 @@ export default function CierrePage() {
                       </td>
                       <td className="px-5 py-4">
                         <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full inline-block ${
-                          cad.currentPhase === "11_oferta_extendida" ? "bg-amber-500/10 text-amber-400 border border-amber-500/15" :
-                          cad.currentPhase === "12_contratado" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : 
+                          cad.currentPhase === "12_oferta_extendida" ? "bg-amber-500/10 text-amber-400 border border-amber-500/15" :
+                          cad.currentPhase === "13_contratado" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : 
                           "bg-rose-500/10 text-rose-400 border border-rose-500/15"
                         }`}>
                           {getPhaseLabel(cad.currentPhase).substring(5)}
@@ -1082,7 +1191,7 @@ export default function CierrePage() {
                         <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full inline-block font-mono ${
                           cad.feedbackStatus === "entregado_manual" 
                             ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25" 
-                            : cad.currentPhase === "11_oferta_extendida" || cad.currentPhase === "12_contratado" 
+                            : cad.currentPhase === "12_oferta_extendida" || cad.currentPhase === "13_contratado" 
                             ? "bg-white/5 text-white/50 border border-white/5" 
                             : "bg-rose-500/10 text-rose-455 border border-[#ffb4ab]/25"
                         }`}>
@@ -1096,14 +1205,12 @@ export default function CierrePage() {
                       </td>
                       <td className="px-5 py-4 text-right">
                         <button
-                          onClick={() => {
-                            setActiveCandidate(cad);
-                            setActiveTab("general");
-                          }}
-                          className="px-3.5 py-1.5 text-[10px] font-black rounded-xl bg-gradient-to-tr from-emerald-500/25 to-[#c4c1fb]/15 border border-[#c4c1fb]/20 text-[#c4c1fb] hover:bg-[#c4c1fb] hover:text-[#101415] hover:shadow-lg transition-all cursor-pointer inline-flex items-center gap-1.5"
+                          onClick={() => handleViewDetails(cad)}
+                          className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+                          title="Ver expediente y detalles completos"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>Lanzar Co-Pilot Cierre</span>
+                          <span>Detalles</span>
                         </button>
                       </td>
                     </tr>
@@ -1113,846 +1220,7 @@ export default function CierrePage() {
             </table>
           </div>
         )}
-
       </div>
-
-      {/* Advanced AI Tools Panel / Drawer Sidebar */}
-      {activeCandidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end pointer-events-auto">
-          {/* Backdrop overlay */}
-          <div 
-            className="absolute inset-0 bg-[#000000]/60 backdrop-blur-sm transition-opacity duration-300 animate-fadeIn" 
-            onClick={() => setActiveCandidate(null)}
-          />
-
-          {/* Slider Drawer Container */}
-          <aside className="absolute top-0 right-0 h-full w-full max-w-3xl bg-[#15181a] border-l border-white/10 shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] animate-slideIn text-left">
-            
-            {/* Header */}
-            <div className="px-6 py-5 border-b border-white/10 bg-[#101415]/90 backdrop-blur-md flex justify-between items-center">
-              <div>
-                <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/15 px-2.5 py-0.5 rounded border border-emerald-500/25 uppercase font-bold tracking-widest inline-block mb-1">
-                  MÓDULO DE NEGOCIACIÓN F4
-                </span>
-                <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <span>Negociación de {activeCandidate.name}</span>
-                  <span className="px-2 py-0.5 text-xs text-white/40 font-mono bg-white/5 rounded-md border border-white/10">
-                    {activeCandidate.id}
-                  </span>
-                </h2>
-                <p className="text-[10px] text-[#879391] mt-0.5">
-                  Herramientas operativas avanzadas: predictores de aceptación, simuladores financieros de beneficios, contratos y pre-onboard.
-                </p>
-              </div>
-              <button
-                onClick={() => setActiveCandidate(null)}
-                className="w-10 h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition-all text-[#c4c1fb] flex items-center justify-center cursor-pointer shrink-0"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* TAB SELECTORS */}
-            <nav className="flex items-center overflow-x-auto bg-[#101415]/40 border-b border-white/5 px-4 py-1.5 gap-1 select-none">
-              <button 
-                onClick={() => setActiveTab("general")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === "general" ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                1. Propuesta & Info
-              </button>
-              <button 
-                onClick={() => setActiveTab("predictivo")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "predictivo" ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>2. Motor Predictivo</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("compensacion")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "compensacion" ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <DollarSign className="w-3.5 h-3.5" />
-                <span>3. Simulador de Salario</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("contrato")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "contrato" ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>4. Generador de Contrato</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("feedback")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "feedback" ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <Languages className="w-3.5 h-3.5" />
-                <span>5. Feedback de Cierre</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("preonboarding")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "preonboarding" ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <Bell className="w-3.5 h-3.5" />
-                <span>6. Pre-Onboarding</span>
-              </button>
-            </nav>
-
-            {/* TAB CONTENT */}
-            <div className="flex-grow p-6 overflow-y-auto space-y-6">
-              
-              {/* TAB 1: GENERAL & INFO */}
-              {activeTab === "general" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    
-                    {/* Contact details */}
-                    <div className="glass-panel p-4.5 rounded-2xl border border-white/5 space-y-3.5">
-                      <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest font-bold">Información de Contacto</h4>
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Nombre completo:</span>
-                          <span className="text-white font-bold">{activeCandidate.name}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Correo electrónico:</span>
-                          <a href={`mailto:${activeCandidate.email}`} className="text-emerald-400 underline font-bold hover:text-emerald-300">
-                            {activeCandidate.email}
-                          </a>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Teléfono móvil:</span>
-                          <a href={`tel:${activeCandidate.contactNumber}`} className="text-white hover:text-emerald-500 font-mono">
-                            {activeCandidate.contactNumber}
-                          </a>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Ubicación física:</span>
-                          <span className="text-[#e2e5e7]">{activeCandidate.location}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Experiencia laboral:</span>
-                          <span className="text-[#e2e5e7] font-semibold">{activeCandidate.experienceYears} años</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Financial details */}
-                    <div className="glass-panel p-4.5 rounded-2xl border border-white/5 space-y-3.5">
-                      <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest font-bold">Desglose de Propuesta Financiera</h4>
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Expectativa del Candidato:</span>
-                          <span className="text-white/80 font-mono font-bold">
-                            {activeCandidate.salaryDetails.expectedSalary.toLocaleString()} € / año
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Salario Base Propuesto:</span>
-                          <span className="text-white font-mono font-bold">
-                            {activeCandidate.salaryDetails.baseSalary.toLocaleString()} € / año
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Bono Variable Anual:</span>
-                          <span className="text-amber-400 font-mono font-bold">
-                            + {activeCandidate.salaryDetails.bonusAnnual.toLocaleString()} € / año
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Salario en Especie / Beneficios:</span>
-                          <span className="text-emerald-400 font-mono font-bold">
-                            + {activeCandidate.salaryDetails.benefitsValue.toLocaleString()} € / año
-                          </span>
-                        </div>
-                        <hr className="border-white/5 my-1" />
-                        <div className="flex justify-between text-sm">
-                          <span className="text-white font-semibold">Compensación Total Directa:</span>
-                          <span className="text-[#6bd8cb] font-mono font-black">
-                            {(
-                              activeCandidate.salaryDetails.baseSalary + 
-                              activeCandidate.salaryDetails.bonusAnnual + 
-                              activeCandidate.salaryDetails.benefitsValue
-                            ).toLocaleString()} € / año
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Flow Status Controller */}
-                  <div className="glass-panel p-5 rounded-2xl border border-white/5 space-y-4">
-                    <h4 className="text-xs font-black text-[#c4c1fb] uppercase tracking-widest font-bold">Control manual del Embudo de Cierre</h4>
-                    <p className="text-[11px] text-[#879391]">
-                      Transiciona manualmente al candidato dentro del embudo operativo. Estas acciones recalcularán los KPIs del dashboard al instante.
-                    </p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 select-none">
-                      <button
-                        onClick={() => handleTransitionState(activeCandidate.id, "11_oferta_extendida")}
-                        className={`px-3 py-2.5 rounded-xl border text-xs font-semibold tracking-wide transition-all cursor-pointer text-center ${
-                          activeCandidate.currentPhase === "11_oferta_extendida"
-                            ? "bg-amber-500/10 border-amber-500/40 text-amber-400 shadow-md"
-                            : "bg-white/5 border-white/5 text-[#879391] hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        11. Oferta Extendida
-                      </button>
-                      <button
-                        onClick={() => handleTransitionState(activeCandidate.id, "12_contratado")}
-                        className={`px-3 py-2.5 rounded-xl border text-xs font-semibold tracking-wide transition-all cursor-pointer text-center ${
-                          activeCandidate.currentPhase === "12_contratado"
-                            ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400 shadow-md font-bold"
-                            : "bg-white/5 border-white/5 text-[#879391] hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        12. Contratado (Won)
-                      </button>
-                      <button
-                        onClick={() => handleTransitionState(activeCandidate.id, "13_rechazado_cliente")}
-                        className={`px-3 py-2.5 rounded-xl border text-xs font-semibold tracking-wide transition-all cursor-pointer text-center ${
-                          activeCandidate.currentPhase === "13_rechazado_cliente"
-                            ? "bg-rose-500/10 border-rose-500/40 text-rose-400 shadow-md"
-                            : "bg-white/5 border-white/5 text-[#879391] hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        13. Rechazado Cliente
-                      </button>
-                      <button
-                        onClick={() => handleTransitionState(activeCandidate.id, "14_candidato_se_baja")}
-                        className={`px-3 py-2.5 rounded-xl border text-xs font-semibold tracking-wide transition-all cursor-pointer text-center ${
-                          activeCandidate.currentPhase === "14_candidato_se_baja"
-                            ? "bg-rose-500/15 border-rose-500/40 text-rose-450 shadow-md"
-                            : "bg-white/5 border-white/5 text-[#879391] hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        14. Candidato se baja
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* General timeline activity log */}
-                  <div className="glass-panel p-5 rounded-2xl border border-white/5 space-y-3 text-left">
-                    <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest font-bold">Bitácora de Actividades</h4>
-                    <div className="space-y-3">
-                      <div className="flex gap-3 text-xs">
-                        <span className="w-16 font-mono text-[#879391] shrink-0">Hoy</span>
-                        <div className="space-y-0.5">
-                          <p className="text-white font-bold">{activeCandidate.lastActivity}</p>
-                          <p className="text-[10px] text-[#879391]">Recruiter Operations Terminal • Auditado</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-3 text-xs">
-                        <span className="w-16 font-mono text-[#879391] shrink-0">Ayer</span>
-                        <div className="space-y-0.5">
-                          <p className="text-white/80">Propuesta económica calibrada con el motor predictivo de riesgo.</p>
-                          <p className="text-[10px] text-[#879391]">Co-Pilot Suggestion Run</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-3 text-xs">
-                        <span className="w-16 font-mono text-[#879391] shrink-0">2 días</span>
-                        <div className="space-y-0.5">
-                          <p className="text-white/80">Proceso habilitado en la Fase 4 de Cierre. Solicitud de contrato inicial.</p>
-                          <p className="text-[10px] text-[#879391]">System Event Handler</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* TAB 2: MOTOR PREDICTIVO */}
-              {activeTab === "predictivo" && (
-                <div className="space-y-5 animate-fadeIn">
-                  <div className="glass-panel p-5 rounded-2xl border border-white/5 space-y-4 text-left">
-                    <div className="flex items-center gap-2 text-amber-500">
-                      <Sparkles className="w-5 h-5 animate-pulse" />
-                      <h4 className="text-sm font-black uppercase tracking-wider font-bold">Simulación del Motor Predictivo de Cierre</h4>
-                    </div>
-                    <p className="text-xs text-white/80 leading-relaxed">
-                      El modelo inteligente evalúa las variables de compensación ofrecida cara a la banda de riesgo del perfil, arrojando la probabilidad matemática de que el candidato acepte la propuesta sin desertar o solicitar re-negociaciones.
-                    </p>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                      <div className="p-4 bg-[#101415] rounded-xl border border-white/5 space-y-1">
-                        <span className="text-[9px] uppercase font-bold text-[#879391]">Probabilidad Base</span>
-                        <p className="text-2xl font-black text-white/40">{activeCandidate.toolsDetails.predictiveMotor.baseProbability}%</p>
-                        <p className="text-[9px] text-[#879391]">Cálculo inicial sin mitigaciones</p>
-                      </div>
-
-                      <div className="p-4 bg-[#101415] rounded-xl border border-white/5 space-y-1 col-span-2">
-                        <span className="text-[9px] uppercase font-bold text-amber-500">Probabilidad Calibrada (Con IA)</span>
-                        <div className="flex justify-between items-end">
-                          <p className="text-3xl font-black text-amber-500">
-                            {activeCandidate.toolsDetails.predictiveMotor.adjustedProbability}%
-                          </p>
-                          <span className={`text-[10px] px-2 py-0.5 font-bold rounded ${
-                            activeCandidate.toolsDetails.predictiveMotor.adjustedProbability >= 80 
-                              ? "bg-emerald-500/10 text-emerald-450 border border-emerald-500/20" 
-                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          }`}>
-                            {activeCandidate.toolsDetails.predictiveMotor.adjustedProbability >= 80 ? "Alta Probabilidad" : "Atención Requerida"}
-                          </span>
-                        </div>
-                        <p className="text-[9px] text-[#879391] mt-0.5">Calculada según flexibilidad económica agregada</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Risk Factors */}
-                  <div className="glass-panel p-5 rounded-2xl border border-white/5 space-y-3.5 text-left">
-                    <h4 className="text-xs font-black text-[#ffb4ab] uppercase tracking-widest font-bold">Factores de Riesgo Críticos Detectados</h4>
-                    <div className="space-y-2">
-                      {activeCandidate.toolsDetails.predictiveMotor.riskFactors.length === 0 ? (
-                        <p className="text-xs text-emerald-400 flex items-center gap-1.5">
-                          <Check className="w-4 h-4" /> No se detectan anomalías de alto riesgo para esta postulación.
-                        </p>
-                      ) : (
-                        activeCandidate.toolsDetails.predictiveMotor.riskFactors.map((factor, idx) => (
-                          <div key={idx} className="flex gap-2 text-xs text-amber-300 bg-amber-500/5 p-3 rounded-xl border border-amber-500/10 items-start">
-                            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                            <span>{factor}</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Mitigation Toggle */}
-                  {activeCandidate.currentPhase === "11_oferta_extendida" && (
-                    <div className="p-5 rounded-2xl border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 flex flex-col md:flex-row justify-between items-center gap-4 text-left">
-                      <div className="space-y-1">
-                        <h4 className="text-xs font-bold text-white uppercase">Acción Correctiva Sugerida por Co-Pilot</h4>
-                        <p className="text-[11px] text-[#879391] leading-normal">
-                          Incrementar el bono variable anual propuesto a fin de compensar la brecha del 8% contra la pretensión salarial declarada por el candidato.
-                        </p>
-                      </div>
-                      <button
-                        onClick={toggleMitigateRisk}
-                        disabled={isSimulatingNego}
-                        className={`px-4 py-2.5 rounded-xl font-bold text-xs uppercase cursor-pointer flex items-center gap-2 transition-all ${
-                          isSimulatingNego 
-                            ? "bg-white/5 text-white/50 border border-white/10 shrink-0"
-                            : activeCandidate.toolsDetails.predictiveMotor.mitigationActionSelected
-                            ? "bg-rose-500 hover:bg-rose-600 text-white font-bold shrink-0 shadow-md"
-                            : "bg-emerald-500 hover:bg-emerald-600 text-[#101415] font-black shrink-0 shadow-lg shadow-[#0d9488]/10"
-                        }`}
-                      >
-                        {isSimulatingNego ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Calculando...</span>
-                          </>
-                        ) : activeCandidate.toolsDetails.predictiveMotor.mitigationActionSelected ? (
-                          <span>Remover Mitigación</span>
-                        ) : (
-                          <>
-                            <Zap className="w-3.5 h-3.5" />
-                            <span>Aplicar mitigación</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {/* TAB 3: SALARY SIMULATOR */}
-              {activeTab === "compensacion" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="glass-panel p-5 rounded-2xl border border-white/5 text-left space-y-4">
-                    <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest font-bold">Simulador de Compensación Total Flexible</h4>
-                    <p className="text-[11px] text-[#879391] leading-relaxed">
-                      Actualiza los valores de la propuesta para simular el impacto en la remuneración flexible y contrastarlo con las expectativas del postulante.
-                    </p>
-
-                    <div className="space-y-4">
-                      {/* Base Salary Input */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs">
-                          <label className="text-[#e2e5e7] font-semibold">Salario Base Bruto Anual: ({simBaseSal.toLocaleString()} €)</label>
-                        </div>
-                        <input
-                          type="range"
-                          min={30000}
-                          max={100000}
-                          step={1000}
-                          value={simBaseSal}
-                          onChange={(e) => setSimBaseSal(Number(e.target.value))}
-                          className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                        />
-                      </div>
-
-                      {/* Variable Bonus Input */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs">
-                          <label className="text-[#e2e5e7] font-semibold">Bono Variable Anual: ({simBonus.toLocaleString()} €)</label>
-                        </div>
-                        <input
-                          type="range"
-                          min={0}
-                          max={15000}
-                          step={500}
-                          value={simBonus}
-                          onChange={(e) => setSimBonus(Number(e.target.value))}
-                          className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                        />
-                      </div>
-
-                      {/* Corporate Benefits Value Input */}
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs">
-                          <label className="text-[#e2e5e7] font-semibold">Monetización de Beneficios Extra: ({simBenefits.toLocaleString()} €)</label>
-                        </div>
-                        <input
-                          type="range"
-                          min={0}
-                          max={5000}
-                          step={100}
-                          value={simBenefits}
-                          onChange={(e) => setSimBenefits(Number(e.target.value))}
-                          className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Calculations breakdown details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
-                    <div className="glass-panel p-5 rounded-2xl border border-white/5 space-y-3">
-                      <h4 className="text-xs font-bold text-white uppercase">Cálculo de Remuneración Estimada</h4>
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Salario Bruto Total:</span>
-                          <span className="font-mono text-white">{(simBaseSal + simBonus).toLocaleString()} € / año</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Neto Aproximado (Fijo IRPF 30%):</span>
-                          <span className="font-mono text-white/80">{(simBaseSal * 0.70).toLocaleString()} € / año (Neto)</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Sueldo Mensual Neto Estimado x12:</span>
-                          <span className="font-mono text-white/90">{Math.round((simBaseSal * 0.70) / 12).toLocaleString()} € / mes</span>
-                        </div>
-                        <hr className="border-white/5 my-1" />
-                        <div className="flex justify-between text-[#6bd8cb] font-bold">
-                          <span>Compensación Total Flexible:</span>
-                          <span className="font-mono">{(simBaseSal + simBonus + simBenefits).toLocaleString()} €</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col justify-between">
-                      <div>
-                        <h4 className="text-xs font-bold text-white uppercase mb-2">Contraste contra Expectativas</h4>
-                        <div className="space-y-2 text-xs">
-                          <div className="flex justify-between">
-                            <span className="text-[#879391]">Expectativa Candidato:</span>
-                            <span className="font-mono text-white font-semibold">
-                              {activeCandidate.salaryDetails.expectedSalary.toLocaleString()} € / año
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-[#879391]">Simulación Actual Flexible:</span>
-                            <span className="font-mono text-white font-semibold">
-                              {(simBaseSal + simBonus + simBenefits).toLocaleString()} € / año
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-4">
-                        {(simBaseSal + simBonus + simBenefits) >= activeCandidate.salaryDetails.expectedSalary ? (
-                          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-[11px] leading-normal flex items-start gap-2">
-                            <Check className="w-4 h-4 shrink-0 mt-0.5" />
-                            <span>La compensación simulada iguala o supera la pretensión declarada. Óptimo nivel de retención económica.</span>
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-[11px] leading-normal flex items-start gap-2">
-                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                            <span>La compensación simulada está por debajo de las pretensiones. Alto riesgo de rechazo o contraoferta externa.</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Set salary changes */}
-                  <div className="flex justify-end select-none">
-                    <button
-                      onClick={() => {
-                        setCandidates(prev => prev.map(c => c.id === activeCandidate.id ? {
-                          ...c,
-                          salaryDetails: {
-                            baseSalary: simBaseSal,
-                            expectedSalary: c.salaryDetails.expectedSalary,
-                            bonusAnnual: simBonus,
-                            benefitsValue: simBenefits
-                          }
-                        } : c));
-                        setActiveCandidate(prev => {
-                          if (!prev) return null;
-                          return {
-                            ...prev,
-                            salaryDetails: {
-                              baseSalary: simBaseSal,
-                              expectedSalary: prev.salaryDetails.expectedSalary,
-                              bonusAnnual: simBonus,
-                              benefitsValue: simBenefits
-                            }
-                          };
-                        });
-                        triggerToast("Cambios del simulador de salarios guardados en el perfil.");
-                      }}
-                      className="px-4.5 py-2.5 rounded-xl bg-gradient-to-tr from-emerald-500 to-[#6bd8cb] font-black text-xs text-[#101415] hover:shadow-lg transition-all cursor-pointer"
-                    >
-                      Aplicar propuesta salarial en perfil
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 4: CONTRACT DRAFT GENERATOR */}
-              {activeTab === "contrato" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="glass-panel p-5 rounded-2xl border border-white/5 text-left space-y-4">
-                    <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest font-bold">Auto-Generador Operativo de Contratos de Empleados</h4>
-                    <p className="text-[11px] text-[#879391] leading-relaxed">
-                      Rellena los valores básicos del contrato de contratación y procesa el borrador formal listo para firmar digitalmente.
-                    </p>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-medium">
-                      <div className="space-y-1.5">
-                        <label className="text-[#e2e5e7]">Tipo de Contrato Colectivo:</label>
-                        <select 
-                          value={contractType}
-                          onChange={(e) => setContractType(e.target.value)}
-                          className="w-full bg-[#101415] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                        >
-                          <option value="Indefinido - Tiempo Completo">Indefinido - Tiempo Completo</option>
-                          <option value="Indefinido - Cuadro Técnico Especializado">Indefinido - Cuadro Técnico Especializado</option>
-                          <option value="Indefinido - Alta Dirección">Indefinido - Alta Dirección</option>
-                          <option value="Temporal - Por Obra / Servicio Determinado">Temporal - Por Obra / Servicio Determinado</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[#e2e5e7]">Fecha Oficial de Incorporación:</label>
-                        <input
-                          type="date"
-                          value={contractStartDate}
-                          onChange={(e) => setContractStartDate(e.target.value)}
-                          className="w-full bg-[#101415] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="pt-2 select-none">
-                      <button
-                        onClick={generateContractDraft}
-                        disabled={isSimulatingContractGen}
-                        className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-xs font-bold text-[#c4c1fb] inline-flex items-center gap-2 cursor-pointer"
-                      >
-                        {isSimulatingContractGen ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Redactando mediante IA...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="w-3.5 h-3.5" />
-                            <span>Generar borrador de contrato</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {activeCandidate.toolsDetails.contractGenerator.generated ? (
-                    <div className="glass-panel p-5 rounded-2xl border border-white/5 text-left space-y-4 animate-scaleUp">
-                      <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                        <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1.5">
-                          <Check className="w-4 h-4" /> BORRADOR JURÍDICO AUTOGENERADO
-                        </span>
-                        <div className="flex gap-1.5 select-none">
-                          <button
-                            onClick={() => {
-                              const draftText = (document.getElementById("contract-draft-text") as HTMLPreElement)?.innerText;
-                              if (draftText) handleCopyText(draftText, "copy_contract");
-                            }}
-                            className="p-2 rounded bg-white/5 border border-white/10 transition-all hover:bg-white/10 hover:text-white text-[#c4c1fb]"
-                            title="Copiar texto"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                          <a
-                            href="#"
-                            onClick={(e) => { e.preventDefault(); triggerToast("Borrador descargado como archivo PDF legal en local."); }}
-                            className="p-2 rounded bg-[#6bd8cb]/15 border border-[#6bd8cb]/20 text-[#6bd8cb] transition-all hover:bg-[#6bd8cb]/25"
-                            title="Descargar PDF"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                          </a>
-                        </div>
-                      </div>
-
-                      <pre 
-                        id="contract-draft-text" 
-                        className="text-[10px] leading-relaxed text-white/70 font-mono overflow-y-auto max-h-60 bg-[#101415] p-3 rounded-lg border border-white/5 whitespace-pre-wrap"
-                      >
-                        {`CONTRATO INDIVIDUAL DE TRABAJO Y PRESTACIÓN DE SERVICIOS
---------------------------------------------------------
-Compañía Contratante: ${activeCandidate.client}
-Empleado Alterno: ${activeCandidate.name}
-Puesto de Trabajo: Ref. ${activeCandidate.role}
-Clasificación Contractual: ${contractType}
-Fecha de Alta y Comienzo: ${contractStartDate}
-
-CLÁUSULAS ESPECÍFICAS DE NEGOCIACIÓN:
-1. COMPENSACIÓN MONETARIA: Compañía asigna un salario bruto fijo anualizado por cuantía exacta de ${activeCandidate.salaryDetails.baseSalary.toLocaleString()} € pagaderos en prorrateo de 12 mensualidades ordenamiento mercantil.
-2. RETRIBUCIÓN ADICIONAL VARIABLE (BONO): Se adiciona cuantía máxima de bono variable estimada de ${activeCandidate.salaryDetails.bonusAnnual.toLocaleString()} € condicionada al cumplimiento de objetivos de plataforma tecnológica.
-3. REMUNERACIÓN EN ESPECIE (BENEFICIOS): Acceso directo a cobertura corporativa de seguro médico familiar, cheque guardería y gimnasio flexible valorados acumuladamente en ${activeCandidate.salaryDetails.benefitsValue.toLocaleString()} € anuales monetizados por la gestora.
-
-Con la aceptación verbal e inicio de firma digital de las partes en fecha ${new Date().toLocaleDateString("es-ES")}, expídase copia para DocuSign Inc.`}
-                      </pre>
-                    </div>
-                  ) : (
-                    <div className="p-6 border border-dashed border-white/10 rounded-2xl text-center text-[#879391] text-xs">
-                      No hay borradores redactados en la sesión actual. Rellena los datos superiores y pulsa "Generar borrador de contrato" para simular la redacción jurídica.
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {/* TAB 5: REDACTOR DE FEEDBACK */}
-              {activeTab === "feedback" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="glass-panel p-5 rounded-2xl border border-white/5 text-left space-y-4">
-                    <h4 className="text-xs font-black text-[#ffb4ab] uppercase tracking-widest font-bold">Redactor y Normalizador de Feedback Constructivo</h4>
-                    <p className="text-[11px] text-[#879391] leading-relaxed">
-                      Para perfiles no incorporados (13 y 14), indexa las causas de rechazo para sugerir un email empático que evite frustración y cuide al candidato (Employer Branding).
-                    </p>
-
-                    <div className="space-y-2">
-                      <label className="text-xs text-[#e2e5e7] font-semibold">Causas Técnicas / Razones del Descarte:</label>
-                      <textarea
-                        rows={3}
-                        value={rejectionReasonInput}
-                        onChange={(e) => setRejectionReasonInput(e.target.value)}
-                        placeholder="Escribe la causa real de no contratación (ej. Desestimada al no poder flexibilizar el paquete salarial fijo)..."
-                        className="w-full bg-[#101415] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#ffb4ab] placeholder-[#879391] font-medium"
-                      />
-                    </div>
-
-                    <div className="flex gap-2.5 select-none">
-                      <button
-                        onClick={generateAiFeedback}
-                        disabled={isSimulatingFeedbackGen}
-                        className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold text-[#c4c1fb] inline-flex items-center gap-2 cursor-pointer"
-                      >
-                        {isSimulatingFeedbackGen ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Redactando...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="w-3.5 h-3.5 text-amber-500" />
-                            <span>Redactar email empático por IA</span>
-                          </>
-                        )}
-                      </button>
-
-                      {activeCandidate.toolsDetails.feedbackWriter.generatedFeedback && (
-                        <button
-                          onClick={deliverManualFeedback}
-                          className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-[#101415] text-xs font-black inline-flex items-center gap-1.5 cursor-pointer shadow-md"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Registrar Feedback como Entregado</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {activeCandidate.toolsDetails.feedbackWriter.generatedFeedback ? (
-                    <div className="glass-panel p-5 rounded-2xl border border-white/5 text-left space-y-4 animate-scaleUp">
-                      <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                        <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1.5">
-                          <Check className="w-4 h-4" /> BORRADOR DE EMAIL EMPÁTICO IA
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] uppercase font-bold ${
-                            activeCandidate.feedbackStatus === "entregado_manual" 
-                              ? "text-emerald-450" 
-                              : "text-amber-500"
-                          }`}>
-                            {activeCandidate.feedbackStatus === "entregado_manual" ? "Registrado (Tasa +1)" : "Borrador sin registrar"}
-                          </span>
-                          <button
-                            onClick={() => handleCopyText(activeCandidate.toolsDetails.feedbackWriter.generatedFeedback, "copy_feedback")}
-                            className="p-2 rounded bg-white/5 border border-white/10 transition-all hover:bg-white/10 hover:text-white text-[#c4c1fb] select-none cursor-pointer"
-                            title="Copiar texto"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <pre 
-                        className="text-[10px] leading-relaxed text-white/80 font-mono overflow-y-auto max-h-60 bg-[#101415] p-3 rounded-lg border border-white/5 whitespace-pre-wrap"
-                      >
-                        {activeCandidate.toolsDetails.feedbackWriter.generatedFeedback}
-                      </pre>
-                    </div>
-                  ) : (
-                    <div className="p-6 border border-dashed border-white/10 rounded-2xl text-center text-[#879391] text-xs">
-                      No hay feedbacks generados. Describe la causa en el cuadro superior y pulsa "Redactar email empático por IA".
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {/* TAB 6: PRE-ONBOARDING */}
-              {activeTab === "preonboarding" && (
-                <div className="space-y-6 animate-fadeIn">
-                  
-                  {/* Summary & Risk rating */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-[#101415] rounded-xl border border-white/5 space-y-1 text-left">
-                      <span className="text-[9px] uppercase font-bold text-[#879391]">Risk de Ghosting / Fuga</span>
-                      <p className={`text-xl font-black ${
-                        activeCandidate.toolsDetails.preOnboard.ghostingRisk === "Alto" ? "text-rose-450" :
-                        activeCandidate.toolsDetails.preOnboard.ghostingRisk === "Medio" ? "text-amber-500" : "text-emerald-400"
-                      }`}>
-                        {activeCandidate.toolsDetails.preOnboard.ghostingRisk}
-                      </p>
-                      <p className="text-[9.5px] text-[#879391]">Riesgo predicho de contraofertas</p>
-                    </div>
-
-                    <div className="p-4 bg-[#101415] rounded-xl border border-white/5 space-y-1 col-span-2 text-left">
-                      <span className="text-[9px] uppercase font-bold text-emerald-400">Objetivo del Pre-Onboarding</span>
-                      <p className="text-[10px] text-white/80 leading-normal mt-0.5">
-                        Mitigar abandonos de último momento durante el período de preaviso de los candidatos bajo contrato formal enviando contenido de valor sobre la compañía.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Touchpoints Cadence Timeline */}
-                  <div className="glass-panel p-5 rounded-2xl border border-white/5 text-left space-y-4">
-                    <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest font-bold">Cadence Sequencer - Timeline de Contactos</h4>
-                    
-                    <div className="relative border-l border-white/10 ml-2.5 pl-5 space-y-5">
-                      {activeCandidate.toolsDetails.preOnboard.cadenceSteps.length === 0 ? (
-                        <p className="text-xs text-[#879391] py-2">Ningún contacto de acompañamiento programado. Solo aplica para candidatos contratados.</p>
-                      ) : (
-                        activeCandidate.toolsDetails.preOnboard.cadenceSteps.map((step, idx) => (
-                          <div key={idx} className="relative text-xs">
-                            {/* Bullet icon */}
-                            <span className={`absolute -left-7 top-[1px] w-4 h-4 rounded-full border flex items-center justify-center ${
-                              step.status === "sent" 
-                                ? "bg-emerald-500/10 border-emerald-500 text-emerald-400" 
-                                : "bg-[#101415] border-white/20 text-[#879391]"
-                            }`}>
-                              {step.status === "sent" ? (
-                                <Check className="w-2.5 h-2.5" />
-                              ) : (
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500/70" />
-                              )}
-                            </span>
-
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-white uppercase">{step.day} :</span>
-                                <span className="font-semibold text-white/90">{step.title}</span>
-                                <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${
-                                  step.status === "sent" ? "bg-emerald-500/10 text-emerald-450" : "bg-white/5 text-[#879391]"
-                                }`}>
-                                  {step.status === "sent" ? "Enviado" : "Programado"}
-                                </span>
-                              </div>
-                              <p className="text-[10px] text-[#879391] font-medium leading-normal bg-[#101415]/60 p-2.5 rounded-lg border border-white/[0.03]">
-                                {step.previewText}
-                              </p>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Add Touchpoint Form */}
-                  {activeCandidate.currentPhase === "12_contratado" && (
-                    <form onSubmit={addPreonboardMilestone} className="glass-panel p-5 rounded-2xl border border-white/5 text-left space-y-3.5">
-                      <h4 className="text-xs font-bold text-white uppercase">Agregar Hito Personalizado en la Cadence</h4>
-                      
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[9.5px] uppercase font-bold text-[#879391]">Plazo (ej: Día +15):</label>
-                          <input
-                            type="text"
-                            name="day"
-                            required
-                            placeholder="Día +15"
-                            className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                          />
-                        </div>
-                        <div className="space-y-1 col-span-2">
-                          <label className="text-[9.5px] uppercase font-bold text-[#879391]">Acción / Título del Hito:</label>
-                          <input
-                            type="text"
-                            name="title"
-                            required
-                            placeholder="Sesión telemétrica de bienvenida tecnica"
-                            className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end select-none">
-                        <button
-                          type="submit"
-                          disabled={isSimulatingOnboardAdd}
-                          className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-xs font-bold text-[#c4c1fb] inline-flex items-center gap-1.5 cursor-pointer"
-                        >
-                          {isSimulatingOnboardAdd ? (
-                            <>
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                              <span>Programando...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Zap className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Programar contacto</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </form>
-                  )}
-
-                </div>
-              )}
-
-            </div>
-          </aside>
-        </div>
-      )}
     </div>
   );
 }
@@ -2006,7 +1274,7 @@ function KanbanCard({ cad, onSelect, onTransition, onDragStart }: KanbanCardProp
 
       {/* Extra actions button */}
       <div className="flex justify-between items-center text-[10px] bg-white/[0.02] p-2.5 rounded-xl border border-white/5 mt-2">
-        {cad.currentPhase === "11_oferta_extendida" && (
+        {cad.currentPhase === "12_oferta_extendida" && (
           <div className="flex items-center gap-1">
             <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
             <span className="text-[#879391]">Previa Aceptación:</span>
@@ -2015,13 +1283,13 @@ function KanbanCard({ cad, onSelect, onTransition, onDragStart }: KanbanCardProp
             </span>
           </div>
         )}
-        {cad.currentPhase === "12_contratado" && (
+        {cad.currentPhase === "13_contratado" && (
           <div className="flex items-center gap-1 text-emerald-450">
             <Check className="w-3.5 h-3.5 shrink-0" />
             <span className="font-bold">Contratado</span>
           </div>
         )}
-        {(cad.currentPhase === "13_rechazado_cliente" || cad.currentPhase === "14_candidato_se_baja") && (
+        {(cad.currentPhase === "14_rechazado_cliente" || cad.currentPhase === "15_candidato_se_baja") && (
           <div className="flex items-center gap-1.5">
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
               cad.feedbackStatus === "entregado_manual" ? "bg-emerald-400" : "bg-rose-500"
@@ -2034,34 +1302,35 @@ function KanbanCard({ cad, onSelect, onTransition, onDragStart }: KanbanCardProp
 
         <button 
           onClick={(e) => { e.stopPropagation(); onSelect(cad); }}
-          className="text-[9.5px] uppercase font-bold text-emerald-450 hover:underline hover:text-emerald-400 ml-auto flex items-center gap-0.5 select-none"
+          className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+          title="Ver expediente y detalles completos"
         >
-          <span>Operar</span>
-          <ChevronRight className="w-3 h-3 mt-0.5" />
+          <Eye className="w-3.5 h-3.5" />
+          <span>Detalles</span>
         </button>
       </div>
 
       {/* Quick fast controls */}
       <div className="grid grid-cols-3 gap-1 pt-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200 select-none">
-        {cad.currentPhase !== "11_oferta_extendida" && (
+        {cad.currentPhase !== "12_oferta_extendida" && (
           <button 
-            onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "11_oferta_extendida"); }}
+            onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "12_oferta_extendida"); }}
             className="px-1.5 py-1 text-[8.5px] font-bold rounded bg-white/5 border border-white/5 text-[#879391] hover:text-white"
           >
             Nego
           </button>
         )}
-        {cad.currentPhase !== "12_contratado" && (
+        {cad.currentPhase !== "13_contratado" && (
           <button 
-            onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "12_contratado"); }}
+            onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "13_contratado"); }}
             className="px-1.5 py-1 text-[8.5px] font-bold rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20"
           >
             Habilitar
           </button>
         )}
-        {(cad.currentPhase !== "13_rechazado_cliente" && cad.currentPhase !== "14_candidato_se_baja") && (
+        {(cad.currentPhase !== "14_rechazado_cliente" && cad.currentPhase !== "15_candidato_se_baja") && (
           <button 
-            onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "13_rechazado_cliente"); }}
+            onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "14_rechazado_cliente"); }}
             className="px-1.5 py-1 text-[8.5px] font-bold rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
           >
             Rechazar

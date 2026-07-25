@@ -2063,7 +2063,7 @@ export default function DescubrimientoPage() {
                         {renderSortIcon("notes")}
                       </div>
                     </th>
-                    <th className="py-4 px-5 text-center select-none text-[#c4c1fb]/50">Acciones</th>
+                    <th className="py-4 px-5 text-center select-none text-[#c4c1fb]/50 min-w-[440px]">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 text-[11px] text-white">
@@ -2157,8 +2157,8 @@ export default function DescubrimientoPage() {
                         </td>
 
                         {/* Actions */}
-                        <td className="py-4 px-5">
-                          <div className="flex items-center justify-center gap-2 text-[10px]">
+                        <td className="py-4 px-5 min-w-[440px]">
+                          <div className="flex items-center justify-end sm:justify-center gap-1.5 text-[10px] flex-wrap">
                             {/* Detalles View Link */}
                             <Link
                               href={`/descubrimiento/${cad.pipeId || cad.id}`}

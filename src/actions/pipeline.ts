@@ -27,13 +27,35 @@ export interface PipelineItem {
       fecha_envio?: string | null;
     } | null;
   } | null;
-  evaluacion?: {
+  f2_evaluacion?: {
+    notas_reclutador?: string | null;
     puntaje_tecnico?: number | null;
     feedback_cliente?: string | null;
+  } | null;
+  evaluacion?: {
+    notas_reclutador?: string | null;
+    puntaje_tecnico?: number | null;
+    feedback_cliente?: string | null;
+  } | null;
+  f3_presentacion?: {
+    notas_reclutador?: string | null;
+    feedback_cliente?: string | null;
+  } | null;
+  presentacion?: {
+    notas_reclutador?: string | null;
+    feedback_cliente?: string | null;
+  } | null;
+  f3_cliente?: {
+    notas_reclutador?: string | null;
+    feedback_cliente?: string | null;
+  } | null;
+  f4_cierre?: {
+    notas_reclutador?: string | null;
   } | null;
   cierre?: {
     fecha_cierre?: string | null;
     motivo_rechazo?: string | null;
+    notas_reclutador?: string | null;
   } | null;
   createdAt: string;
   updatedAt: string;

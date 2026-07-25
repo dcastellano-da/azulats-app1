@@ -49,20 +49,22 @@ import {
 import { 
   PresentacionCandidate, 
   INITIAL_PRESENTACION_CANDIDATES, 
-  calculatePresentacionKPIs 
+  calculatePresentacionKPIs,
+  mapPipelineToPresentacionCandidates
 } from "@/lib/presentacion";
-
-const ACTIVE_BUSQUEDAS = [
-  { id: "b1", client: "Inditex S.A.", role: "Frontend Dev (React/Node)" },
-  { id: "b2", client: "Telefónica S.A.", role: "Product Manager Tech" },
-  { id: "b3", client: "SEAT S.A.", role: "Software Architect Rust" },
-  { id: "b4", client: "Banco Santander", role: "SecOps Specialist" }
-];
+import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
+import { getCandidatosAPI, Candidato } from "@/actions/candidatos";
+import { getPipelineAPI, PipelineItem, actualizarPipelineAPI } from "@/actions/pipeline";
 
 export default function PresentacionPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   
+  // Backend States
+  const [activeBusquedas, setActiveBusquedas] = useState<Busqueda[]>([]);
+  const [dataLoading, setDataLoading] = useState<boolean>(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+
   // States
   const [candidates, setCandidates] = useState<PresentacionCandidate[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -98,10 +100,63 @@ export default function PresentacionPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Initialize
+  // Fetch backend data
+  const fetchBackendData = async () => {
+    setDataLoading(true);
+    setDataError(null);
+    try {
+      // 1. Fetch active searches
+      const searchesList = await getBusquedasAPI();
+      setActiveBusquedas(searchesList);
+
+      // 2. Fetch candidates
+      const candidatesRes = await getCandidatosAPI();
+      let candidatesList: Candidato[] = [];
+      if (candidatesRes.success && Array.isArray(candidatesRes.data)) {
+        candidatesList = candidatesRes.data;
+      }
+
+      // 3. Fetch pipelines
+      let pipeItems: PipelineItem[] = [];
+      if (selectedSearch === "Todos") {
+        if (searchesList.length > 0) {
+          const promises = searchesList.map(s => getPipelineAPI(s.id));
+          const results = await Promise.all(promises);
+          results.forEach(res => {
+            if (res.success && Array.isArray(res.data)) {
+              pipeItems = pipeItems.concat(res.data);
+            }
+          });
+        } else {
+          const res = await getPipelineAPI("REQ-001");
+          if (res.success && Array.isArray(res.data)) {
+            pipeItems = res.data;
+          }
+        }
+      } else {
+        const match = searchesList.find(s => `${s.cliente} - ${s.perfil_busqueda}` === selectedSearch);
+        if (match) {
+          const res = await getPipelineAPI(match.id);
+          if (res.success && Array.isArray(res.data)) {
+            pipeItems = res.data;
+          }
+        }
+      }
+
+      // Map to PresentacionCandidate[]
+      const mapped = mapPipelineToPresentacionCandidates(pipeItems, candidatesList, searchesList);
+      setCandidates(mapped);
+    } catch (err: any) {
+      console.error("Error al obtener datos de presentación del backend:", err);
+      setDataError(err.message || "Error al conectar con los servicios backend del pipeline.");
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setCandidates(INITIAL_PRESENTACION_CANDIDATES);
-  }, []);
+    fetchBackendData();
+  }, [selectedSearch]);
 
   // Client-side auth redirect
   useEffect(() => {
@@ -126,21 +181,40 @@ export default function PresentacionPage() {
   const kpis = calculatePresentacionKPIs(candidates);
   
   // State transition
-  const handleTransitionState = (id: string, targetPhase: PresentacionCandidate["currentPhase"]) => {
+  const handleTransitionState = async (id: string, targetPhase: PresentacionCandidate["currentPhase"]) => {
+    const targetCandidate = candidates.find(c => c.id === id);
+    const label = getPhaseLabel(targetPhase);
+
     setCandidates((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, currentPhase: targetPhase, lastActivity: `Estado cambiado a ${getPhaseLabel(targetPhase)}` } : c))
+      prev.map((c) => (c.id === id ? { ...c, currentPhase: targetPhase, lastActivity: `Estado cambiado a ${label}` } : c))
     );
     if (activeCandidate && activeCandidate.id === id) {
       setActiveCandidate((prev) => prev ? { ...prev, currentPhase: targetPhase } : null);
     }
-    triggerToast(`Candidato reubicado a la columna de ${getPhaseLabel(targetPhase).substring(5)}`);
+    triggerToast(`Candidato reubicado a la columna de ${label.substring(5)}`);
+
+    if (targetCandidate?.pipeId) {
+      try {
+        const res = await actualizarPipelineAPI(targetCandidate.pipeId, {
+          flujo: {
+            estado_actual: targetPhase,
+            fecha_ultimo_cambio: new Date().toISOString()
+          }
+        });
+        if (!res.success) {
+          console.warn("[Presentacion] Warning al actualizar pipeline en backend:", res.message);
+        }
+      } catch (err) {
+        console.error("[Presentacion] Error al actualizar pipeline en backend:", err);
+      }
+    }
   };
 
   const getPhaseLabel = (phase: PresentacionCandidate["currentPhase"]) => {
     switch (phase) {
-      case "08_shortlist": return "08 - Shortlist / Enviado a Cliente";
-      case "09_entrevista_cliente": return "09 - Entrevista con Cliente";
-      case "10_standby": return "10 - Stand-by / Back-up";
+      case "09_shortlist": return "09 - Shortlist / Enviado a Cliente";
+      case "10_entrevista_cliente": return "10 - Entrevista con Cliente";
+      case "11_standby": return "11 - Stand-by / Back-up";
     }
   };
 
@@ -397,10 +471,15 @@ export default function PresentacionPage() {
 
   const sortedListCandidates = [...filteredCandidates].sort(sortCandidates);
 
+  // Navigation handler for candidate detail page
+  const handleViewDetails = (cad: PresentacionCandidate) => {
+    router.push(`/presentacion/${cad.pipeId || cad.id}`);
+  };
+
   // Column counts
-  const countShortlist = candidates.filter((c) => c.currentPhase === "08_shortlist").length;
-  const countEntrevista = candidates.filter((c) => c.currentPhase === "09_entrevista_cliente").length;
-  const countStandby = candidates.filter((c) => c.currentPhase === "10_standby").length;
+  const countShortlist = candidates.filter((c) => c.currentPhase === "09_shortlist").length;
+  const countEntrevista = candidates.filter((c) => c.currentPhase === "10_entrevista_cliente").length;
+  const countStandby = candidates.filter((c) => c.currentPhase === "11_standby").length;
 
   return (
     <div className={`relative min-h-screen bg-[#101415] text-white p-6 md:p-8 space-y-8 overflow-x-hidden transition-all duration-350 ${isFullScreen ? 'p-4' : ''}`}>
@@ -527,6 +606,32 @@ export default function PresentacionPage() {
             </Link>
           </div>
         </header>
+
+        {/* Backend loading / error indicator */}
+        {dataLoading && (
+          <div className="p-3 rounded-xl border border-[#6bd8cb]/20 bg-[#6bd8cb]/10 text-[#6bd8cb] text-xs flex items-center gap-2.5 animate-fadeIn">
+            <div className="w-4 h-4 border-2 border-[#6bd8cb] border-t-transparent rounded-full animate-spin"></div>
+            <span>Sincronizando pipeline y postulantes desde servicios backend...</span>
+          </div>
+        )}
+
+        {dataError && (
+          <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs flex justify-between items-center gap-3 animate-fadeIn text-left">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+              <div>
+                <span className="font-bold">Error Backend: </span>
+                {dataError}
+              </div>
+            </div>
+            <button 
+              onClick={() => fetchBackendData()} 
+              className="px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-[10px] uppercase cursor-pointer"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
 
         {/* Warning Indicator limits if WIP overloaded */}
         {kpis.isWipOverloaded && !isWipWarningDismissed && (
@@ -767,9 +872,9 @@ export default function PresentacionPage() {
                 className="bg-[#101415]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer w-full md:w-auto font-bold"
               >
                 <option value="Todos" className="bg-[#15181a]">Todas las Búsquedas</option>
-                {ACTIVE_BUSQUEDAS.map((b) => (
-                  <option key={b.id} value={`${b.client} - ${b.role}`} className="bg-[#15181a] text-white">
-                    {b.client} - {b.role}
+                {activeBusquedas.map((b) => (
+                  <option key={b.id} value={`${b.cliente} - ${b.perfil_busqueda}`} className="bg-[#15181a] text-white">
+                    {b.cliente} - {b.perfil_busqueda}
                   </option>
                 ))}
               </select>
@@ -785,9 +890,9 @@ export default function PresentacionPage() {
                   className="bg-[#101415]/60 border border-[#c4c1fb]/20 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer w-full md:w-auto font-bold"
                 >
                   <option value="Todos" className="bg-[#15181a]">Todas las Fases</option>
-                  <option value="08_shortlist" className="bg-[#15181a]">08 - Shortlist / Enviado</option>
-                  <option value="09_entrevista_cliente" className="bg-[#15181a]">09 - Entrevista con Cliente</option>
-                  <option value="10_standby" className="bg-[#15181a]">10 - Stand-by</option>
+                  <option value="09_shortlist" className="bg-[#15181a]">09 - Shortlist / Enviado</option>
+                  <option value="10_entrevista_cliente" className="bg-[#15181a]">10 - Entrevista con Cliente</option>
+                  <option value="11_standby" className="bg-[#15181a]">11 - Stand-by</option>
                 </select>
               </div>
             )}
@@ -798,10 +903,10 @@ export default function PresentacionPage() {
             <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 select-none">
               <button
                 onClick={() => setViewMode("kanban")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   viewMode === "kanban"
-                    ? "bg-amber-500 text-[#101415] shadow shadow-amber-500/10"
-                    : "text-[#879391] hover:text-white"
+                    ? "bg-[#6bd8cb] text-[#101415] shadow-sm"
+                    : "text-[#879391] hover:text-white hover:bg-white/5"
                 }`}
               >
                 <Grid3X3 className="w-3.5 h-3.5" />
@@ -809,14 +914,14 @@ export default function PresentacionPage() {
               </button>
               <button
                 onClick={() => setViewMode("lista")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   viewMode === "lista"
-                    ? "bg-amber-500 text-[#101415] shadow shadow-amber-500/10"
-                    : "text-[#879391] hover:text-white"
+                    ? "bg-[#6bd8cb] text-[#101415] shadow-sm"
+                    : "text-[#879391] hover:text-white hover:bg-white/5"
                 }`}
               >
                 <List className="w-3.5 h-3.5" />
-                <span>Lista detallada</span>
+                <span>Lista Detallada</span>
               </button>
             </div>
 
@@ -836,7 +941,7 @@ export default function PresentacionPage() {
               ) : (
                 <>
                   <Maximize2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Pantalla Completa</span>
+                  <span className="hidden sm:inline">Maximizar</span>
                 </>
               )}
             </button>
@@ -851,22 +956,22 @@ export default function PresentacionPage() {
             {/* COLUMN 1: Shortlist / Enviado a Cliente */}
             <div 
               onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, "08_shortlist")}
+              onDrop={(e) => handleDrop(e, "09_shortlist")}
               className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-amber-500 text-left"
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">08 - Shortlist / Enviado a Cliente</span>
-                  <span className="text-[10px] text-[#879391] mt-0.5">Expedientes presentados para aprobación</span>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                  <h3 className="text-xs font-bold text-white tracking-wide uppercase">09 - Shortlist / Enviado</h3>
                 </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-amber-500 font-mono">
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-mono font-bold">
                   {countShortlist}
                 </span>
               </div>
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
-                {filteredCandidates.filter(c => c.currentPhase === "08_shortlist").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                {filteredCandidates.filter(c => c.currentPhase === "09_shortlist").map((cad) => (
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
                 ))}
                 {countShortlist === 0 && <EmptyColumnText text="Ninguna presentación" />}
               </div>
@@ -875,12 +980,12 @@ export default function PresentacionPage() {
             {/* COLUMN 2: Entrevista con Cliente */}
             <div 
               onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, "09_entrevista_cliente")}
+              onDrop={(e) => handleDrop(e, "10_entrevista_cliente")}
               className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-emerald-500 text-left"
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">09 - Entrevista con Cliente</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">10 - Entrevista con Cliente</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Agendas coordinadas y entrevistas activas</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-emerald-400 font-mono">
@@ -889,8 +994,8 @@ export default function PresentacionPage() {
               </div>
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
-                {filteredCandidates.filter(c => c.currentPhase === "09_entrevista_cliente").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                {filteredCandidates.filter(c => c.currentPhase === "10_entrevista_cliente").map((cad) => (
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
                 ))}
                 {countEntrevista === 0 && <EmptyColumnText text="Ninguna reunión agendada" />}
               </div>
@@ -899,12 +1004,12 @@ export default function PresentacionPage() {
             {/* COLUMN 3: Stand-by / Backup */}
             <div 
               onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, "10_standby")}
+              onDrop={(e) => handleDrop(e, "11_standby")}
               className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-purple-500 text-left"
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">10 - Stand-by / Back-up</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">11 - Stand-by / Back-up</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">Calificados en reserva técnica</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-purple-400 font-mono">
@@ -913,8 +1018,8 @@ export default function PresentacionPage() {
               </div>
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
-                {filteredCandidates.filter(c => c.currentPhase === "10_standby").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                {filteredCandidates.filter(c => c.currentPhase === "11_standby").map((cad) => (
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
                 ))}
                 {countStandby === 0 && <EmptyColumnText text="Ningún recurso en reserva" />}
               </div>
@@ -942,7 +1047,7 @@ export default function PresentacionPage() {
                   <th className="px-5 py-4 cursor-pointer hover:text-white text-center" onClick={() => toggleSort("score")}>
                     Fit Score {renderSortIcon("score")}
                   </th>
-                  <th className="px-5 py-4 text-right">Herramientas Operativas</th>
+                  <th className="px-5 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-medium">
@@ -971,8 +1076,8 @@ export default function PresentacionPage() {
                       </td>
                       <td className="px-5 py-4">
                         <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full inline-block ${
-                          cad.currentPhase === "08_shortlist" ? "bg-amber-500/10 text-amber-400 border border-amber-500/15" :
-                          cad.currentPhase === "09_entrevista_cliente" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : 
+                          cad.currentPhase === "09_shortlist" ? "bg-amber-500/10 text-amber-400 border border-amber-500/15" :
+                          cad.currentPhase === "10_entrevista_cliente" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : 
                           "bg-purple-500/10 text-purple-400 border border-purple-500/15"
                         }`}>
                           {getPhaseLabel(cad.currentPhase).substring(5)}
@@ -988,14 +1093,12 @@ export default function PresentacionPage() {
                       </td>
                       <td className="px-5 py-4 text-right">
                         <button
-                          onClick={() => {
-                            setActiveCandidate(cad);
-                            setActiveTab("general");
-                          }}
-                          className="px-3.5 py-1.5 text-[10px] font-black rounded-xl bg-gradient-to-tr from-amber-500/25 to-[#c4c1fb]/15 border border-[#c4c1fb]/20 text-[#c4c1fb] hover:bg-[#c4c1fb] hover:text-[#101415] hover:shadow-lg transition-all cursor-pointer inline-flex items-center gap-1.5"
+                          onClick={() => handleViewDetails(cad)}
+                          className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+                          title="Ver expediente y detalles completos"
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          <span>Lanzar Herramientas IA</span>
+                          <span>Detalles</span>
                         </button>
                       </td>
                     </tr>
@@ -1007,595 +1110,6 @@ export default function PresentacionPage() {
         )}
 
       </div>
-
-      {/* Advanced AI Tools Panel / Drawer Sidebar */}
-      {activeCandidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end pointer-events-auto">
-          {/* Backdrop overlay */}
-          <div 
-            className="absolute inset-0 bg-[#000000]/60 backdrop-blur-sm transition-opacity duration-300 animate-fadeIn" 
-            onClick={() => setActiveCandidate(null)}
-          />
-
-          {/* Slider Drawer Container */}
-          <aside className="absolute top-0 right-0 h-full w-full max-w-3xl bg-[#15181a] border-l border-white/10 shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] animate-slideIn text-left">
-            
-            {/* Header */}
-            <div className="px-6 py-5 border-b border-white/10 bg-[#101415]/90 backdrop-blur-md flex justify-between items-center">
-              <div>
-                <span className="text-[9px] font-mono text-amber-500 bg-amber-500/15 px-2.5 py-0.5 rounded border border-amber-500/25 uppercase font-bold tracking-widest inline-block mb-1">
-                  MÓDULO DE CLIENTE F3
-                </span>
-                <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <span>Expediente de {activeCandidate.name}</span>
-                  <span className="px-2 py-0.5 text-xs text-white/40 font-mono bg-white/5 rounded-md border border-white/10">
-                    {activeCandidate.id}
-                  </span>
-                </h2>
-                <p className="text-[10px] text-[#879391] mt-0.5">
-                  Herramientas operativas automatizadas: briefings, calendarios ágiles y alertas de cumplimiento de SLA.
-                </p>
-              </div>
-              <button
-                onClick={() => setActiveCandidate(null)}
-                className="w-10 h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition-all text-[#c4c1fb] flex items-center justify-center cursor-pointer shrink-0"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* TAB SELECTORS */}
-            <nav className="flex items-center overflow-x-auto bg-[#101415]/40 border-b border-white/5 px-4 py-1.5 gap-1 select-none">
-              <button 
-                onClick={() => setActiveTab("general")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === "general" ? "bg-amber-500/15 text-amber-500 border border-amber-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                1. General & Info
-              </button>
-              <button 
-                onClick={() => setActiveTab("analitica")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "analitica" ? "bg-amber-500/15 text-amber-500 border border-amber-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <PlayCircle className="w-3.5 h-3.5" />
-                <span>2. Analítica Zoom/Meet</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("traductor")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "traductor" ? "bg-amber-500/15 text-amber-500 border border-amber-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <Languages className="w-3.5 h-3.5" />
-                <span>3. Traductor CV</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("briefing")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "briefing" ? "bg-amber-500/15 text-amber-500 border border-amber-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>4. AI Briefing</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("agenda")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "agenda" ? "bg-amber-500/15 text-amber-500 border border-amber-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                <span>5. Agenda Condicional</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("tracker")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "tracker" ? "bg-amber-500/15 text-amber-500 border border-amber-500/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <Bell className="w-3.5 h-3.5" />
-                <span>6. Rastro SLA</span>
-              </button>
-            </nav>
-
-            {/* TAB CONTENT ACCORDION */}
-            <div className="flex-grow p-6 overflow-y-auto space-y-6">
-              
-              {/* TAB 1: GENERAL */}
-              {activeTab === "general" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="glass-panel p-4.5 rounded-2xl border border-white/5 space-y-3.5">
-                      <h4 className="text-xs font-black text-amber-500 uppercase tracking-widest">Información de Contacto</h4>
-                      
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Nombre completo:</span>
-                          <span className="text-white font-bold">{activeCandidate.name}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Correo electrónico:</span>
-                          <a href={`mailto:${activeCandidate.email}`} className="text-amber-400 underline font-bold hover:text-amber-300">
-                            {activeCandidate.email}
-                          </a>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Teléfono móvil:</span>
-                          <a href={`tel:${activeCandidate.contactNumber}`} className="text-white hover:text-amber-500 font-mono">
-                            {activeCandidate.contactNumber}
-                          </a>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Ubicación física:</span>
-                          <span className="text-[#e2e5e7]">{activeCandidate.location}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="glass-panel p-4.5 rounded-2xl border border-white/5 space-y-3.5">
-                      <h4 className="text-xs font-black text-[#6bd8cb] uppercase tracking-widest font-bold">Estado en Proceso</h4>
-                      
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Cliente corporativo:</span>
-                          <span className="text-white font-bold">{activeCandidate.client}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Puesto Técnico:</span>
-                          <span className="text-white font-bold">{activeCandidate.role}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Años experiencia:</span>
-                          <span className="text-white font-bold">{activeCandidate.experienceYears} años</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[#879391]">Puntuación de ajuste (Fit):</span>
-                          <span className="text-white font-bold font-mono text-sm">{activeCandidate.score}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="glass-panel p-4.5 rounded-2xl border border-white/5 space-y-3">
-                    <span className="text-[10px] text-white/40 uppercase tracking-widest font-black block">Actividad en esta Fase</span>
-                    <p className="text-xs text-[#e0e3e5] leading-relaxed">
-                      {activeCandidate.lastActivity}
-                    </p>
-                    <div className="text-[10px] text-[#879391] font-mono pt-1">
-                      Fecha de Ingreso a F3: {new Date(activeCandidate.entryDate).toLocaleString("es-ES")}
-                    </div>
-                  </div>
-
-                  {/* Operational controls to shift candidate phase directly inside slide-over */}
-                  <div className="p-4 rounded-2xl border border-white/10 bg-white/5 space-y-3.5">
-                    <span className="text-xs font-black text-white uppercase tracking-wider block">Asignar Nueva Fase del Cliente</span>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => handleTransitionState(activeCandidate.id, "08_shortlist")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          activeCandidate.currentPhase === "08_shortlist"
-                            ? "bg-amber-500 text-stone-900 border border-amber-500 font-black"
-                            : "bg-white/5 border border-white/10 text-[#879391] hover:text-white"
-                        }`}
-                      >
-                        08 - Shortlist / Enviado
-                      </button>
-                      <button
-                        onClick={() => handleTransitionState(activeCandidate.id, "09_entrevista_cliente")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          activeCandidate.currentPhase === "09_entrevista_cliente"
-                            ? "bg-emerald-500 text-stone-900 border border-emerald-500 font-black"
-                            : "bg-white/5 border border-white/10 text-[#879391] hover:text-white"
-                        }`}
-                      >
-                        09 - Entrevista
-                      </button>
-                      <button
-                        onClick={() => handleTransitionState(activeCandidate.id, "10_standby")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          activeCandidate.currentPhase === "10_standby"
-                            ? "bg-purple-500 text-white border border-purple-500 font-black"
-                            : "bg-white/5 border border-white/10 text-[#879391] hover:text-white"
-                        }`}
-                      >
-                        10 - Stand-by / Backup
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: ANALÍTICA ZOOM/MEET */}
-              {activeTab === "analitica" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="flex justify-between items-center pb-3 border-b border-white/10">
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Telemetría de Llamada con Cliente</h4>
-                      <p className="text-[10px] text-[#879391]">Transcripción en tiempo real y detección de microexpresiones por redes neuronales.</p>
-                    </div>
-                    
-                    <button
-                      onClick={runZoomAnalysis}
-                      disabled={isSimulatingAnalysis}
-                      className="px-4 py-2 font-black rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-[#101415] text-xs transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/10 shrink-0"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isSimulatingAnalysis ? 'animate-spin' : ''}`} />
-                      <span>{isSimulatingAnalysis ? "Analizando..." : "Correr Calibración IA"}</span>
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="glass-panel p-4 rounded-xl border border-white/5 text-center flex flex-col justify-center space-y-1 bg-[#101415]/75">
-                      <span className="text-[9px] uppercase font-bold text-[#879391]">Índice de Sentimiento</span>
-                      <span className="text-2xl font-black text-amber-500 font-mono">
-                        {activeCandidate.toolsDetails.analitica.sentimentScore}%
-                      </span>
-                    </div>
-
-                    <div className="glass-panel p-4 rounded-xl border border-white/5 text-center flex flex-col justify-center space-y-1 bg-[#101415]/75">
-                      <span className="text-[9px] uppercase font-bold text-[#879391]">Clasificación Global</span>
-                      <span className="text-sm font-bold text-emerald-400">
-                        {activeCandidate.toolsDetails.analitica.globalSentiment}
-                      </span>
-                    </div>
-
-                    <div className="glass-panel p-4 rounded-xl border border-white/5 text-center flex flex-col justify-center space-y-1 bg-[#101415]/75">
-                      <span className="text-[9px] uppercase font-bold text-[#879391]">Alineación Salarial</span>
-                      {activeCandidate.toolsDetails.analitica.salaryAlert ? (
-                        <div className="flex items-center justify-center gap-1 text-rose-400 font-bold text-xs bg-rose-500/5 py-1 px-2 rounded border border-rose-500/10 animate-pulse">
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                          <span>Desalineación Directa</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center gap-1 text-emerald-400 font-bold text-xs bg-emerald-500/5 py-1 px-2 rounded border border-emerald-500/10">
-                          <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                          <span>Alineado</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Salary details check */}
-                  <div className="p-4 rounded-xl border border-white/10 bg-white/5 flex justify-between text-xs">
-                    <div>
-                      <span className="text-[#879391] block">Pretensiones Salariales Candidato:</span>
-                      <span className="font-bold text-white">{activeCandidate.toolsDetails.analitica.salaryRequested}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[#879391] block">Banda Máxima Autorizada Cliente:</span>
-                      <span className="font-bold text-[#6bd8cb]">{activeCandidate.toolsDetails.analitica.salaryOffered}</span>
-                    </div>
-                  </div>
-
-                  {/* Transcript Snippets */}
-                  <div className="space-y-2.5">
-                    <h5 className="text-[10px] font-bold text-white/50 uppercase tracking-wider">Extracto Clave Zoom (Meeting)</h5>
-                    <div className="space-y-3 bg-[#101415]/50 border border-white/5 rounded-xl p-4 overflow-y-auto max-h-48">
-                      {activeCandidate.toolsDetails.analitica.transcriptSnippets.map((t, idx) => (
-                        <div key={idx} className="text-xs space-y-1">
-                          <span className={`font-black uppercase tracking-wider text-[9px] ${t.speaker === "Candidato" || t.speaker === "Candidata" ? "text-amber-500" : "text-[#c4c1fb]"}`}>
-                            {t.speaker}:
-                          </span>
-                          <p className="text-[#e2e5e7] italic leading-relaxed">"{t.text}"</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Micro-expressions detected list */}
-                  <div className="space-y-2.5">
-                    <h5 className="text-[10px] font-bold text-white/50 uppercase tracking-wider">Microexpresiones & Insights de Voz</h5>
-                    <div className="flex flex-wrap gap-1.5">
-                      {activeCandidate.toolsDetails.analitica.microExpressionsDetected.map((m, idx) => (
-                        <span key={idx} className="px-2.5 py-1 text-[9px] font-mono font-bold bg-[#6bd8cb]/15 text-[#6bd8cb] border border-[#6bd8cb]/25 rounded">
-                          {m}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* TAB 3: TRADUCTOR CV */}
-              {activeTab === "traductor" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="flex justify-between items-center pb-3 border-b border-white/10">
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Traductor y Estandarizador de Perfiles</h4>
-                      <p className="text-[10px] text-[#879391]">Traduce y normaliza de forma síncrona el currículum al inglés para simplificar la evaluación del cliente internacional.</p>
-                    </div>
-
-                    <button
-                      onClick={runTranslationAndStadardizer}
-                      disabled={isSimulatingTranslation || activeCandidate.toolsDetails.traductor.cvTranslated}
-                      className="px-4 py-2 font-black rounded-xl bg-[#6bd8cb] text-[#101415] hover:bg-[#6bd8cb]/95 text-xs transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-md"
-                    >
-                      {isSimulatingTranslation ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Procesando...</span>
-                        </>
-                      ) : activeCandidate.toolsDetails.traductor.cvTranslated ? (
-                        <>
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Traducido Exitosamente</span>
-                        </>
-                      ) : (
-                        <>
-                          <Languages className="w-3.5 h-3.5" />
-                          <span>Traducir al Inglés & Estandarizar</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left text-xs">
-                    <div className="space-y-2">
-                      <span className="text-[9px] uppercase font-bold text-white/40 block">Extracto Original (Castellano/Portugués)</span>
-                      <div className="bg-[#101415]/75 border border-white/5 rounded-xl p-4 min-h-36 font-sans leading-relaxed text-[#c4c1fb]">
-                        {activeCandidate.toolsDetails.traductor.originalCVText}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                       <span className="text-[9px] uppercase font-bold text-white/40 block">Vista Normalizada Standard (Inglés)</span>
-                       <div className="bg-[#101415]/75 border border-white/5 rounded-xl p-4 min-h-36 font-sans leading-relaxed text-white">
-                         {activeCandidate.toolsDetails.traductor.cvTranslated ? (
-                           <div className="space-y-2.5">
-                             <div className="flex items-center gap-1.5 pb-1 border-b border-white/10 text-emerald-400 text-[10px] font-bold">
-                               <Check className="w-3.5 h-3.5 shrink-0" />
-                               <span>CV NORMALIZED (ATS SECURE STYLE)</span>
-                             </div>
-                             <p>{activeCandidate.toolsDetails.traductor.translatedCVText}</p>
-                           </div>
-                         ) : (
-                           <div className="flex flex-col items-center justify-center h-28 text-center text-[#879391] italic text-[11px] gap-2">
-                             <Languages className="w-6 h-6 opacity-30" />
-                             <span>Traducción pendiente. Haz click en el botón superior.</span>
-                           </div>
-                         )}
-                       </div>
-                    </div>
-                  </div>
-
-                  {activeCandidate.toolsDetails.traductor.cvTranslated && (
-                    <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-xs flex justify-between items-center gap-2">
-                      <span>Currículum disponible para el cliente en formato internacional estándar (PDF / CV Inglés).</span>
-                      <button 
-                        onClick={() => handleCopyText(activeCandidate.toolsDetails.traductor.translatedCVText, "translated_cv")}
-                        className="px-2 py-1 rounded bg-emerald-500/15 border border-emerald-500/25 hover:bg-emerald-500/25 transition-all text-[10px] font-bold cursor-pointer shrink-0"
-                      >
-                        Copiar CV Traducido
-                      </button>
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {/* TAB 4: CANDIDATE BRIEFING */}
-              {activeTab === "briefing" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="flex justify-between items-center pb-3 border-b border-white/10">
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Generador de Candidate Briefings</h4>
-                      <p className="text-[10px] text-[#879391]">Crea el resumen ejecutivo de 3 párrafos (Fit Técnico, Fit Cultural, Alineación Salarial) listo para enviar por correo o Teams al Hiring Manager.</p>
-                    </div>
-
-                    <button
-                      onClick={runBriefingGenerator}
-                      disabled={isSimulatingBriefingGen}
-                      className="px-4 py-2 font-black rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-[#101415] text-xs transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-md shrink-0"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isSimulatingBriefingGen ? 'animate-spin' : ''}`} />
-                      <span>{isSimulatingBriefingGen ? "Generando..." : "Generar Briefing IA"}</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-2">
-                    <span className="text-[9px] uppercase font-bold text-white/40 block">Briefing Ejecutivo de Presentación</span>
-                    <div className="bg-[#101415] border border-white/10 rounded-2xl p-5 min-h-[160px] font-mono text-xs leading-relaxed text-left relative">
-                      {activeCandidate.toolsDetails.briefing.generated ? (
-                        <>
-                          <p className="whitespace-pre-line text-[#e0e3e5]">{activeCandidate.toolsDetails.briefing.content}</p>
-                          <button
-                            onClick={() => handleCopyText(activeCandidate.toolsDetails.briefing.content, "copiar_briefing")}
-                            className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/15 transition-all text-[10px] text-[#c4c1fb] font-bold flex items-center gap-1 cursor-pointer"
-                          >
-                            {copiedTextType === "copiar_briefing" ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{copiedTextType === "copiar_briefing" ? "Copiado" : "Copiar plantilla"}</span>
-                          </button>
-                        </>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-28 text-center text-[#879391] italic text-[11px] gap-2.5">
-                          <FileText className="w-7 h-7 opacity-30 animate-pulse" />
-                          <span>No hay briefing generado todavía. Presiona "Generar Briefing IA" para compilar el resumen ejecutivo.</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {activeCandidate.toolsDetails.briefing.generated && (
-                    <div className="p-3 bg-[#161a1b] rounded-xl text-[10px] text-[#879391] leading-relaxed flex items-start gap-2">
-                      <Zap className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                      <span>Tip de IA: Este resumen resalta el ajuste del salario y minimiza las brechas de retención primarias. Copia el texto para enviárselo directamente al cliente por email.</span>
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-              {/* TAB 5: AGENDA CONDICIONAL */}
-              {activeTab === "agenda" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="flex justify-between items-center pb-3 border-b border-white/10">
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Orquestador de Agendas Condicional</h4>
-                      <p className="text-[10px] text-[#879391]">Cruza calendarios de reclutadores, clientes y candidatos para proponer slots óptimos de entrevista eliminando demoras de coordinación manual.</p>
-                    </div>
-
-                    <button
-                      onClick={suggestOptimalSlot}
-                      disabled={isSimulatingAgendasSlot || activeCandidate.toolsDetails.agenda.isScheduled}
-                      className="px-4 py-2 font-black rounded-xl bg-amber-500 text-stone-900 hover:bg-amber-600 text-xs transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-md shrink-0 animate-pulse"
-                    >
-                      {activeCandidate.toolsDetails.agenda.isScheduled ? (
-                        <>
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Reunión Agendada</span>
-                        </>
-                      ) : (
-                        <>
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>Sugerir Horario Óptimo</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Scheduled info badge */}
-                  {activeCandidate.toolsDetails.agenda.isScheduled && (
-                    <div className="p-4.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-xs space-y-1">
-                      <div className="font-bold flex items-center gap-1.5 text-sm">
-                        <Check className="w-4 h-4 shrink-0" />
-                        <span>¡Reunión en Agenda Confirmada!</span>
-                      </div>
-                      <p className="text-[11px] text-white">Slot reservado: <span className="font-bold text-emerald-400">{activeCandidate.toolsDetails.agenda.recruiterSlotSelected}</span></p>
-                    </div>
-                  )}
-
-                  {/* Suggested list check */}
-                  <div className="space-y-3.5">
-                    <span className="text-[9px] uppercase font-bold text-white/40 block">Franjas de Tiempo Libres Intersectadas</span>
-                    {activeCandidate.toolsDetails.agenda.suggestedSlots && activeCandidate.toolsDetails.agenda.suggestedSlots.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-2.5">
-                        {activeCandidate.toolsDetails.agenda.suggestedSlots.map((slot, idx) => (
-                          <div 
-                            key={idx} 
-                            onClick={suggestOptimalSlot}
-                            className="bg-[#101415]/75 border border-white/5 hover:border-amber-500/30 p-3.5 rounded-xl flex justify-between items-center transition-all cursor-pointer text-xs"
-                          >
-                            <span className="font-bold text-[#e0e3e5]">{slot}</span>
-                            <span className="text-[10px] text-amber-500 hover:underline">Agendar con este slot</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      !activeCandidate.toolsDetails.agenda.isScheduled && (
-                        <div className="h-28 flex items-center justify-center text-center text-[#879391] italic text-[11px]">
-                          No hay franjas libres configuradas para este cliente. Haz clic en "Sugerir Horario Óptimo" para generar intersecciones de calendarios.
-                        </div>
-                      )
-                    )}
-                  </div>
-
-                  {/* Visual flowchart mock calendar components */}
-                  <div className="p-4 rounded-xl border border-white/10 bg-white/5 space-y-2 text-xs">
-                    <span className="font-bold text-white block">Esquema de disponibilidad analizada:</span>
-                    <div className="grid grid-cols-3 gap-2.5 text-center text-[10px] font-mono">
-                      <div className="p-2 bg-[#161a1b] rounded border border-white/5">
-                        <span className="text-[#879391] block">Candidato</span>
-                        <span className="text-emerald-400 font-bold">12 Slots OK</span>
-                      </div>
-                      <div className="p-2 bg-[#161a1b] rounded border border-white/5">
-                        <span className="text-[#879391] block">Recruiter</span>
-                        <span className="text-emerald-400 font-bold">8 Slots OK</span>
-                      </div>
-                      <div className="p-2 bg-[#161a1b] rounded border border-white/5">
-                        <span className="text-[#879391] block">Cliente (Hiring)</span>
-                        <span className="text-amber-500 font-bold">3 Slots OK</span>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* TAB 6: RASTREADOR DE SLA */}
-              {activeTab === "tracker" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="flex justify-between items-center pb-3 border-b border-white/10">
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Bot Rastreador de SLAs para Clientes</h4>
-                      <p className="text-[10px] text-[#879391]">Monitorea si el cliente responde dentro de las 48 horas de SLA para evitar que el candidato se enfríe y pierda enganche (engagement).</p>
-                    </div>
-
-                    <button
-                      onClick={sendSlaAlertPing}
-                      disabled={isSimulatingSlaPing}
-                      className="px-4 py-2 font-black rounded-xl bg-amber-500 text-stone-900 hover:bg-amber-600 text-xs transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-md shrink-0"
-                    >
-                      <Send className={`w-3.5 h-3.5 ${isSimulatingSlaPing ? 'animate-spin' : ''}`} />
-                      <span>{isSimulatingSlaPing ? "Enviando..." : "Enviar Ping de recordatorio (SLA)"}</span>
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5">
-                    <div className="glass-panel p-4.5 rounded-xl border border-white/5 bg-[#101415]/75 space-y-1">
-                      <span className="text-[9px] uppercase font-bold text-[#879391] block">Tiempo transcurrido desde Envío</span>
-                      <span className="text-xl font-black font-mono text-white block">
-                        {activeCandidate.toolsDetails.tracker.hoursSinceSent} horas
-                      </span>
-                    </div>
-
-                    <div className="glass-panel p-4.5 rounded-xl border border-white/5 bg-[#101415]/75 space-y-1">
-                      <span className="text-[9px] uppercase font-bold text-[#879391] block">Pings enviados por ATS</span>
-                      <span className="text-xl font-black font-mono text-[#6bd8cb] block">
-                        {activeCandidate.toolsDetails.tracker.totalRemindersSent} alertas
-                      </span>
-                    </div>
-                  </div>
-
-                  {activeCandidate.toolsDetails.tracker.slaExceeded ? (
-                    <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 text-xs flex items-center gap-3">
-                      <AlertTriangle className="w-5 h-5 text-rose-455 shrink-0 animate-pulse" />
-                      <div>
-                        <span className="font-black text-white">¡SLA de 48 Horas Excedido! </span>
-                        El Hiring Manager de {activeCandidate.client} acumula {activeCandidate.toolsDetails.tracker.hoursSinceSent} horas sin proveer calificado feedback. Se recomienda enviar un Ping o alertar al Key Account Manager de forma manual para evitar cancelaciones tempranas.
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-xs flex items-center gap-3">
-                      <ShieldCheck className="w-5 h-5 text-emerald-450 shrink-0" />
-                      <div>
-                        <span className="font-black text-white">SLA en rango óptimo.</span>
-                        Menos de 48 horas en espera. No se requiere intervención crítica, el proceso fluye correctamente según los tiempos esperados.
-                      </div>
-                    </div>
-                  )}
-
-                  {activeCandidate.toolsDetails.tracker.lastReminderTime && (
-                    <div className="p-3 bg-[#161a1b] rounded-xl text-[10px] text-[#879391]">
-                      Última notificación enviada: <span className="font-bold text-[#c4c1fb]">{new Date(activeCandidate.toolsDetails.tracker.lastReminderTime).toLocaleString("es-ES")}</span>
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-            </div>
-
-            {/* Slider footer */}
-            <div className="px-6 py-4.5 border-t border-white/10 bg-[#101415]/90 backdrop-blur-md flex justify-between items-center">
-              <span className="text-[10px] text-[#879391] font-mono">
-                Sincronizado con base de datos de Maquetas (Fase 3)
-              </span>
-              
-              <button
-                onClick={() => setActiveCandidate(null)}
-                className="px-5 py-2 rounded-xl text-xs font-black bg-white/5 border border-white/10 text-white hover:bg-white/10 cursor-pointer transition-all"
-              >
-                Cerrar expediente
-              </button>
-            </div>
-
-          </aside>
-        </div>
-      )}
 
       {/* FLOATING TOAST FEEDBACK NOTIFIER */}
       {toastMessage && (
@@ -1677,17 +1191,26 @@ function KanbanCard({
         onClick={() => {
           onSelect(cad);
         }}
-        className="w-full py-1.5 rounded-xl border border-amber-500/25 bg-amber-500/5 hover:bg-amber-500/15 hover:text-white transition-all text-[9.5px] font-black text-amber-500 flex items-center justify-center gap-1 cursor-pointer shadow"
+        className="w-full py-1.5 rounded-xl border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb]/15 transition-all text-[9.5px] font-black text-[#c4c1fb] flex items-center justify-center gap-1 cursor-pointer shadow"
       >
-        <Cpu className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-        <span>Lanzar Herramientas Cliente</span>
+        <Cpu className="w-3.5 h-3.5 text-[#c4c1fb] animate-pulse" />
+        <span>Ver Expediente Completo</span>
       </button>
 
       {/* Footer controls quick shifts */}
-      <div className="flex gap-1.5 pt-2 border-t border-white/5">
-        {cad.currentPhase === "08_shortlist" && (
+      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
+        {/* Detalles button */}
+        <button
+          onClick={() => onSelect(cad)}
+          className="px-2 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb] hover:text-[#101415] text-[9px] font-bold text-[#c4c1fb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+          title="Ver expediente y detalles completos del candidato"
+        >
+          <Eye className="w-3 h-3 shrink-0" />
+          <span>Detalles</span>
+        </button>
+        {cad.currentPhase === "09_shortlist" && (
           <button
-            onClick={() => onTransition(cad.id, "09_entrevista_cliente")}
+            onClick={() => onTransition(cad.id, "10_entrevista_cliente")}
             className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/35 text-emerald-400 font-bold text-[9px] flex items-center justify-center gap-0.5 flex-grow cursor-pointer"
           >
             <span>Entrevista</span>
@@ -1695,16 +1218,16 @@ function KanbanCard({
           </button>
         )}
 
-        {cad.currentPhase === "09_entrevista_cliente" && (
+        {cad.currentPhase === "10_entrevista_cliente" && (
           <div className="flex gap-1 flex-grow">
             <button
-              onClick={() => onTransition(cad.id, "08_shortlist")}
+              onClick={() => onTransition(cad.id, "09_shortlist")}
               className="px-2 py-1 rounded bg-[#161a1b] border border-white/10 hover:bg-white/10 text-white font-bold text-[9px] flex-grow text-center transition-all cursor-pointer"
             >
               Shortlist
             </button>
             <button
-              onClick={() => onTransition(cad.id, "10_standby")}
+              onClick={() => onTransition(cad.id, "11_standby")}
               className="px-2 py-1 rounded bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/25 text-purple-400 font-bold text-[9px] flex-grow text-center transition-all cursor-pointer"
             >
               Stand-by
@@ -1712,9 +1235,9 @@ function KanbanCard({
           </div>
         )}
 
-        {cad.currentPhase === "10_standby" && (
+        {cad.currentPhase === "11_standby" && (
           <button
-            onClick={() => onTransition(cad.id, "09_entrevista_cliente")}
+            onClick={() => onTransition(cad.id, "10_entrevista_cliente")}
             className="px-2 py-1 rounded bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-stone-900 font-bold text-[9px] flex-grow text-center transition-all cursor-pointer"
           >
             Volver a Entrevista

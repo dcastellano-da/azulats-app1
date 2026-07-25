@@ -42,7 +42,8 @@ import {
   PlayCircle,
   Eye,
   Camera,
-  ChevronsRight
+  ChevronsRight,
+  HelpCircle
 } from "lucide-react";
 import { 
   EvaluacionCandidate, 
@@ -119,8 +120,10 @@ const mapPipelineToEvaluacionCandidates = (
       currentPhase = "05_screening";
     } else if (stateStr.includes("06") || stateStr.includes("assessment") || stateStr.includes("prueba")) {
       currentPhase = "06_assessment";
-    } else if (stateStr.includes("07") || stateStr.includes("descartado")) {
-      currentPhase = "07_descartado_interno";
+    } else if (stateStr.includes("07") || stateStr.includes("en_duda") || stateStr.includes("duda")) {
+      currentPhase = "07_en_duda_evaluacion";
+    } else if (stateStr.includes("08") || stateStr.includes("descartado")) {
+      currentPhase = "08_descartado_interno";
     } else {
       currentPhase = "05_screening";
     }
@@ -133,7 +136,7 @@ const mapPipelineToEvaluacionCandidates = (
     const entryDate = pipe.flujo?.fecha_ultimo_cambio || pipe.createdAt || new Date().toISOString();
     const email = cand?.email || "candidato@email.com";
     const contactNumber = cand?.telefono_movil || "+34 600 000 000";
-    const recruiterNotes = pipe.f1_descubrimiento?.notas_reclutador || cand?.notas_iniciales || undefined;
+    const recruiterNotes = pipe.f2_evaluacion?.notas_reclutador || pipe.evaluacion?.notas_reclutador || undefined;
 
     result.push({
       id: cand?.id || pipe.claves_conexion?.id_candidato || pipe.id,
@@ -176,9 +179,10 @@ export default function EvaluacionPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "lista">("kanban");
   const [isFullScreen, setIsFullScreen] = useState(false);
   
-  // Details slide-over
-  const [activeCandidate, setActiveCandidate] = useState<EvaluacionCandidate | null>(null);
-  const [activeTab, setActiveTab] = useState<"general" | "sintetizador" | "inconsistencias" | "preguntas" | "validador" | "copilot">("general");
+  // Navigation handler for detail page
+  const handleViewDetails = (cad: EvaluacionCandidate) => {
+    router.push(`/evaluacion/${cad.pipeId || cad.id}`);
+  };
   
   // Sorthing states (list view)
   const [sortField, setSortField] = useState<string>("score");
@@ -287,9 +291,6 @@ export default function EvaluacionPage() {
     setCandidates((prev) =>
       prev.map((c) => (c.id === id ? { ...c, currentPhase: targetPhase, lastActivity: `Estado cambiado a ${label}` } : c))
     );
-    if (activeCandidate && activeCandidate.id === id) {
-      setActiveCandidate((prev) => prev ? { ...prev, currentPhase: targetPhase, lastActivity: `Estado cambiado a ${label}` } : null);
-    }
 
     if (targetCandidate?.pipeId) {
       try {
@@ -312,7 +313,8 @@ export default function EvaluacionPage() {
     switch (phase) {
       case "05_screening": return "05 - Screening (Entrevista Inicial)";
       case "06_assessment": return "06 - Prueba / Assessment Técnico";
-      case "07_descartado_interno": return "07 - Descartado (Interno)";
+      case "07_en_duda_evaluacion": return "07 - En Duda Evaluación";
+      case "08_descartado_interno": return "08 - Descartado (Interno)";
     }
   };
 
@@ -327,7 +329,7 @@ export default function EvaluacionPage() {
     try {
       if (candidateToAdvance.pipeId) {
         const now = new Date().toISOString();
-        const nuevoEstado = "08_presentado_cliente";
+        const nuevoEstado = "09_presentado_cliente";
         const res = await actualizarPipelineAPI(candidateToAdvance.pipeId, {
           flujo: {
             estado_actual: nuevoEstado,
@@ -339,9 +341,6 @@ export default function EvaluacionPage() {
         });
         if (res.success) {
           setCandidates((prev) => prev.filter((c) => c.id !== candidateToAdvance.id));
-          if (activeCandidate?.id === candidateToAdvance.id) {
-            setActiveCandidate(null);
-          }
         }
       } else {
         setCandidates((prev) => prev.filter((c) => c.id !== candidateToAdvance.id));
@@ -384,32 +383,6 @@ export default function EvaluacionPage() {
     setTimeout(() => {
       setIsSimulatingCopilotRun(false);
       setSimulatedCopilotCompleted(true);
-      if (activeCandidate) {
-        setCandidates(prev => prev.map(c => c.id === activeCandidate.id ? {
-          ...c,
-          toolsDetails: {
-            ...c.toolsDetails,
-            copilot: {
-              ...c.toolsDetails.copilot,
-              completionRate: 95,
-              effortScore: 4.8,
-              summary: "Simulación de Codificación Completa con éxito. Desempeño sólido validado por el Evaluador Co-Pilot en tiempo real (métrica cruzada con requerimientos)."
-            }
-          }
-        } : c));
-        setActiveCandidate(prev => prev ? {
-          ...prev,
-          toolsDetails: {
-            ...prev.toolsDetails,
-            copilot: {
-              ...prev.toolsDetails.copilot,
-              completionRate: 95,
-              effortScore: 4.8,
-              summary: "Simulación de Codificación Completa con éxito. Desempeño sólido validado por el Evaluador Co-Pilot en tiempo real (métrica cruzada con requerimientos)."
-            }
-          }
-        } : null);
-      }
     }, 2500);
   };
 
@@ -420,34 +393,6 @@ export default function EvaluacionPage() {
       setIsSimulatingValidadorCheck(false);
       const isSuccess = Math.random() > 0.3;
       setSimulatedValidadorSuccess(isSuccess);
-      if (activeCandidate) {
-        setCandidates(prev => prev.map(c => c.id === activeCandidate.id ? {
-          ...c,
-          toolsDetails: {
-            ...c.toolsDetails,
-            validador: {
-              ...c.toolsDetails.validador,
-              verificationStatus: isSuccess ? "success" : "fail",
-              envStatus: isSuccess 
-                ? "Entorno de red verificado sin proxies sospechosos ni compartición de pantallas de terceros." 
-                : "Advertencia: Múltiples pantallas detectadas en llamadas de WebRTC activas."
-            }
-          }
-        } : c));
-        setActiveCandidate(prev => prev ? {
-          ...prev,
-          toolsDetails: {
-            ...prev.toolsDetails,
-            validador: {
-              ...prev.toolsDetails.validador,
-              verificationStatus: isSuccess ? "success" : "fail",
-              envStatus: isSuccess 
-                ? "Entorno de red verificado sin proxies sospechosos ni compartición de pantallas de terceros." 
-                : "Advertencia: Múltiples pantallas detectadas en llamadas de WebRTC activas."
-            }
-          }
-        } : null);
-      }
     }, 2000);
   };
 
@@ -518,7 +463,8 @@ export default function EvaluacionPage() {
   // Phase Counts
   const countScreening = candidates.filter((c) => c.currentPhase === "05_screening").length;
   const countAssessment = candidates.filter((c) => c.currentPhase === "06_assessment").length;
-  const countDescartados = candidates.filter((c) => c.currentPhase === "07_descartado_interno").length;
+  const countEnDuda = candidates.filter((c) => c.currentPhase === "07_en_duda_evaluacion").length;
+  const countDescartados = candidates.filter((c) => c.currentPhase === "08_descartado_interno").length;
 
   return (
     <div className={`relative min-h-screen bg-[#101415] text-white p-6 md:p-8 space-y-8 overflow-x-hidden transition-all duration-350 ${isFullScreen ? 'p-4' : ''}`}>
@@ -852,10 +798,10 @@ export default function EvaluacionPage() {
         </section>
 
         {/* Global Filter Bar */}
-        <section className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md flex flex-col xl:flex-row gap-4 justify-between items-center text-left">
-          <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-center">
+        <section className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md flex flex-col 2xl:flex-row gap-4 justify-between items-center text-left">
+          <div className="flex flex-col md:flex-row flex-wrap gap-3 w-full 2xl:w-auto items-center">
             {/* Search Input */}
-            <div className="relative w-full md:max-w-xs xl:w-72">
+            <div className="relative w-full md:max-w-xs 2xl:w-72">
               <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-[#879391]" />
               <input
                 type="text"
@@ -895,14 +841,15 @@ export default function EvaluacionPage() {
                   <option value="Todos" className="bg-[#15181a]">Todos los estados</option>
                   <option value="05_screening" className="bg-[#15181a]">05 - Screening</option>
                   <option value="06_assessment" className="bg-[#15181a]">06 - Assessment Técnico</option>
-                  <option value="07_descartado_interno" className="bg-[#15181a]">07 - Descartado (Interno)</option>
+                  <option value="07_en_duda_evaluacion" className="bg-[#15181a]">07 - En Duda Evaluación</option>
+                  <option value="08_descartado_interno" className="bg-[#15181a]">08 - Descartado (Interno)</option>
                 </select>
               </div>
             )}
           </div>
 
           {/* Toggle buttons for viewMode and Fullscreen */}
-          <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-end">
+          <div className="flex items-center flex-wrap gap-3 w-full 2xl:w-auto justify-center 2xl:justify-end shrink-0">
             <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 select-none">
               <button
                 onClick={() => setViewMode("kanban")}
@@ -935,16 +882,17 @@ export default function EvaluacionPage() {
                   ? "bg-[#6bd8cb]/15 border-[#6bd8cb]/30 text-[#6bd8cb] hover:bg-[#6bd8cb]/25 shadow-sm"
                   : "bg-white/5 border-white/10 text-[#c4c1fb]/80 hover:bg-white/10 hover:text-white"
               }`}
+              title={isFullScreen ? "Restaurar vista normal" : "Maximizar pantalla"}
             >
               {isFullScreen ? (
                 <>
                   <Minimize2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Restaurar</span>
+                  <span>Restaurar</span>
                 </>
               ) : (
                 <>
                   <Maximize2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Pantalla Completa</span>
+                  <span>Maximizar</span>
                 </>
               )}
             </button>
@@ -977,7 +925,7 @@ export default function EvaluacionPage() {
         {/* View Mode Content */}
         {viewMode === "kanban" ? (
           /* Kanban Board layout */
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 animate-fadeIn">
             
             {/* COLUMN 1: Screening */}
             <div 
@@ -997,7 +945,7 @@ export default function EvaluacionPage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "05_screening").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onAdvancePhase={handleAdvancePhase} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onAdvancePhase={handleAdvancePhase} onDragStart={handleDragStart} />
                 ))}
                 {countScreening === 0 && <EmptyColumnText text="Ningún programado" />}
               </div>
@@ -1021,21 +969,45 @@ export default function EvaluacionPage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "06_assessment").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onAdvancePhase={handleAdvancePhase} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onAdvancePhase={handleAdvancePhase} onDragStart={handleDragStart} />
                 ))}
                 {countAssessment === 0 && <EmptyColumnText text="Ningún assessment activo" />}
               </div>
             </div>
 
-            {/* COLUMN 3: Discarded */}
+            {/* COLUMN 3: En Duda */}
             <div 
               onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, "07_descartado_interno")}
+              onDrop={(e) => handleDrop(e, "07_en_duda_evaluacion")}
+              className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-amber-400 text-left"
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">07 - EN DUDA EVALUACIÓN</span>
+                  <span className="text-[10px] text-[#879391] mt-0.5">Requiere revisión adicional</span>
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-amber-400">
+                  {countEnDuda}
+                </span>
+              </div>
+
+              <div className="flex-grow space-y-3.5 overflow-y-auto">
+                {filteredCandidates.filter(c => c.currentPhase === "07_en_duda_evaluacion").map((cad) => (
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onAdvancePhase={handleAdvancePhase} onDragStart={handleDragStart} />
+                ))}
+                {countEnDuda === 0 && <EmptyColumnText text="Ningún candidato en duda" />}
+              </div>
+            </div>
+
+            {/* COLUMN 4: Discarded */}
+            <div 
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, "08_descartado_interno")}
               className="rounded-2xl border border-white/10 bg-white/[0.01] backdrop-blur-md flex flex-col p-4 space-y-4 min-h-[600px] border-t-[4px] border-t-rose-500 text-left"
             >
               <div className="flex justify-between items-center pb-2 border-b border-white/5">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase">07 - DESCARTADO (INTERNO)</span>
+                  <span className="text-xs font-bold text-white tracking-wide uppercase">08 - DESCARTADO (INTERNO)</span>
                   <span className="text-[10px] text-[#879391] mt-0.5">No cumple con barra mínima</span>
                 </div>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-rose-400">
@@ -1044,8 +1016,8 @@ export default function EvaluacionPage() {
               </div>
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
-                {filteredCandidates.filter(c => c.currentPhase === "07_descartado_interno").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={setActiveCandidate} onTransition={handleTransitionState} onAdvancePhase={handleAdvancePhase} onDragStart={handleDragStart} />
+                {filteredCandidates.filter(c => c.currentPhase === "08_descartado_interno").map((cad) => (
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onAdvancePhase={handleAdvancePhase} onDragStart={handleDragStart} />
                 ))}
                 {countDescartados === 0 && <EmptyColumnText text="Ningún descarte" />}
               </div>
@@ -1076,7 +1048,7 @@ export default function EvaluacionPage() {
                   <th className="px-5 py-4 cursor-pointer hover:text-white text-center" onClick={() => toggleSort("score")}>
                     Fit Score {renderSortIcon("score")}
                   </th>
-                  <th className="px-5 py-4 text-right">Acciones & Diagnóstico</th>
+                  <th className="px-5 py-4 text-right min-w-[440px]">Acciones & Diagnóstico</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-medium">
@@ -1090,7 +1062,13 @@ export default function EvaluacionPage() {
                   sortedListCandidates.map((cad) => (
                     <tr key={cad.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-5 py-4">
-                        <div className="font-bold text-white text-sm">{cad.name}</div>
+                        <button
+                          onClick={() => handleViewDetails(cad)}
+                          className="font-bold text-white text-sm hover:text-[#6bd8cb] cursor-pointer transition-colors text-left block hover:underline"
+                          title={`Ver expediente y detalles completos de ${cad.name}`}
+                        >
+                          {cad.name}
+                        </button>
                         <div className="text-[10px] text-[#879391] mt-0.5 flex items-center gap-1">
                           <MapPin className="w-3 h-3 text-[#6bd8cb]/70" />
                           {cad.location}
@@ -1130,14 +1108,11 @@ export default function EvaluacionPage() {
                           {cad.score}%
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-5 py-4 text-right min-w-[440px]">
                         <div className="flex items-center justify-end gap-1.5 text-[10px] flex-wrap">
                           {/* Detalles button */}
                           <button
-                            onClick={() => {
-                              setActiveCandidate(cad);
-                              setActiveTab("general");
-                            }}
+                            onClick={() => handleViewDetails(cad)}
                             className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0"
                             title="Ver expediente y detalles completos"
                           >
@@ -1147,10 +1122,7 @@ export default function EvaluacionPage() {
 
                           {/* Diagnóstico IA */}
                           <button
-                            onClick={() => {
-                              setActiveCandidate(cad);
-                              setActiveTab("sintetizador");
-                            }}
+                            onClick={() => handleViewDetails(cad)}
                             className="px-2.5 py-1 rounded border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0"
                             title="Diagnóstico Motor IA"
                           >
@@ -1181,7 +1153,18 @@ export default function EvaluacionPage() {
                             </button>
                           )}
 
-                          {cad.currentPhase === "07_descartado_interno" && (
+                          {cad.currentPhase === "07_en_duda_evaluacion" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "06_assessment")}
+                              title="Volver a Assessment"
+                              className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold hover:bg-amber-500 hover:text-stone-950 transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                              <span>Volver a Assessment</span>
+                            </button>
+                          )}
+
+                          {cad.currentPhase === "08_descartado_interno" && (
                             <button
                               onClick={() => handleTransitionState(cad.id, "05_screening")}
                               title="Reactivar candidato a 05 - Screening"
@@ -1201,11 +1184,23 @@ export default function EvaluacionPage() {
                             <UserCheck className="w-3.5 h-3.5 shrink-0" />
                             <span>Avanzar Fase</span>
                           </button>
+                          
+                          {/* Botón En Duda */}
+                          {cad.currentPhase !== "08_descartado_interno" && cad.currentPhase !== "07_en_duda_evaluacion" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "07_en_duda_evaluacion")}
+                              className="px-2.5 py-1 rounded border border-amber-500/20 bg-amber-500/5 text-amber-500 hover:bg-amber-500 hover:text-white font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                              title="Marcar en duda"
+                            >
+                              <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+                              <span>En Duda</span>
+                            </button>
+                          )}
 
                           {/* Rechazar / Descartar */}
-                          {cad.currentPhase !== "07_descartado_interno" && (
+                          {cad.currentPhase !== "08_descartado_interno" && (
                             <button
-                              onClick={() => handleTransitionState(cad.id, "07_descartado_interno")}
+                              onClick={() => handleTransitionState(cad.id, "08_descartado_interno")}
                               className="px-2 py-1 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-rose-400 font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0"
                               title="Descartar internamente"
                             >
@@ -1225,539 +1220,6 @@ export default function EvaluacionPage() {
 
       </div>
 
-      {/* Advanced AI Tools Panel / Drawer Sidebar */}
-      {activeCandidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end pointer-events-auto">
-          {/* Backdrop overlay */}
-          <div 
-            className="absolute inset-0 bg-[#000000]/60 backdrop-blur-sm transition-opacity duration-300 animate-fadeIn" 
-            onClick={() => setActiveCandidate(null)}
-          />
-
-          {/* Slider content drawer container */}
-          <aside className="absolute top-0 right-0 h-full w-full max-w-3xl bg-[#15181a] border-l border-white/10 shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] animate-slideIn">
-            
-            {/* Header */}
-            <div className="px-6 py-5 border-b border-white/10 bg-[#101415]/90 backdrop-blur-md flex justify-between items-center text-left">
-              <div>
-                <span className="text-[9px] font-mono text-[#6bd8cb] bg-[#6bd8cb]/15 px-2.5 py-0.5 rounded border border-[#6bd8cb]/25 uppercase font-bold tracking-widest inline-block mb-1">
-                  MÓDULO DE SELECCIÓN F2
-                </span>
-                <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <span>Expediente de {activeCandidate.name}</span>
-                  <span className="px-2 py-0.5 text-xs text-white/40 font-mono bg-white/5 rounded-md border border-white/10">
-                    {activeCandidate.id}
-                  </span>
-                </h2>
-                <p className="text-[10px] text-[#879391] mt-0.5">
-                  Herramientas operativas avanzadas y diagnóstico libre de sesgos en el filtro interno.
-                </p>
-              </div>
-              <button
-                onClick={() => setActiveCandidate(null)}
-                className="w-10 h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition-all text-[#c4c1fb] flex items-center justify-center cursor-pointer shrink-0"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* TAB SELECTORS */}
-            <nav className="flex items-center overflow-x-auto bg-[#101415]/40 border-b border-white/5 px-4 py-1 gap-1 select-none">
-              <button 
-                onClick={() => setActiveTab("general")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === "general" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                1. General & Info
-              </button>
-              <button 
-                onClick={() => setActiveTab("sintetizador")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "sintetizador" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <FileText className="w-3 h-3" />
-                <span>5. Sintetizador</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("inconsistencias")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "inconsistencias" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <AlertTriangle className="w-3 h-3 text-[#ffb4ab]" />
-                <span>6. Detector Crono</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("preguntas")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "preguntas" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <Zap className="w-3 h-3" />
-                <span>7. Preguntas STAR</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("validador")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "validador" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                <span>8. Validador Identidad</span>
-              </button>
-              <button 
-                onClick={() => setActiveTab("copilot")}
-                className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                  activeTab === "copilot" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-                }`}
-              >
-                <Code className="w-3 h-3 text-[#6bd8cb]" />
-                <span>Co-Pilot adaptativo</span>
-              </button>
-            </nav>
-
-            {/* TAB PREVIEW BODY */}
-            <div className="flex-grow overflow-y-auto p-6 space-y-6 text-white text-left">
-              
-              {/* TAB 1: GENERAL PROFILE DETAILS */}
-              {activeTab === "general" && (
-                <div className="space-y-6 animate-fadeIn">
-                  
-                  {/* Basic Card Profile Info */}
-                  <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.01] flex flex-col md:flex-row gap-5 items-start md:items-center">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#9b5de5] to-[#6bd8cb] p-0.5 shadow-md self-center">
-                      <div className="w-full h-full bg-[#15181a] rounded-2xl flex items-center justify-center text-xl font-extrabold text-[#6bd8cb]">
-                        {activeCandidate.name.charAt(0)}
-                      </div>
-                    </div>
-                    <div className="space-y-1 flex-grow">
-                      <h3 className="text-lg font-bold text-white">{activeCandidate.name}</h3>
-                      <p className="text-xs text-[#c4c1fb] font-semibold">{activeCandidate.role}</p>
-                      <div className="text-[10px] text-[#879391] flex items-center gap-1.5 flex-wrap">
-                        <span className="flex items-center gap-1 border border-white/5 bg-white/5 rounded px-2.5 py-0.5">
-                          <Building2 className="w-3 h-3" />
-                          {activeCandidate.client}
-                        </span>
-                        <span className="flex items-center gap-1 border border-white/5 bg-white/5 rounded px-2.5 py-0.5">
-                          <MapPin className="w-3 h-3" />
-                          {activeCandidate.location}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right self-stretch flex flex-col justify-between items-end gap-2 border-t border-white/5 md:border-t-0 pt-3.5 md:pt-0">
-                      <span className="text-[10px] text-[#879391] block uppercase font-extrabold tracking-widest">
-                        Fit Score
-                      </span>
-                      <div className="text-2xl font-black text-[#6bd8cb] bg-[#6bd8cb]/10 px-3 py-1.5 rounded-xl border border-[#6bd8cb]/20 font-mono">
-                        {activeCandidate.score}%
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Metadata fields */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-xl border border-white/5 bg-white/[0.01] space-y-1">
-                      <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold">Información de contacto</span>
-                      <div className="space-y-1.5 text-xs">
-                        <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-[#6bd8cb]" />{activeCandidate.contactNumber}</p>
-                        <p className="flex items-center gap-2 text-wrap truncate"><Mail className="w-3.5 h-3.5 text-[#c4c1fb]" />{activeCandidate.email}</p>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-xl border border-white/5 bg-white/[0.01] space-y-1">
-                      <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold">Estado actual & Retención</span>
-                      <div className="space-y-1 text-xs">
-                        <p className="font-semibold text-white">Estado: <span className="text-[#c4c1fb]">{getPhaseLabel(activeCandidate.currentPhase).substring(5)}</span></p>
-                        <p className="text-[#879391]">Ingresó al WIP: {new Date(activeCandidate.entryDate).toLocaleString()}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Decision workflow block */}
-                  <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02] space-y-3.5">
-                    <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
-                      <Zap className="w-4 h-4 text-[#6bd8cb]" />
-                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Avanzar o Modificar Fase</h4>
-                    </div>
-
-                    <p className="text-xs text-[#879391] leading-relaxed">
-                      Elige el estado del candidato en el flujo interno de evaluación técnica de la agencia:
-                    </p>
-
-                    <div className="flex flex-wrap gap-2.5 pt-1">
-                      <button
-                        onClick={() => handleTransitionState(activeCandidate.id, "05_screening")}
-                        disabled={activeCandidate.currentPhase === "05_screening"}
-                        className="px-3.5 py-2.5 rounded-xl border border-amber-500/25 bg-amber-500/5 text-amber-400 hover:bg-amber-500 hover:text-stone-950 font-bold text-xs disabled:opacity-30 disabled:hover:bg-amber-500/5 disabled:hover:text-amber-400 disabled:cursor-not-allowed transition-all cursor-pointer"
-                      >
-                        Mover a Screening
-                      </button>
-
-                      <button
-                        onClick={() => handleTransitionState(activeCandidate.id, "06_assessment")}
-                        disabled={activeCandidate.currentPhase === "06_assessment"}
-                        className="px-3.5 py-2.5 rounded-xl border border-[#6bd8cb]/25 bg-[#6bd8cb]/5 text-[#6bd8cb] hover:bg-[#6bd8cb] hover:text-[#101415] font-bold text-xs disabled:opacity-30 disabled:hover:bg-[#6bd8cb]/5 disabled:hover:text-[#6bd8cb] disabled:cursor-not-allowed transition-all cursor-pointer"
-                      >
-                        Mover a Assessment
-                      </button>
-
-                      <button
-                        onClick={() => handleTransitionState(activeCandidate.id, "07_descartado_interno")}
-                        disabled={activeCandidate.currentPhase === "07_descartado_interno"}
-                        className="px-3.5 py-2.5 rounded-xl border border-rose-500/25 bg-rose-500/5 text-rose-450 hover:bg-rose-550 hover:text-white font-bold text-xs disabled:opacity-30 disabled:hover:bg-rose-500/5 disabled:hover:text-rose-450 disabled:cursor-not-allowed transition-all cursor-pointer"
-                      >
-                        Marcar como Descartado
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-
-              {/* TAB 5: SINTETIZADOR DE ENTREVISTAS */}
-              {activeTab === "sintetizador" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-[11px] text-white/90">
-                    <span className="font-bold text-[#6bd8cb]">Herramienta 5: Sintetizador de Entrevistas</span>
-                    <p className="mt-0.5 text-[#879391] leading-relaxed">
-                      Cruza de forma inteligente el manuscrito de la llamada inicial del reclutador, sus notas improvisadas en la agenda y la descripción vacante de la búsqueda.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* PROS */}
-                    <div className="p-4.5 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.01] space-y-2">
-                      <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block">Puntos Fuertes (Pros)</span>
-                      <ul className="list-disc pl-4 text-xs space-y-1.5 text-white/80">
-                        {activeCandidate.toolsDetails.sintetizador.pros.map((pro, index) => (
-                          <li key={index}>{pro}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* CONTRAS */}
-                    <div className="p-4.5 rounded-xl border border-amber-500/10 bg-amber-500/[0.01] space-y-2">
-                      <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider block">Déficit o Brechas Técnicas (Cons)</span>
-                      <ul className="list-disc pl-4 text-xs space-y-1.5 text-white/80">
-                        {activeCandidate.toolsDetails.sintetizador.contras.map((con, index) => (
-                          <li key={index}>{con}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* RIESGOS */}
-                    <div className="p-4.5 rounded-xl border border-rose-500/10 bg-rose-500/[0.01] space-y-2">
-                      <span className="text-[10px] text-rose-400 font-bold uppercase tracking-wider block">Señales de Alerta (Riesgos)</span>
-                      <ul className="list-disc pl-4 text-xs space-y-1.5 text-white/80">
-                        {activeCandidate.toolsDetails.sintetizador.riesgos.map((risk, index) => (
-                          <li key={index}>{risk}</li>
-                        ))}
-                      </ul>
-                    </div>
-
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 6: DETECTOR DE INCONSISTENCIAS CRONOLOGICAS */}
-              {activeTab === "inconsistencias" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="p-4 rounded-xl border border-white/5 bg-rose-950/20 text-[11px] text-white/90">
-                    <span className="font-bold text-rose-450">Herramienta 6: Detector de Inconsistencias Cronológicas</span>
-                    <p className="mt-0.5 text-[#879391]">
-                      Analiza secuencias entre fechas de empleos listados en la hoja de vida (PDF/Doc) para alertar sobre huecos prolongados o solapamientos.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <span className="text-[10px] text-white/40 uppercase tracking-widest font-black block">Análisis de consistencia</span>
-                    
-                    {!activeCandidate.toolsDetails.inconsistencias.hasGaps && activeCandidate.toolsDetails.inconsistencias.overlaps.length === 0 ? (
-                      <div className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center flex flex-col items-center justify-center gap-2">
-                        <Check className="w-8 h-8 text-emerald-400" />
-                        <span className="text-xs font-bold text-white uppercase tracking-wider">Línea temporal impecable</span>
-                        <p className="text-xs text-[#879391] max-w-sm">No se detectaron brechas desocupadas ni períodos superpuestos en su trayectoria.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3.5">
-                        {/* Gaps */}
-                        {activeCandidate.toolsDetails.inconsistencias.gaps.map((gap, index) => (
-                          <div key={index} className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/[0.03] space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-rose-450 bg-rose-500/10 px-2 py-0.5 rounded font-black uppercase">Hueco temporal detectado</span>
-                              <span className="text-xs font-mono font-bold text-white">{gap.period} ({gap.duration})</span>
-                            </div>
-                            <p className="text-xs text-[#879391] italic">"{gap.description}"</p>
-                          </div>
-                        ))}
-
-                        {/* Overlaps */}
-                        {activeCandidate.toolsDetails.inconsistencias.overlaps.map((overlap, index) => (
-                          <div key={index} className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.03] space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded font-black uppercase">Solapamiento sospechoso</span>
-                              <span className="text-xs font-mono font-bold text-white">Alerta de doble ocupación</span>
-                            </div>
-                            <p className="text-xs text-[#879391] italic">"{overlap}"</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 7: GENERADOR DE PREGUNTAS TECNICAS (STAR) */}
-              {activeTab === "preguntas" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-[11px] text-white/90">
-                    <span className="font-bold text-[#6bd8cb]">Herramienta 7: Generador de Preguntas Técnicas STAR</span>
-                    <p className="mt-0.5 text-[#879391]">
-                      Formula dinámicamente tres preguntas de comportamiento y código cruzando el stack específico de su CV técnico con la descripción funcional.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <span className="text-[10px] text-white/40 uppercase tracking-widest font-black block">Preguntas de evaluación preparadas</span>
-
-                    {activeCandidate.toolsDetails.preguntas.map((q, idx) => (
-                      <div key={idx} className="p-4 rounded-xl border border-white/5 bg-white/[0.01] space-y-3">
-                        <div className="flex justify-between items-start gap-3">
-                          <span className="w-5 h-5 rounded-md bg-[#c4c1fb] text-[#101415] flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
-                            {idx + 1}
-                          </span>
-                          <span className="text-xs text-white leading-relaxed flex-grow text-left font-semibold">{q}</span>
-                        </div>
-                        <div className="pt-2 border-t border-white/5 flex items-center justify-between">
-                          <button
-                            onClick={() => handleCopyText(q, `q-${idx}`)}
-                            className="text-[9px] text-[#6bd8cb] hover:underline flex items-center gap-1 font-bold cursor-pointer"
-                          >
-                            <Copy className="w-2.5 h-2.5" />
-                            <span>{copiedTextType === `q-${idx}` ? "Copiado!" : "Copiar plantilla de pregunta"}</span>
-                          </button>
-                          <span className="text-[8px] uppercase tracking-wider font-extrabold text-[#c4c1fb]">Método STAR</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 8: VALIDADOR DE IDENTIDAD Y ENTORNO */}
-              {activeTab === "validador" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-[11px] text-white/90">
-                    <span className="font-bold text-[#6bd8cb]">Herramienta 8: Validador de Identidad y Entorno</span>
-                    <p className="mt-0.5 text-[#879391]">
-                      Chequeo asincrónico por IP, geolocalización latente y capturas de cámara web dinámicas para evitar fraude y verificar entorno de test limpio.
-                    </p>
-                  </div>
-
-                  {/* Simulator Trigger */}
-                  <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] flex items-center justify-between">
-                    <div className="space-y-1">
-                      <span className="text-xs font-bold text-white">Ejecutar Chequeo de Identidad</span>
-                      <p className="text-[10px] text-[#879391]">Sondea las conexiones WebRTC y valida fotograma de control.</p>
-                    </div>
-
-                    <button
-                      onClick={triggerValidadorSimulation}
-                      disabled={isSimulatingValidadorCheck}
-                      className="px-4 py-2 text-[10px] font-black rounded-xl bg-emerald-500 text-stone-950 font-bold hover:bg-emerald-400 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0"
-                    >
-                      {isSimulatingValidadorCheck ? (
-                        <>
-                          <RefreshCw className="w-3 h-3 animate-spin" />
-                          <span>Verificando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <PlayCircle className="w-3.5 h-3.5" />
-                          <span>Iniciar escaneo</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Diagnostic Details */}
-                  <div className="space-y-3.5 border-t border-white/5 pt-4">
-                    <span className="text-[10px] text-white/40 uppercase tracking-widest font-black block">Resultado de la verificación</span>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="p-4 rounded-lg bg-black/30 border border-white/5 space-y-1">
-                        <span className="text-[8px] text-[#879391] uppercase font-bold tracking-wider">Dirección IP Escaneada</span>
-                        <code className="text-xs font-mono text-[#6bd8cb] block">{activeCandidate.toolsDetails.validador.ip}</code>
-                      </div>
-                      <div className="p-4 rounded-lg bg-black/30 border border-white/5 space-y-1">
-                        <span className="text-[8px] text-[#879391] uppercase font-bold tracking-wider">Geolocalización declarada</span>
-                        <code className="text-xs font-mono text-[#c4c1fb] block">{activeCandidate.toolsDetails.validador.location}</code>
-                      </div>
-                    </div>
-
-                    {/* Status Alert box */}
-                    <div className={`p-4 rounded-xl border flex items-start gap-3 ${
-                      activeCandidate.toolsDetails.validador.verificationStatus === "success" ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" :
-                      activeCandidate.toolsDetails.validador.verificationStatus === "fail" ? "border-rose-500/20 bg-rose-500/5 text-rose-450" :
-                      "border-amber-500/20 bg-amber-500/5 text-amber-400"
-                    }`}>
-                      {activeCandidate.toolsDetails.validador.verificationStatus === "success" ? <ShieldCheck className="w-5 h-5 shrink-0" /> : <AlertTriangle className="w-5 h-5 shrink-0" />}
-                      <div className="space-y-1 text-xs">
-                        <p className="font-bold uppercase tracking-wider text-[10px]">
-                          {activeCandidate.toolsDetails.validador.verificationStatus === "success" ? "VERIFICADO - ENTORNO INTEGRIL" :
-                           activeCandidate.toolsDetails.validador.verificationStatus === "fail" ? "FALLÓ - POSIBLE FRAUDE DETECTADO" :
-                           "PENDIENTE DE CHEQUEO"}
-                        </p>
-                        <p className="text-[#879391] leading-normal">{activeCandidate.toolsDetails.validador.envStatus}</p>
-                      </div>
-                    </div>
-
-                    {/* CCTV camera capture simulation placeholder */}
-                    <div className="p-4 rounded-xl border border-white/5 bg-black/40 flex flex-col items-center justify-center space-y-3 relative overflow-hidden h-[180px]">
-                      <div className="absolute top-2 left-2 flex items-center gap-1 text-[8px] bg-rose-500 text-white font-bold px-1.5 py-0.5 rounded uppercase">
-                        <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping"></div>
-                        <span>Cámara en vivo (Captura al azar)</span>
-                      </div>
-
-                      {activeCandidate.toolsDetails.validador.verificationStatus === "fail" ? (
-                        <>
-                          <div className="w-12 h-12 bg-white/5 rounded-full border border-rose-500/40 flex items-center justify-center text-rose-400">
-                            <X className="w-6 h-6 animate-pulse" />
-                          </div>
-                          <span className="text-[10px] text-rose-300 font-bold uppercase tracking-wider">FALLA EN CHEQUEO VISUAL</span>
-                        </>
-                      ) : (
-                        <>
-                          <Camera className="w-12 h-12 text-[#6bd8cb] opacity-50" />
-                          <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1.5 leading-normal">
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Fotograma verificado con ID oficial</span>
-                          </span>
-                        </>
-                      )}
-                    </div>
-
-                  </div>
-                </div>
-              )}
-
-              {/* CO-PILOT ADAPTATIVO PAIR-PROGRAMMING */}
-              {activeTab === "copilot" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="p-4 rounded-xl border border-white/5 bg-indigo-950/20 text-[11px] text-white/90">
-                    <span className="font-bold text-[#c4c1fb]">Entorno de Pair-Programming Adaptativo (AI Co-Pilot)</span>
-                    <p className="mt-0.5 text-[#879391]">
-                      Colaboración en vivo de código (Live coding test) asistida por IA. Analiza métricas de dificultad, tiempo de resolución y calcula el esfuerzo real comparado con el estándar del equipo cliente.
-                    </p>
-                  </div>
-
-                  {/* Simulator action */}
-                  <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] flex items-center justify-between">
-                    <div className="space-y-1">
-                      <span className="text-xs font-bold text-white">Simular Sesión de Programación en Vivo</span>
-                      <p className="text-[10px] text-[#879391]">Ejecuta el asistente y analiza el rendimiento en tiempo real.</p>
-                    </div>
-
-                    <button
-                      onClick={triggerCopilotSimulation}
-                      disabled={isSimulatingCopilotRun}
-                      className="px-4 py-2 text-[10px] font-black rounded-xl bg-[#6bd8cb] text-[#101415] hover:bg-[#5bc2b5] transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5 shrink-0 shadow shadow-[#6bd8cb]/15"
-                    >
-                      {isSimulatingCopilotRun ? (
-                        <>
-                          <RefreshCw className="w-3 h-3 animate-spin" />
-                          <span>Procesando código...</span>
-                        </>
-                      ) : (
-                        <>
-                          <PlayCircle className="w-3.5 h-3.5" />
-                          <span>Lanzar Simulación</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Code Editor emulator block */}
-                  <div className="border border-white/10 bg-[#101415] rounded-xl overflow-hidden font-mono">
-                    <div className="flex justify-between items-center bg-white/5 px-4 py-2 border-b border-white/5 text-[10px] text-[#879391]">
-                      <span>sandbox_exercise.{activeCandidate.toolsDetails.copilot.languageUsed === "Rust / WebAssembly" ? "rs" : "tsx"}</span>
-                      <span className="text-[#6bd8cb]">LIVE_COMPILED_STABLE</span>
-                    </div>
-
-                    <div className="p-4 text-xs text-[#a5d6ff] text-left overflow-x-auto space-y-1 h-[140px] max-h-[140px]">
-                      {activeCandidate.toolsDetails.copilot.languageUsed === "Rust / WebAssembly" ? (
-                        <>
-                          <p><span className="text-rose-420">pub fn</span> <span className="text-[#d2a8ff]">optimize_memory_allocation</span>{"(buffer: &[u8]) -> Result<Vec<u8>, Error> {"}</p>
-                          <p className="pl-4"><span className="text-rose-420">let mut</span> {"processed_output = Vec::with_capacity(buffer.len());"}</p>
-                          <p className="pl-4 text-[#8b949e]">// AI assisted memory mapping and bound checks</p>
-                          <p className="pl-4"><span className="text-[#68b688]">for</span> {"chunk in buffer.chunks_exact(4) {"}</p>
-                          <p className="pl-8">{"processed_output.extend_from_slice(chunk);"}</p>
-                          <p className="pl-4">{"}"}</p>
-                          <p className="pl-4">{"Ok(processed_output)"}</p>
-                          <p>{"}"}</p>
-                        </>
-                      ) : (
-                        <>
-                          <p><span className="text-rose-420">export const</span> <span className="text-[#d2a8ff]">useMemoryCache</span>{" = (key: string, initialData: any) => {"}</p>
-                          <p className="pl-4"><span className="text-rose-420">const</span> {"[cached, setCached] = useState(initialData);"}</p>
-                          <p className="pl-4 text-[#8b949e]">// Auto-pilot dependency injection check</p>
-                          <p className="pl-4">{"useEffect(() => {"}</p>
-                          <p className="pl-8">{"globalCache.registerKey(key, cached);"}</p>
-                          <p className="pl-4">{"}, [key, cached]);"}</p>
-                          <p className="pl-4">{"return [cached, setCached];"}</p>
-                          <p>{"}"}</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Copilot performance stats metrics */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-white/5 pt-4">
-                    <div className="p-3.5 rounded-xl bg-white/[0.01] border border-white/5 flex flex-col justify-between">
-                      <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold">Nivel Dificultad</span>
-                      <span className="text-base font-bold text-white block mt-1">{activeCandidate.toolsDetails.copilot.difficultyLevel}</span>
-                    </div>
-                    <div className="p-3.5 rounded-xl bg-white/[0.01] border border-white/5 flex flex-col justify-between">
-                      <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold">Tasa Completación</span>
-                      <span className="text-base font-bold text-[#6bd8cb] block mt-1">{activeCandidate.toolsDetails.copilot.completionRate}%</span>
-                    </div>
-                    <div className="p-3.5 rounded-xl bg-white/[0.01] border border-white/5 flex flex-col justify-between">
-                      <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold">Esfuerzo Estimado</span>
-                      <span className="text-base font-bold text-[#c4c1fb] block mt-1">{activeCandidate.toolsDetails.copilot.effortScore} / 5 pts</span>
-                    </div>
-                  </div>
-
-                  {/* Summary commentary box */}
-                  <div className="p-4 rounded-xl border border-white/5 bg-[#15181a]">
-                    <span className="text-[10px] text-white/40 uppercase tracking-widest font-black block mb-1">Comentario del Evaluador Co-Pilot</span>
-                    <p className="text-xs text-[#879391] leading-relaxed italic">
-                      "{activeCandidate.toolsDetails.copilot.summary}"
-                    </p>
-                  </div>
-                </div>
-              )}
-
-            </div>
-
-            {/* Slider footer */}
-            <div className="px-6 py-4.5 border-t border-white/10 bg-[#101415]/90 backdrop-blur-md flex justify-between items-center">
-              <span className="text-[10px] text-[#879391] font-mono">
-                Sincronizado con base de datos de Maquetas
-              </span>
-              
-              <button
-                onClick={() => setActiveCandidate(null)}
-                className="px-5 py-2 rounded-xl text-xs font-black bg-white/5 border border-white/10 text-white hover:bg-white/10 cursor-pointer transition-all"
-              >
-                Cerrar expediente
-              </button>
-            </div>
-
-          </aside>
-        </div>
-      )}
 
       {/* Modal Emergente Mejorado: Confirmar Cambio de Fase a Cliente (Fase 3) */}
       {candidateToAdvance && (
@@ -1916,13 +1378,11 @@ function KanbanCard({
 
       {/* Advanced diagnostics trigger button */}
       <button
-        onClick={() => {
-          onSelect(cad);
-        }}
+        onClick={() => onSelect(cad)}
         className="w-full py-1.5 rounded-xl border border-[#c4c1fb]/25 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb]/15 hover:text-white transition-all text-[9.5px] font-black text-[#c4c1fb] flex items-center justify-center gap-1 cursor-pointer shadow shadow-[#4338ca]/5"
       >
         <Cpu className="w-3.5 h-3.5 text-[#c4c1fb] animate-pulse" />
-        <span>Abrir Diagnóstico IA</span>
+        <span>Ver Expediente Completo</span>
       </button>
 
       {/* Footer controls quick shifts: Detalles, Avanzar estado, Avanzar Fase, Rechazar */}
@@ -1960,7 +1420,18 @@ function KanbanCard({
           </button>
         )}
 
-        {cad.currentPhase === "07_descartado_interno" && (
+        {cad.currentPhase === "07_en_duda_evaluacion" && (
+          <button
+            onClick={() => onTransition(cad.id, "06_assessment")}
+            title="Volver a Assessment"
+            className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/25 text-amber-400 font-bold text-[9px] flex items-center justify-center gap-1 flex-grow cursor-pointer whitespace-nowrap"
+          >
+            <ChevronsRight className="w-3 h-3 shrink-0" />
+            <span>Volver a Assessment</span>
+          </button>
+        )}
+
+        {cad.currentPhase === "08_descartado_interno" && (
           <button
             onClick={() => onTransition(cad.id, "05_screening")}
             title="Reactivar candidato a 05 - Screening"
@@ -1982,9 +1453,9 @@ function KanbanCard({
         </button>
 
         {/* Discard button */}
-        {cad.currentPhase !== "07_descartado_interno" && (
+        {cad.currentPhase !== "08_descartado_interno" && (
           <button
-            onClick={() => onTransition(cad.id, "07_descartado_interno")}
+            onClick={() => onTransition(cad.id, "08_descartado_interno")}
             className="px-2 py-1 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-rose-400 text-[9px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
             title="Descartar internamente"
           >

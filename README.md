@@ -112,7 +112,7 @@ El **Módulo de Configuración** provee el control de personalización y operabi
 
 ### Módulo F: Talent Mixer (Postulantes)
 El **Talent Mixer** proporciona la bandeja de entrada inteligente para centralizar todo el padrón de postulantes ingresantes.
-*   **Bandeja Principal (/talento) en Formato Kanban:** Tablero Kanban responsive organizado en 4 columnas de progresión: `PENDIENTE`, `REVISADO`, `SELECCIONADO` y `DESCARTADO`, con soporte para interacciones Drag & Drop e indicadores de estado reactivos.
+*   **Bandeja Principal (/talento) en Formato Kanban:** Tablero Kanban responsive organizado en 4 columnas de progresión: `PENDIENTE`, `REVISADO`, `SELECCIONADO` y `DESCARTADO (NO SELECCIONAR)`, con soporte para interacciones Drag & Drop e indicadores de estado reactivos.
 *   **Asignación de Búsquedas Activas al SELECCIONAR:** Al mover a un candidato a la columna `SELECCIONADO`, el subtítulo cambia a "Candidatos en búsquedas" y se despliega un modal glassmorphic de asignación de vacantes. El modal permite asociar el candidato a un proceso de búsqueda activo, actualizando su estatus y creando de forma física la postulación dentro del pipeline de Descubrimiento en el estado inicial `01 - NUEVO EN REVISION`.
 *   **Consola DAW (Faders de Calificación IA):** Faders de ecualización analógicos simulados e interactivos dentro de la ficha de detalle (`/talento/[id]`) para calificar en caliente los scores de *Hard Skills*, *Soft Skills*, *Fit Cultural* y *Seniority Index*.
 *   **Slide-over de Alta de Candidato:** Formulario con etiquetas flotantes dinámicas, Drag-and-drop de archivos PDF, control estricto de consentimiento legal y captura inteligente para alertas de error `400 Bad Request` del servidor.
@@ -141,7 +141,9 @@ El **F1 Descubrimiento** brinda a los reclutadores el tablero maestro de sourcin
 
 ### Módulo H: F2 Evaluación (Pruebas Técnicas & Simulaciones IA)
 El **F2 Evaluación** gestiona la fase interna de validación técnica, entrevistas en profundidad y assessments interactivos libres de sesgo tecnológico.
-*   **Pipeline de Evaluación Kanban:** Tablero de control clasificado en 3 columnas de progresión técnica: `05 - Entrevista Inicial / screening`, `06 - Prueba / Assessment Técnico` y `07 - Descartado (Interno)`, provisto de interacciones *Drag & Drop* completas y actualización instantánea de fase.
+*   **Pipeline de Evaluación Kanban:** Tablero de control clasificado en **4 columnas** de progresión técnica: `05 - Entrevista Inicial / Screening`, `06 - Prueba / Assessment Técnico`, `07 - En Duda Evaluación` y `08 - Descartado (Interno)`, provisto de interacciones *Drag & Drop* completas, grid `xl:grid-cols-4` y actualización instantánea de fase.
+*   **Estado Intermedio "En Duda":** Nuevo estado `07_en_duda_evaluacion` (color ámbar) para candidatos que requieren revisión adicional antes de ser descartados. Botón de acción "En Duda" disponible en tarjetas Kanban y vista Lista Detallada.
+*   **Renumeración de Estado Descartado:** El estado anterior `07_descartado_interno` pasó a `08_descartado_interno` para acomodar el nuevo estado intermedio. Las transiciones de avance a F3 apuntan a `09_presentado_cliente`.
 *   **Métricas e Indicadores de Rendimiento de Evaluación:** Tarjetas analíticas de control para *WIP Cycle Time* promedio (horas activas acumuladas en evaluación), *cNPS* general de candidatos, e índice de aprobación *Pass-through Rate*. Adicionalmente, incluye alerta de sobrecarga operativa en color amarillo ámbar cuando el WIP supera los 10 candidatos activos.
 *   **Filtros de Búsqueda y Multi-Cliente:** Barra de filtrado dinámico para acotar y aislar candidatos por rol y cliente corporativo clave (ej. Telefónica, Santander, SEAT).
 *   **Slide-over Contenedor de Diagnóstico IA:** Cajón lateral deslizable e interactivo enfocado en herramientas cognitivas avanzadas libres de sesgos:
@@ -151,6 +153,13 @@ El **F2 Evaluación** gestiona la fase interna de validación técnica, entrevis
   - *Validador de Identidad y Entorno*: Chequeo asincrónico IP, geolocalización latente y capturas de cámara web simuladas con interfaz interactiva ("Iniciar escaneo") para prevenir fraudes.
   - *AI Co-Pilot Adaptive Pair Programming*: Entorno simulado de colaboración en vivo ("Live coding test") con visor de compilador de sandbox interactivo compatible con Rust/WASM y TypeScript, mostrando tasa de completación, dificultad y esfuerzo estimado.
 
+### Módulo I: F3 Cliente Evaluación (Presentación al Cliente & Calibración)
+El **F3 Cliente Evaluación** (`/presentacion`) administra la fase de presentación formal de expedientes y calibración técnica con los Hiring Managers del cliente corporativo.
+*   **Pipeline de Presentación Kanban y Lista:** Tablero de control clasificado en 3 columnas: `09 - Shortlist / Enviado a Cliente`, `10 - Entrevista con Cliente` y `11 - Stand-by / Back-up`, con soporte Drag & Drop, conmutador Kanban/Lista y pantalla completa.
+*   **Integración REST Backend Directa:** Conectado a Server Actions (`getBusquedasAPI`, `getCandidatosAPI`, `getPipelineAPI` y `actualizarPipelineAPI`) para consultar y actualizar en tiempo real el pipeline y los candidatos reales en la nube.
+*   **KPIs de Negocio:** Tarjetas de métricas de *Stakeholder Blockage Time*, *Calibration Accuracy*, *cNPS del Cliente* y alerta de saturación de cola (WIP > 10).
+*   **Consola de Herramientas de IA para Calibración (Slide-over):** Analítica de Entrevistas Zoom/Meet, Traductor y Estandarizador de Perfiles ATS, Generador de Executive Candidate Briefings por IA, Orquestador de Agendas Condicional y Bot Rastreador de SLA.
+
 ---
 
 ## Ejecución del Servidor Local and Tests
@@ -159,7 +168,7 @@ El **F2 Evaluación** gestiona la fase interna de validación técnica, entrevis
     ```bash
     npm install
     ```
-2.  **Arranca el servidor local de desarrollo:**
+2.  **ARRANCAR EL SERVIDOR LOCAL EN DESARROLLO ------------------------------------------**
     ```bash
     npm run dev
     ```
@@ -204,6 +213,29 @@ git add .
 git commit -m "Texto del cambio" 
 git push origin main
 ```
+
+*   **25/07/2026:** Creación de la Página Dedicada de Detalle de Candidato `/presentacion/[id]`:
+    *   **Navegación Standalone:** Se eliminó el contenedor deslizable lateral (slide-over) de `/presentacion` en favor de una página dedicada independiente `/presentacion/[id]` con arquitectura y maquetación homologadas a la página de Evaluación (`/evaluacion/[id]`).
+    *   **Historial y Línea de Tiempo SLA:** Integración de la trazabilidad de metadatos de pipeline, estados del backend e historial de cambios con indicador de horas de espera.
+    *   **Edición Multietapa de Notas:** Módulo de anotaciones para notas de Origen, F1 Descubrimiento, F2 Evaluación y F3 Presentación con guardado asíncrono en backend (`actualizarCandidatoAPI` y `actualizarPipelineAPI`).
+    *   **Suite Completa de Herramientas F3:** Adaptación a sistema de pestañas de todas las herramientascliente (Analítica Telemétrica Zoom, Traductor y Estandarizador ATS, Candidate Briefing Ejecutivo por IA, Orquestador de Agendas Condicional y Bot Rastreador de SLA).
+    *   **Graduación a Fase 4 Cierre:** Incorporación del modal interactivo de confirmación para graduar al candidato a Fase 4 Cierre (`11_oferta_extendida`) y redirección automatizada a `/cierre`.
+
+*   **25/07/2026:** Integración Backend en el Módulo "F4 Cierre del Proceso" (Cierre):
+    *   **Conexión a Servicios REST Backend:** Se eliminó el mockeo primario en `/cierre`, conectando la vista directamente a las Server Actions (`getBusquedasAPI`, `getCandidatosAPI`, `getPipelineAPI` y `actualizarPipelineAPI`).
+    *   **Carga Dinámica de Búsquedas:** El desplegable de *Búsqueda activa* se puebla en tiempo real desde el backend.
+    *   **Persistencia de Estados de Cierre:** Las transiciones entre columnas (`12_oferta_extendida`, `13_contratado`, `14_rechazado_cliente`, `15_candidato_se_baja`) persisten asíncronamente mutando `flujo.estado_actual` y `cierre.fecha_cierre` en el servidor.
+    *   **Preservación de Facilidades e IA ("OPERAR"):** Mantenimiento 100% operativo del slide-over interactivo con sus 5 componentes simulados (Motor Predictivo de Aceptación, Simulador Salarial Flexible, Generador de Contratos, Feedback Emocional/Estructurado y Cadencias Pre-Onboarding).
+    *   **Resiliencia Visual & Pruebas Unitarias:** Inserción de spinner de carga y banner de error con reintento, pasando con 100% de éxito la suite de pruebas automatizadas (`tests/cierre.test.js`).
+
+*   **25/07/2026:** Integración Backend en el Módulo "F3 Cliente Evaluación" (Presentación):
+    *   **Conexión a Servicios REST Backend:** Se eliminó la dependencia de mockups como fuente de datos primaria en `/presentacion`, conectando la vista con las Server Actions (`getBusquedasAPI`, `getCandidatosAPI`, `getPipelineAPI` y `actualizarPipelineAPI`).
+    *   **Carga Dinámica de Búsquedas y Filtros:** El selector de *Búsqueda activa* en la barra de filtros principal ahora carga dinámicamente el padrón real de vacantes desde el servidor.
+    *   **Persistencia de Estados de Pipeline:** Al arrastrar o reubicar postulantes entre las columnas Kanban o Lista (`09_shortlist`, `10_entrevista_cliente`, `11_standby`), la aplicación emite peticiones PATCH asíncronas vía `actualizarPipelineAPI` para actualizar `flujo.estado_actual` y `fecha_ultimo_cambio` en la base de datos de backend.
+    *   **Preservación de Herramientas Inteligentes de Cliente:** Mantenimiento operativo completo de la suite interactiva de herramientas en el slide-over ("Analítica de Entrevistas Zoom", "Traductor y Estandarizador de Perfiles ATS", "Generador de Candidate Briefings", "Orquestador de Agendas Condicional" y "Bot Rastreador de SLA").
+    *   **Homologación de Botón "Detalles":** Reemplazado el texto y diseño de "Lanzar Herramientas Cliente" / "Lanzar Herramientas IA" por el botón estandarizado **"Detalles"** con ícono `<Eye />` y estilos idénticos a la página de Evaluación tanto en la vista Kanban como en Lista Detallada.
+    *   **Resiliencia Visual:** Inserción de un spinner de sincronización de backend y banner de error con botón de reintento ante contingencias de red.
+    *   **Suite de Pruebas Unitarias:** Verificación de la suite de pruebas unitarias (`tests/presentacion.test.js`) con 100% de éxito (4/4 pruebas aprobadas) y compilación limpia sin errores de tipos en TypeScript.
 
 *   **25/07/2026:** Optimización de Usabilidad, Estandarización de Botones y Maquetación en Módulo F1 Descubrimiento:
     *   **Renombrado y Destacado de Campo backend `notas_reclutador`:** Integración del campo `notas_reclutador` en `PipelineItem.f1_descubrimiento` y mapeo en el modelo `SourcedCandidate`. En la interfaz se estandarizó su título a **"Notas Descubrimiento"** (en vista Kanban, tabla Lista Detallada y ficha de detalle `/descubrimiento/[id]`), ubicándolo prioritariamente por encima de las notas iniciales y con resplandor cyan glassmorphism.
@@ -317,7 +349,25 @@ git push origin main
     *   **Indicadores KPI de Negocio:** Cálculos automáticos de WIP Cycle Time, cNPS promedio e índice Pass-through Rate, con alertas visuales de sobrecarga (límite de 10 candidatos activos en cola).
     *   **Herramientas Operativas Avanzadas de IA:** Slide-over contextual con tabulación interactiva que alberga simuladores visuales para el Sintetizador de llamadas (Pros/Cons/Riesgos), Detector Cronológico (Gaps/Overlaps), Preguntas STAR con copiado rápido, Validador de Identidad/Entorno (IP/Geofencing/Cámara) y AI Co-Pilot (Entorno de Live Coding con sandbox en Rust y TSX).
     *   **Suite de Pruebas Unitarias:** Creación de `tests/evaluacion.test.js` bajo el framework nativo `node:test` para certificar la precisión del dataset inicial y el correcto cómputo de desviaciones en KPIs.
-    *   **Consistencia de Navegación Global:** Vinculación del acceso directo horizontal "F2 Evaluación" en los encabezados principales de Dashboard, Descubrimiento, Búsquedas, Talento, Configuración y Reclutamiento.
+*   **25/07/2026:** Nuevo Estado F2 `07 - En Duda Evaluación`, Renumeración Global de Pipeline y Renombrado en Talento:
+    *   **Nuevo Estado Intermedio en F2 Evaluación:** Incorporación del estado `07_en_duda_evaluacion` ("07 - EN DUDA EVALUACIÓN") entre Assessment y Descartado en el pipeline de Evaluación. Columna Kanban propia con color ámbar y botón "En Duda" disponible en tarjetas Kanban y vista Lista Detallada. El estado permite señalar candidatos que requieren revisión adicional sin descartarlos definitivamente.
+    *   **Renumeración Completa del Pipeline:** Para acomodar el nuevo estado, todos los estados subsiguientes fueron renumerados en cascada:
+        - F2 Evaluación: `07_descartado_interno` → `08_descartado_interno`
+        - F3 Presentación: `08_shortlist` → `09_shortlist` · `09_entrevista_cliente` → `10_entrevista_cliente` · `10_standby` → `11_standby`
+        - F4 Cierre: `11_oferta_extendida` → `12_oferta_extendida` · `12_contratado` → `13_contratado` · `13_rechazado_cliente` → `14_rechazado_cliente` · `14_candidato_se_baja` → `15_candidato_se_baja`
+        - Avance F2→F3: `08_presentado_cliente` → `09_presentado_cliente`
+        - Avance F3→F4: `11_oferta_extendida` → `12_oferta_extendida`
+        - Retroceso F4→F3 ("Volver a Fase Cliente"): `08_shortlist` → `09_shortlist`
+    *   **Grid Kanban F2 a 4 Columnas:** Actualización del layout Kanban de F2 Evaluación de `md:grid-cols-3` a `md:grid-cols-2 xl:grid-cols-4` para mostrar correctamente las 4 columnas (Screening, Assessment, En Duda, Descartado) sin ocultar ninguna.
+    *   **Renombrado en Talento:** La columna `DESCARTADO` en el Talent Mixer (`/talento`) fue renombrada a `DESCARTADO (NO SELECCIONAR)` para clarificar la intención de no reutilización del candidato en procesos activos.
+    *   **Consistencia Total y Tests:** Actualización de `src/lib/evaluacion.ts`, `src/lib/presentacion.ts`, `src/lib/cierre.ts`, todos los archivos de página y las suites de pruebas unitarias. Compilación TypeScript limpia y **33/33 tests aprobados**.
+
+*   **25/07/2026:** Integración de Servicios Backend y Navegación Dedicada en Módulos `/presentacion` y `/cierre`:
+    *   **Eliminación de Mocks y Conexión Backend:** Sustitución de datos simulados en `/presentacion` y `/cierre` por llamadas API reales (`getBusquedasAPI`, `getCandidatosAPI`, `getPipelineAPI`, `actualizarCandidatoAPI`, `actualizarPipelineAPI`).
+    *   **Páginas de Detalle Dedicadas (`/presentacion/[id]` y `/cierre/[id]`):** Creación de vistas de expedientes completos de candidatos para Fase 3 (Presentación) y Fase 4 (Cierre) con navegación mediante breadcrumbs y enlaces directos entre fases del pipeline.
+    *   **Nomenclatura y Controles:** Renombrado del botón "Pantalla Completa" a "Maximizar" en las vistas de Kanban y Lista Detallada. Reemplazo de los botones "Lanzar Herramientas Cliente" (en Presentación) y "OPERAR" (en Cierre) por botones con etiqueta "Detalles" e ícono `<Eye />` que dirigen a las rutas individuales de expediente.
+    *   **Facilidades IA de Cierre:** Integración de 5 herramientas operativas en la ficha `/cierre/[id]`: Motor Predictivo de Aceptación, Simulador Salarial Flexible, Generador de Carta Oferta / Contrato PDF, Generador de Feedback Empático de Employer Branding y Secuenciador Pre-Onboarding.
+    *   **Editor de Notas Multietapa:** Guardado asíncrono y persistencia de notas del reclutador en todas las etapas del pipeline (Inicial, F1, F2, F3, F4).
 
 *   **20/07/2026:** Integración de la Importación Asistida por IA (Módulo Postulantes):
     *   **Server Actions Ampliadas:** Incorporación de la Server Action `importarCandidatoIA_API(formData)` en `src/actions/candidatos.ts` para gestionar el enlace asíncrono y seguro con el endpoint `POST /api/v1/candidatos/importar-ia` inyectando JWT.

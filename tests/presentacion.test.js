@@ -15,7 +15,7 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
     assert.strictEqual(typeof first.role, 'string');
     assert.strictEqual(typeof first.client, 'string');
     assert.strictEqual(typeof first.score, 'number');
-    assert.ok(['08_shortlist', '09_entrevista_cliente', '10_standby'].includes(first.currentPhase));
+    assert.ok(['09_shortlist', '10_entrevista_cliente', '11_standby'].includes(first.currentPhase));
     
     // Tools details validation
     assert.ok(first.toolsDetails, 'Debe tener la sección toolsDetails');
@@ -35,7 +35,7 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
         client: 'Client-1',
         location: 'Madrid',
         score: 90,
-        currentPhase: '08_shortlist',
+        currentPhase: '09_shortlist',
         entryDate: new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString(), // 10 hours ago
         cNPS: 10,
         lastActivity: 'Active',
@@ -65,7 +65,7 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
         client: 'Client-1',
         location: 'Madrid',
         score: 85,
-        currentPhase: '09_entrevista_cliente', // excluded from blockage time, included in calibration accuracy
+        currentPhase: '10_entrevista_cliente', // excluded from blockage time, included in calibration accuracy
         entryDate: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
         cNPS: 6,
         lastActivity: 'Active',
@@ -95,7 +95,7 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
         client: 'Client-2',
         location: 'Madrid',
         score: 70,
-        currentPhase: '10_standby', // included in blockage time and calibration accuracy
+        currentPhase: '11_standby', // included in blockage time and calibration accuracy
         entryDate: new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(), // 30 hours ago
         cNPS: null, // should be excluded from cNPS average
         lastActivity: 'Inactive',
@@ -129,10 +129,10 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
     // 2. Check cNPS average: (10 + 6) / 2 = 8
     assert.strictEqual(kpis.avgCNPS, 8);
 
-    // 3. Check Blockage Time average: 08_shortlist (10h) and 10_standby (30h) -> (10 + 30) / 2 = 20 hours
+    // 3. Check Blockage Time average: 09_shortlist (10h) and 11_standby (30h) -> (10 + 30) / 2 = 20 hours
     assert.ok(Math.abs(kpis.blockageTimeHours - 20) < 0.2, `Expected blockage time around 20, got ${kpis.blockageTimeHours}`);
 
-    // 4. Check Calibration Accuracy: (09_entrevista_cliente (1) + 10_standby (1)) / activeWipCount (3) = 66.66% -> rounded: 67%
+    // 4. Check Calibration Accuracy: (10_entrevista_cliente (1) + 11_standby (1)) / activeWipCount (3) = 66.66% -> rounded: 67%
     assert.strictEqual(kpis.calibrationAccuracy, 67);
   });
 
@@ -144,7 +144,7 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
       client: 'Inditex',
       location: 'Spain',
       score: 75,
-      currentPhase: i % 3 === 0 ? '08_shortlist' : (i % 3 === 1 ? '09_entrevista_cliente' : '10_standby'),
+      currentPhase: i % 3 === 0 ? '09_shortlist' : (i % 3 === 1 ? '10_entrevista_cliente' : '11_standby'),
       entryDate: new Date().toISOString(),
       cNPS: 8,
       lastActivity: 'Ready',

@@ -6,13 +6,16 @@ export interface EvaluacionCandidate {
   client: string;
   location: string;
   score: number; // Fit rating 0-100
-  currentPhase: "05_screening" | "06_assessment" | "07_descartado_interno";
+  currentPhase: "05_screening" | "06_assessment" | "07_en_duda_evaluacion" | "08_descartado_interno";
   entryDate: string; // ISO string to check WIP bottleneck times
   cNPS?: number; // Candidate Net Promoter Score [1-10]
   lastActivity: string;
   experienceYears: number;
   contactNumber: string;
   email: string;
+  initialNotes?: string;
+  f1Notes?: string;
+  f2Notes?: string;
   recruiterNotes?: string;
   toolsDetails: {
     sintetizador: {
@@ -285,7 +288,7 @@ export const INITIAL_EVALUACION_CANDIDATES: EvaluacionCandidate[] = [
     client: "Inditex S.A.",
     location: "Madrid, España / Remoto",
     score: 68,
-    currentPhase: "07_descartado_interno",
+    currentPhase: "08_descartado_interno",
     entryDate: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
     cNPS: 5,
     lastActivity: "Descartado internamente. Brecha de habilidades técnicas alta.",
@@ -346,7 +349,7 @@ export interface EvaluacionKPIs {
 export function calculateEvaluacionKPIs(candidates: EvaluacionCandidate[]): EvaluacionKPIs {
   // WIP Count represents candidates who are actively in screening (05) or assessment (06).
   const wipCandidates = candidates.filter(
-    (c) => c.currentPhase === "05_screening" || c.currentPhase === "06_assessment"
+    (c) => c.currentPhase === "05_screening" || c.currentPhase === "06_assessment" || c.currentPhase === "07_en_duda_evaluacion"
   );
   
   const activeWipCount = wipCandidates.length;
@@ -375,10 +378,10 @@ export function calculateEvaluacionKPIs(candidates: EvaluacionCandidate[]): Eval
   // or those who have stayed active represent their pass-through ability.
   // Formula: Percentage of candidates evaluated (06 + any sent beyond) out of all non-discarded (05 + 06).
   const totalScreened = candidates.filter(
-    (c) => c.currentPhase === "05_screening" || c.currentPhase === "06_assessment"
+    (c) => c.currentPhase === "05_screening" || c.currentPhase === "06_assessment" || c.currentPhase === "07_en_duda_evaluacion"
   ).length;
   
-  const passedToAssessment = candidates.filter((c) => c.currentPhase === "06_assessment").length;
+  const passedToAssessment = candidates.filter((c) => c.currentPhase === "06_assessment" || c.currentPhase === "07_en_duda_evaluacion").length;
   const passThroughRate = totalScreened > 0 ? Math.round((passedToAssessment / totalScreened) * 100) : 0;
 
   return {

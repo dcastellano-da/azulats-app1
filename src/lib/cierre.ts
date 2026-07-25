@@ -1,11 +1,16 @@
+import { PipelineItem } from "@/actions/pipeline";
+import { Candidato } from "@/actions/candidatos";
+import { Busqueda } from "@/actions/busquedas";
+
 export interface CierreCandidate {
   id: string;
+  pipeId?: string;
   name: string;
   role: string;
   client: string;
   location: string;
   score: number; // Fit rating 0-100
-  currentPhase: "11_oferta_extendida" | "12_contratado" | "13_rechazado_cliente" | "14_candidato_se_baja";
+  currentPhase: "12_oferta_extendida" | "13_contratado" | "14_rechazado_cliente" | "15_candidato_se_baja";
   entryDate: string; // ISO string when candidate entered the phase
   offerDate: string; // ISO string when offer was extended
   closedDate?: string; // ISO string when flow became final (Won/Lost/Drop-out)
@@ -15,6 +20,12 @@ export interface CierreCandidate {
   contactNumber: string;
   email: string;
   feedbackStatus: "pendiente" | "entregado_manual" | "automatizado";
+  initialNotes?: string;
+  f1Notes?: string;
+  f2Notes?: string;
+  f3Notes?: string;
+  f4Notes?: string;
+  recruiterNotes?: string;
   salaryDetails: {
     baseSalary: number; // Yearly gross in Euros
     expectedSalary: number; // Candidate's expected yearly gross
@@ -46,6 +57,134 @@ export interface CierreCandidate {
   };
 }
 
+export const generateDefaultCierreToolsDetails = (candName: string, role: string, score: number) => {
+  return {
+    salaryDetails: {
+      baseSalary: 50000,
+      expectedSalary: 52000,
+      bonusAnnual: 3000,
+      benefitsValue: 1500
+    },
+    toolsDetails: {
+      predictiveMotor: {
+        baseProbability: score > 85 ? 78 : 65,
+        adjustedProbability: score > 85 ? 78 : 65,
+        riskFactors: [
+          "Monitoreo de posibles contraofertas de retención.",
+          "Verificación de fecha de preaviso e incorporación."
+        ],
+        mitigationActionSelected: false
+      },
+      feedbackWriter: {
+        reasonsForReject: "",
+        generatedFeedback: "",
+        isSent: false
+      },
+      contractGenerator: {
+        generated: false,
+        contractType: "Indefinido - Tiempo Completo",
+        startDate: "2026-09-01"
+      },
+      preOnboard: {
+        cadenceSteps: [
+          { day: "Día +1", title: `Bienvenida ejecutiva a ${candName}`, status: "scheduled" as const, previewText: `Hola ${candName}, te damos la bienvenida al proceso de incorporación...` },
+          { day: "Día +7", title: "Contacto de pre-onboarding con el equipo", status: "scheduled" as const, previewText: "Coordinación de entrega de equipo y accesos corporativos..." }
+        ],
+        ghostingRisk: "Bajo" as const
+      }
+    }
+  };
+};
+
+export const mapPipelineToCierreCandidates = (
+  pipelineItems: PipelineItem[],
+  candidatosList: Candidato[],
+  busquedasList: Busqueda[]
+): CierreCandidate[] => {
+  const candMap = new Map(candidatosList.map(c => [c.id, c]));
+  const busqMap = new Map(busquedasList.map(b => [b.id, b]));
+
+  const result: CierreCandidate[] = [];
+
+  for (const pipe of pipelineItems) {
+    const cand = candMap.get(pipe.claves_conexion?.id_candidato);
+    const busq = busqMap.get(pipe.claves_conexion?.id_busqueda);
+
+    const stateStr = (pipe.flujo?.estado_actual || "").toLowerCase();
+
+    // Map pipeline states to Cierre phases (12_oferta_extendida, 13_contratado, 14_rechazado_cliente, 15_candidato_se_baja)
+    let currentPhase: CierreCandidate["currentPhase"] | null = null;
+    if (stateStr.includes("11") || stateStr.includes("oferta") || stateStr.includes("negociacion")) {
+      currentPhase = "12_oferta_extendida";
+    } else if (stateStr.includes("12") || stateStr.includes("contratado") || stateStr.includes("won") || stateStr.includes("ganado") || stateStr.includes("cierre")) {
+      currentPhase = "13_contratado";
+    } else if (stateStr.includes("13") || stateStr.includes("rechazado") || stateStr.includes("lost")) {
+      currentPhase = "14_rechazado_cliente";
+    } else if (stateStr.includes("14") || stateStr.includes("baja") || stateStr.includes("drop")) {
+      currentPhase = "15_candidato_se_baja";
+    }
+
+    if (!currentPhase) {
+      continue;
+    }
+
+    const candName = cand?.nombre_completo || "Candidato";
+    const role = cand?.puesto || busq?.perfil_busqueda || "Especialista Tech";
+    const client = busq?.cliente || "Cliente";
+    const location = cand?.ubicacion || "España / Remoto";
+    const score = pipe.f1_descubrimiento?.analisis_semantico?.fit_score ?? pipe.f2_evaluacion?.puntaje_tecnico ?? pipe.evaluacion?.puntaje_tecnico ?? 88;
+    const entryDate = pipe.flujo?.fecha_ultimo_cambio || pipe.createdAt || new Date().toISOString();
+    const offerDate = pipe.cierre?.fecha_cierre || entryDate;
+    const closedDate = currentPhase !== "12_oferta_extendida" ? (pipe.cierre?.fecha_cierre || entryDate) : undefined;
+    const email = cand?.email || "candidato@email.com";
+    const contactNumber = cand?.telefono_movil || "+34 600 000 000";
+
+    const initialNotes = cand?.notas_iniciales || "";
+    const f1Notes = pipe.f1_descubrimiento?.notas_reclutador || "";
+    const f2Notes = pipe.f2_evaluacion?.notas_reclutador || pipe.evaluacion?.notas_reclutador || "";
+    const f3Notes = (pipe as any)?.f3_presentacion?.notas_reclutador || 
+                    (pipe as any)?.presentacion?.notas_reclutador || 
+                    (pipe as any)?.f3_cliente?.notas_reclutador || 
+                    (pipe as any)?.f3?.notas_reclutador || "";
+    const f4Notes = (pipe as any)?.f4_cierre?.notas_reclutador || (pipe as any)?.cierre?.notas_reclutador || "";
+
+    const defaults = generateDefaultCierreToolsDetails(candName, role, score);
+
+    result.push({
+      id: cand?.id || pipe.claves_conexion?.id_candidato || pipe.id,
+      pipeId: pipe.id,
+      name: candName,
+      role,
+      client,
+      location,
+      score,
+      currentPhase,
+      entryDate,
+      offerDate,
+      closedDate,
+      cNPS: 9,
+      lastActivity: pipe.flujo?.fecha_ultimo_cambio 
+        ? `Último cambio: ${new Date(pipe.flujo.fecha_ultimo_cambio).toLocaleDateString("es-ES")}` 
+        : "Registro de cierre sincronizado desde backend",
+      experienceYears: 5,
+      contactNumber,
+      email,
+      feedbackStatus: "pendiente",
+      initialNotes,
+      f1Notes,
+      f2Notes,
+      f3Notes,
+      f4Notes,
+      recruiterNotes: f4Notes || f3Notes || f2Notes,
+      salaryDetails: defaults.salaryDetails,
+      toolsDetails: defaults.toolsDetails
+    });
+  }
+
+  return result;
+};
+
+
 // Initial mock dataset for closing (Cierre) process
 export const INITIAL_CIERRE_CANDIDATES: CierreCandidate[] = [
   {
@@ -55,7 +194,7 @@ export const INITIAL_CIERRE_CANDIDATES: CierreCandidate[] = [
     client: "Inditex S.A.",
     location: "A Coruña, España / Remoto",
     score: 89,
-    currentPhase: "11_oferta_extendida",
+    currentPhase: "12_oferta_extendida",
     entryDate: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(), // 36 hours ago
     offerDate: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
     lastActivity: "Propuesta formal enviada. Esperando negociación del esquema flexible.",
@@ -105,7 +244,7 @@ export const INITIAL_CIERRE_CANDIDATES: CierreCandidate[] = [
     client: "Telefónica S.A.",
     location: "Madrid, España / Híbrido",
     score: 91,
-    currentPhase: "11_oferta_extendida",
+    currentPhase: "12_oferta_extendida",
     entryDate: new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString(), // 50 hours ago (>48h latency warning)
     offerDate: new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString(),
     lastActivity: "Borrador de propuesta extendido verbalmente. Ajustes en variables pendientes.",
@@ -155,7 +294,7 @@ export const INITIAL_CIERRE_CANDIDATES: CierreCandidate[] = [
     client: "SEAT S.A.",
     location: "Barcelona, España / Híbrido",
     score: 96,
-    currentPhase: "12_contratado",
+    currentPhase: "13_contratado",
     entryDate: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
     offerDate: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
     closedDate: new Date(Date.now() - 40 * 60 * 60 * 1000).toISOString(), // 32 hours latency
@@ -206,7 +345,7 @@ export const INITIAL_CIERRE_CANDIDATES: CierreCandidate[] = [
     client: "Inditex S.A.",
     location: "Madrid, España / Remoto",
     score: 85,
-    currentPhase: "12_contratado",
+    currentPhase: "13_contratado",
     entryDate: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
     offerDate: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
     closedDate: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(), // 24 hours latency
@@ -255,7 +394,7 @@ export const INITIAL_CIERRE_CANDIDATES: CierreCandidate[] = [
     client: "Telefónica S.A.",
     location: "Madrid, España",
     score: 79,
-    currentPhase: "13_rechazado_cliente",
+    currentPhase: "14_rechazado_cliente",
     entryDate: new Date(Date.now() - 120 * 60 * 60 * 1000).toISOString(),
     offerDate: new Date(Date.now() - 120 * 60 * 60 * 1000).toISOString(),
     closedDate: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
@@ -300,7 +439,7 @@ export const INITIAL_CIERRE_CANDIDATES: CierreCandidate[] = [
     client: "Banco Santander",
     location: "Madrid, España / Remoto",
     score: 88,
-    currentPhase: "14_candidato_se_baja",
+    currentPhase: "15_candidato_se_baja",
     entryDate: new Date(Date.now() - 144 * 60 * 60 * 1000).toISOString(),
     offerDate: new Date(Date.now() - 144 * 60 * 60 * 1000).toISOString(),
     closedDate: new Date(Date.now() - 100 * 60 * 60 * 1000).toISOString(), // Latency of 44 hours
@@ -347,24 +486,24 @@ export interface CierreKPIs {
   offerAcceptanceRate: number; // Hired(12) / Resolved Hires (Hired(12) + DropOut(14)) * 100
   avgDecisionLatencyHours: number; // Avg latency of offer closure in hours
   feedbackClosureRate: number; // (Manual feedbacks / Lost + DropOuts) * 100
-  activeClosingWipCount: number; // Number of active negos (11_oferta_extendida)
+  activeClosingWipCount: number; // Number of active negos (12_oferta_extendida)
   isWipOverloaded: boolean; // True if active negos > 5
 }
 
 export function calculateCierreKPIs(candidates: CierreCandidate[]): CierreKPIs {
   // Count active WIP (candidates under offer extension, phase 11)
-  const activeClosingWipCount = candidates.filter(c => c.currentPhase === "11_oferta_extendida").length;
+  const activeClosingWipCount = candidates.filter(c => c.currentPhase === "12_oferta_extendida").length;
   const isWipOverloaded = activeClosingWipCount > 5;
 
-  // 1. Offer Acceptance Rate (OAR) = 12_contratado / (12_contratado + 14_candidato_se_baja) * 100
-  const contractedCount = candidates.filter(c => c.currentPhase === "12_contratado").length;
-  const dropOutCount = candidates.filter(c => c.currentPhase === "14_candidato_se_baja").length;
+  // 1. Offer Acceptance Rate (OAR) = 13_contratado / (13_contratado + 15_candidato_se_baja) * 100
+  const contractedCount = candidates.filter(c => c.currentPhase === "13_contratado").length;
+  const dropOutCount = candidates.filter(c => c.currentPhase === "15_candidato_se_baja").length;
   const resolvedOffersCount = contractedCount + dropOutCount;
   const offerAcceptanceRate = resolvedOffersCount > 0 ? Math.round((contractedCount / resolvedOffersCount) * 100) : 0;
 
   // 2. Average Decision Latency: average hours from offerDate to closedDate for all resolved candidates (12, 13, 14)
   const resolvedCandidates = candidates.filter(
-    c => (c.currentPhase === "12_contratado" || c.currentPhase === "13_rechazado_cliente" || c.currentPhase === "14_candidato_se_baja") && c.closedDate
+    c => (c.currentPhase === "13_contratado" || c.currentPhase === "14_rechazado_cliente" || c.currentPhase === "15_candidato_se_baja") && c.closedDate
   );
   
   let totalLatencyHours = 0;
@@ -384,7 +523,7 @@ export function calculateCierreKPIs(candidates: CierreCandidate[]): CierreKPIs {
     : 0;
 
   // 3. Feedback Closure Rate = (Rejected (13) + Dropouts (14) with feedbackStatus === 'entregado_manual') / Total (13 + 14) * 100
-  const rejectedPool = candidates.filter(c => c.currentPhase === "13_rechazado_cliente" || c.currentPhase === "14_candidato_se_baja");
+  const rejectedPool = candidates.filter(c => c.currentPhase === "14_rechazado_cliente" || c.currentPhase === "15_candidato_se_baja");
   const manualFeedbackCount = rejectedPool.filter(c => c.feedbackStatus === "entregado_manual").length;
   const feedbackClosureRate = rejectedPool.length > 0 
     ? Math.round((manualFeedbackCount / rejectedPool.length) * 100) 

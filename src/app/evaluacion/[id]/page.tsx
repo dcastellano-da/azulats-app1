@@ -7,11 +7,10 @@ import { useAuth } from "@/context/AuthContext";
 import { 
   Building2, 
   MapPin, 
-  ChevronRight, 
   Ban, 
   AlertCircle, 
-  Clock, 
-  Check, 
+  Clock,
+  Check,
   Copy, 
   UserCheck, 
   RefreshCw, 
@@ -26,18 +25,19 @@ import {
   Code,
   Zap,
   AlertTriangle,
-  PlayCircle,
-  Camera,
   Phone,
   Mail,
-  Eye
+  Star,
+  ChevronRight,
+  Compass,
+  HelpCircle
 } from "lucide-react";
 
 // Backend API Actions
-import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
-import { getCandidatosAPI, Candidato } from "@/actions/candidatos";
+import { getBusquedasAPI } from "@/actions/busquedas";
+import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, actualizarPipelineAPI } from "@/actions/pipeline";
-import { EvaluacionCandidate, calculateEvaluacionKPIs } from "@/lib/evaluacion";
+import { EvaluacionCandidate } from "@/lib/evaluacion";
 
 const generateDefaultToolsDetails = (candName: string, role: string, score: number) => {
   const isRust = role.toLowerCase().includes("rust") || role.toLowerCase().includes("architect");
@@ -59,8 +59,8 @@ const generateDefaultToolsDetails = (candName: string, role: string, score: numb
     },
     inconsistencias: {
       hasGaps: false,
-      gaps: [],
-      overlaps: []
+      gaps: [] as { period: string; duration: string; description: string }[],
+      overlaps: [] as string[]
     },
     preguntas: [
       `¿Cómo abordas la optimización y escalabilidad en arquitecturas para ${role}?`,
@@ -84,6 +84,8 @@ const generateDefaultToolsDetails = (candName: string, role: string, score: numb
   };
 };
 
+type DiagTab = "sintetizador" | "inconsistencias" | "preguntas" | "validador" | "copilot";
+
 export default function EvaluacionDetallePage() {
   const params = useParams();
   const router = useRouter();
@@ -97,15 +99,21 @@ export default function EvaluacionDetallePage() {
   const [error, setError] = useState<string | null>(null);
 
   // Active Tab for AI Diagnostic Tools
-  const [activeTab, setActiveTab] = useState<"general" | "sintetizador" | "inconsistencias" | "preguntas" | "validador" | "copilot">("general");
+  const [activeTab, setActiveTab] = useState<DiagTab>("sintetizador");
 
-  // Editing state for Recruiter Notes
+  // Editing state for Recruiter Notes across all phases
   const [isEditingNotes, setIsEditingNotes] = useState(false);
-  const [editRecruiterNotes, setEditRecruiterNotes] = useState("");
+  const [editInitialNotes, setEditInitialNotes] = useState("");
+  const [editF1Notes, setEditF1Notes] = useState("");
+  const [editF2Notes, setEditF2Notes] = useState("");
   const [isSavingNotes, setIsSavingNotes] = useState(false);
 
   // Simulation states
   const [copiedTextType, setCopiedTextType] = useState<string | null>(null);
+
+  // Phase 3 Advance Modal State
+  const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
+  const [isAdvancingPhase, setIsAdvancingPhase] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -125,7 +133,6 @@ export default function EvaluacionDetallePage() {
         candidatesList = candidatesRes.data;
       }
 
-      // Fetch pipeline items across active searches
       let pipeItems: PipelineItem[] = [];
       if (searches.length > 0) {
         const promises = searches.map(s => getPipelineAPI(s.id));
@@ -137,7 +144,6 @@ export default function EvaluacionDetallePage() {
         });
       }
 
-      // Match pipeline item by pipeId or candidate id
       let targetPipe = pipeItems.find(p => p.id === id || p.claves_conexion?.id_candidato === id);
       let targetCand = candidatesList.find(c => c.id === id || (targetPipe && c.id === targetPipe.claves_conexion?.id_candidato));
 
@@ -154,8 +160,10 @@ export default function EvaluacionDetallePage() {
           currentPhase = "05_screening";
         } else if (stateStr.includes("06") || stateStr.includes("assessment") || stateStr.includes("prueba")) {
           currentPhase = "06_assessment";
-        } else if (stateStr.includes("07") || stateStr.includes("descartado")) {
-          currentPhase = "07_descartado_interno";
+        } else if (stateStr.includes("07") || stateStr.includes("en_duda") || stateStr.includes("duda")) {
+          currentPhase = "07_en_duda_evaluacion";
+        } else if (stateStr.includes("08") || stateStr.includes("descartado")) {
+          currentPhase = "08_descartado_interno";
         }
 
         const candName = cObj?.nombre_completo || "Candidato";
@@ -163,7 +171,10 @@ export default function EvaluacionDetallePage() {
         const client = bObj?.cliente || "Cliente General";
         const location = cObj?.ubicacion || "España / Remoto";
         const score = targetPipe?.f1_descubrimiento?.analisis_semantico?.fit_score ?? targetPipe?.evaluacion?.puntaje_tecnico ?? 88;
-        const notes = targetPipe?.f1_descubrimiento?.notas_reclutador || cObj?.notas_iniciales || "";
+        
+        const initialNotes = cObj?.notas_iniciales || "";
+        const f1Notes = targetPipe?.f1_descubrimiento?.notas_reclutador || "";
+        const f2Notes = targetPipe?.f2_evaluacion?.notas_reclutador || targetPipe?.evaluacion?.notas_reclutador || "";
 
         const item: EvaluacionCandidate = {
           id: cObj?.id || targetPipe?.claves_conexion?.id_candidato || id,
@@ -182,13 +193,18 @@ export default function EvaluacionDetallePage() {
           experienceYears: 5,
           contactNumber: cObj?.telefono_movil || "+34 600 000 000",
           email: cObj?.email || "candidato@email.com",
-          recruiterNotes: notes,
+          initialNotes,
+          f1Notes,
+          f2Notes,
+          recruiterNotes: f2Notes,
           toolsDetails: generateDefaultToolsDetails(candName, role, score)
         };
 
         setCand(item);
         setActivePipelineItem(targetPipe || null);
-        setEditRecruiterNotes(notes);
+        setEditInitialNotes(initialNotes);
+        setEditF1Notes(f1Notes);
+        setEditF2Notes(f2Notes);
       } else {
         setError("No se encontró el expediente del candidato en el pipeline de evaluación.");
       }
@@ -208,20 +224,30 @@ export default function EvaluacionDetallePage() {
     if (!cand) return;
     setIsSavingNotes(true);
     try {
-      if (cand.pipeId) {
-        const res = await actualizarPipelineAPI(cand.pipeId, {
-          f1_descubrimiento: {
-            notas_reclutador: editRecruiterNotes.trim()
-          }
+      // 1. Update Candidate initial notes in backend
+      if (cand.id) {
+        await actualizarCandidatoAPI(cand.id, {
+          notas_iniciales: editInitialNotes.trim()
         });
-        if (!res.success) {
-          console.warn("Warn saving notes in backend:", res.message);
-        }
       }
-      setCand(prev => prev ? { ...prev, recruiterNotes: editRecruiterNotes.trim() } : null);
+      // 2. Update Pipeline F1 and F2 notes in backend
+      if (cand.pipeId) {
+        await actualizarPipelineAPI(cand.pipeId, {
+          f1_descubrimiento: { notas_reclutador: editF1Notes.trim() },
+          f2_evaluacion: { notas_reclutador: editF2Notes.trim() },
+          evaluacion: { notas_reclutador: editF2Notes.trim() }
+        });
+      }
+      setCand(prev => prev ? {
+        ...prev,
+        initialNotes: editInitialNotes.trim(),
+        f1Notes: editF1Notes.trim(),
+        f2Notes: editF2Notes.trim(),
+        recruiterNotes: editF2Notes.trim()
+      } : null);
       setIsEditingNotes(false);
     } catch (err) {
-      console.error("Error al guardar notas del reclutador:", err);
+      console.error("Error al guardar historial de notas:", err);
     } finally {
       setIsSavingNotes(false);
     }
@@ -229,29 +255,23 @@ export default function EvaluacionDetallePage() {
 
   const handleTransitionState = async (targetPhase: EvaluacionCandidate["currentPhase"]) => {
     if (!cand) return;
+    const now = new Date().toISOString();
     const label = getPhaseLabel(targetPhase);
     setCand(prev => prev ? { ...prev, currentPhase: targetPhase, lastActivity: `Estado cambiado a ${label}` } : null);
+    setActivePipelineItem(prev => prev ? {
+      ...prev,
+      flujo: { ...prev.flujo, estado_actual: targetPhase, fecha_ultimo_cambio: now }
+    } : null);
 
     if (cand.pipeId) {
       try {
         await actualizarPipelineAPI(cand.pipeId, {
-          flujo: {
-            estado_actual: targetPhase,
-            fecha_ultimo_cambio: new Date().toISOString()
-          }
+          flujo: { estado_actual: targetPhase, fecha_ultimo_cambio: now }
         });
       } catch (err) {
         console.error("Error al actualizar estado:", err);
       }
     }
-  };
-
-  // Phase 3 Advance Modal State
-  const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
-  const [isAdvancingPhase, setIsAdvancingPhase] = useState(false);
-
-  const handleAdvancePhase = () => {
-    setIsAdvanceModalOpen(true);
   };
 
   const confirmAdvancePhaseAction = async () => {
@@ -260,7 +280,7 @@ export default function EvaluacionDetallePage() {
     try {
       if (cand.pipeId) {
         const now = new Date().toISOString();
-        const nuevoEstado = "08_presentado_cliente";
+        const nuevoEstado = "09_presentado_cliente";
         const historialActualizado = [
           { estado: nuevoEstado, timestamp: now },
           ...(activePipelineItem?.flujo?.historial_estados || [])
@@ -290,441 +310,692 @@ export default function EvaluacionDetallePage() {
 
   const getPhaseLabel = (phase: EvaluacionCandidate["currentPhase"]) => {
     switch (phase) {
-      case "05_screening": return "05 - Screening (Entrevista Inicial)";
-      case "06_assessment": return "06 - Prueba / Assessment Técnico";
-      case "07_descartado_interno": return "07 - Descartado (Interno)";
+      case "05_screening": return "05 - Screening";
+      case "06_assessment": return "06 - Assessment";
+      case "07_en_duda_evaluacion": return "07 - En Duda";
+      case "08_descartado_interno": return "08 - Descartado";
     }
   };
 
+  const phaseColors = {
+    "05_screening": "text-amber-400 border-amber-500/20 bg-amber-500/10",
+    "06_assessment": "text-[#6bd8cb] border-[#6bd8cb]/20 bg-[#6bd8cb]/10",
+    "07_en_duda_evaluacion": "text-amber-500 border-amber-500/20 bg-amber-500/10",
+    "08_descartado_interno": "text-rose-400 border-rose-500/20 bg-rose-500/10"
+  };
+
+  // ── Loading ──
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-[#101415] flex flex-col items-center justify-center space-y-3">
-        <div className="w-10 h-10 border-4 border-[#6bd8cb] border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-[#6bd8cb] border-t-transparent rounded-full animate-spin" />
         <p className="text-xs text-[#6bd8cb] font-bold">Cargando expediente de evaluación...</p>
       </div>
     );
   }
 
+  // ── Error ──
   if (error || !cand) {
     return (
       <div className="min-h-screen bg-[#101415] text-white p-8 flex flex-col items-center justify-center space-y-4">
         <AlertCircle className="w-12 h-12 text-rose-400" />
         <h2 className="text-lg font-bold text-white">{error || "Candidato no encontrado"}</h2>
-        <Link 
-          href="/evaluacion" 
-          className="px-4 py-2 bg-[#6bd8cb] text-[#101415] rounded-xl text-xs font-bold hover:bg-[#5bc2b5] transition-all"
-        >
-          Volver al Pipeline de Evaluación
-        </Link>
+        <p className="text-xs text-[#879391] max-w-md text-center">
+          {`El ID solicitado "${id}" no corresponde a un perfil de evaluación registrado.`}
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => loadCandidateData()}
+            className="px-4 py-2 bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 rounded-xl text-xs hover:bg-[#6bd8cb] hover:text-black transition-all font-bold"
+          >
+            Reintentar
+          </button>
+          <Link
+            href="/evaluacion"
+            className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs hover:bg-[#c4c1fb] hover:text-black transition-all"
+          >
+            Volver a Evaluación
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#101415] text-white p-6 md:p-8 space-y-8 text-left">
+    <main className="min-h-screen bg-[#101415] text-[#e0e3e5] px-4 md:px-8 py-6 selection:bg-[#c4c1fb] selection:text-stone-900">
       <div className="max-w-6xl mx-auto space-y-6">
-        
-        {/* Header navigation */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/10">
-          <Link 
-            href="/evaluacion" 
-            className="flex items-center gap-2 text-xs font-bold text-[#c4c1fb] hover:text-white transition-all group"
+
+        {/* ── Breadcrumb Navigation ── */}
+        <div className="flex justify-between items-center pb-2 border-b border-white/5">
+          <Link
+            href="/evaluacion"
+            className="flex items-center gap-2 text-xs font-bold text-[#879391] hover:text-[#c4c1fb] transition-colors group"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span>Volver al Pipeline de Evaluación</span>
+            <span>Volver a F2 Evaluación</span>
           </Link>
 
-          <span className="text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-3 py-1 rounded-full uppercase tracking-wider border border-[#6bd8cb]/20">
+          <span className="text-[10px] font-bold text-[#c4c1fb] bg-[#c4c1fb]/10 px-3 py-1 rounded-full uppercase tracking-wider border border-[#c4c1fb]/20">
             Fase 2: Evaluación Interna
           </span>
         </div>
 
-        {/* Main Candidate Card Banner */}
-        <div className="p-6 rounded-3xl border border-white/10 bg-white/[0.02] backdrop-blur-md flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
-          <div className="space-y-2 flex-grow">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-extrabold text-white tracking-tight">{cand.name}</h1>
-              <span className={`px-3 py-1 text-[10px] font-bold rounded-full ${
-                cand.currentPhase === "05_screening" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
-                cand.currentPhase === "06_assessment" ? "bg-[#6bd8cb]/10 text-[#6bd8cb] border border-[#6bd8cb]/20" :
-                "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-              }`}>
-                {getPhaseLabel(cand.currentPhase)}
-              </span>
-            </div>
+        {/* ── Main Grid Layout ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            <p className="text-sm font-semibold text-[#c4c1fb]">{cand.role}</p>
+          {/* ══════════════════════════════════
+              MAIN AREA (col-span-2)
+          ══════════════════════════════════ */}
+          <div className="lg:col-span-2 space-y-6">
 
-            <div className="flex flex-wrap items-center gap-3 text-xs text-[#879391] pt-1">
-              <span className="flex items-center gap-1 bg-white/5 border border-white/5 rounded-lg px-2.5 py-1">
-                <Building2 className="w-3.5 h-3.5 text-[#c4c1fb]" />
-                {cand.client}
-              </span>
-              <span className="flex items-center gap-1 bg-white/5 border border-white/5 rounded-lg px-2.5 py-1">
-                <MapPin className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                {cand.location}
-              </span>
-              <span className="flex items-center gap-1 bg-white/5 border border-white/5 rounded-lg px-2.5 py-1">
-                <Phone className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                {cand.contactNumber}
-              </span>
-              <span className="flex items-center gap-1 bg-white/5 border border-white/5 rounded-lg px-2.5 py-1">
-                <Mail className="w-3.5 h-3.5 text-[#c4c1fb]" />
-                {cand.email}
-              </span>
-            </div>
-          </div>
+            {/* ── Hero Card ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 relative overflow-hidden space-y-6">
+              {/* Decorative gradient blob */}
+              <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-[#c4c1fb]/5 blur-3xl pointer-events-none" />
 
-          <div className="flex items-center gap-4 border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-6 self-stretch md:self-auto justify-between md:justify-start">
-            <div className="text-right">
-              <span className="text-[10px] text-[#879391] uppercase font-bold tracking-wider block">Fit Score</span>
-              <span className="text-3xl font-black text-[#6bd8cb] font-mono">{cand.score}%</span>
-            </div>
-          </div>
-        </div>
-
-        {/* NOTAS RECLUTADOR / EVALUACIÓN (Destacado Visualmente - Estilo Descubrimiento) */}
-        <div className="p-5 rounded-2xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/5 space-y-2 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-[#6bd8cb] font-bold flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-[#6bd8cb]" />
-              <span>Notas Reclutador / Evaluación</span>
-            </span>
-
-            {!isEditingNotes ? (
-              <button
-                onClick={() => setIsEditingNotes(true)}
-                className="px-3 py-1 rounded-lg border border-[#6bd8cb]/30 bg-[#6bd8cb]/10 text-[#6bd8cb] hover:bg-[#6bd8cb] hover:text-[#101415] text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <Edit2 className="w-3 h-3" />
-                <span>Editar notas</span>
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSaveNotes}
-                  disabled={isSavingNotes}
-                  className="px-3 py-1 rounded-lg bg-[#6bd8cb] text-[#101415] hover:bg-[#5bc2b5] text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                >
-                  <Save className="w-3 h-3" />
-                  <span>{isSavingNotes ? "Guardando..." : "Guardar"}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setEditRecruiterNotes(cand.recruiterNotes || "");
-                    setIsEditingNotes(false);
-                  }}
-                  className="px-3 py-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                  <span>Cancelar</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {isEditingNotes ? (
-            <textarea
-              value={editRecruiterNotes}
-              onChange={(e) => setEditRecruiterNotes(e.target.value)}
-              rows={3}
-              placeholder="Escribe notas de evaluación sobre el candidato..."
-              className="w-full bg-[#101415]/80 border border-[#6bd8cb]/40 p-3 text-xs rounded-xl text-white placeholder-[#879391] focus:border-[#6bd8cb] focus:outline-none resize-none leading-relaxed"
-            />
-          ) : (
-            <div className="p-3.5 bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 rounded-xl text-xs text-white leading-relaxed font-medium shadow-sm">
-              {cand.recruiterNotes ? cand.recruiterNotes : <span className="italic text-[#879391]">Sin notas de evaluación asignadas para este candidato.</span>}
-            </div>
-          )}
-        </div>
-
-        {/* Action Toolbar Row: Cambios de estado y Fase */}
-        <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02] flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-[#6bd8cb]" />
-            <span className="text-xs font-bold text-white uppercase tracking-wider">Acciones del Candidato</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Avanzar estado */}
-            {cand.currentPhase === "05_screening" && (
-              <button
-                onClick={() => handleTransitionState("06_assessment")}
-                className="px-4 py-2 rounded-xl bg-[#6bd8cb]/15 border border-[#6bd8cb]/30 text-[#6bd8cb] hover:bg-[#6bd8cb] hover:text-[#101415] font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <ChevronsRight className="w-4 h-4" />
-                <span>Avanzar a Assessment</span>
-              </button>
-            )}
-
-            {cand.currentPhase === "06_assessment" && (
-              <button
-                onClick={() => handleTransitionState("05_screening")}
-                className="px-4 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500 hover:text-stone-950 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <ChevronsRight className="w-4 h-4" />
-                <span>Volver a Screening</span>
-              </button>
-            )}
-
-            {cand.currentPhase === "07_descartado_interno" && (
-              <button
-                onClick={() => handleTransitionState("05_screening")}
-                className="px-4 py-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500 hover:text-white font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <ChevronsRight className="w-4 h-4" />
-                <span>Reactivar Candidato</span>
-              </button>
-            )}
-
-            {/* Avanzar Fase (Fase 3: Presentación al Cliente) */}
-            <button
-              onClick={handleAdvancePhase}
-              className="px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500 hover:text-stone-950 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>Avanzar a Fase 3 (Cliente)</span>
-            </button>
-
-            {/* Descartar / Rechazar */}
-            {cand.currentPhase !== "07_descartado_interno" && (
-              <button
-                onClick={() => handleTransitionState("07_descartado_interno")}
-                className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-rose-400 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <Ban className="w-4 h-4" />
-                <span>Rechazar</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Diagnostic Tools Tabs Section */}
-        <div className="rounded-3xl border border-white/10 bg-white/[0.01] overflow-hidden">
-          
-          {/* Tab Navigation Header */}
-          <nav className="flex items-center overflow-x-auto bg-[#101415]/80 border-b border-white/10 px-6 py-2 gap-2 select-none">
-            <button 
-              onClick={() => setActiveTab("general")}
-              className={`py-2 px-4 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === "general" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-              }`}
-            >
-              1. General & Info
-            </button>
-            <button 
-              onClick={() => setActiveTab("sintetizador")}
-              className={`py-2 px-4 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "sintetizador" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>5. Sintetizador</span>
-            </button>
-            <button 
-              onClick={() => setActiveTab("inconsistencias")}
-              className={`py-2 px-4 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "inconsistencias" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-              }`}
-            >
-              <AlertTriangle className="w-3.5 h-3.5 text-[#ffb4ab]" />
-              <span>6. Detector Crono</span>
-            </button>
-            <button 
-              onClick={() => setActiveTab("preguntas")}
-              className={`py-2 px-4 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "preguntas" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>7. Preguntas STAR</span>
-            </button>
-            <button 
-              onClick={() => setActiveTab("validador")}
-              className={`py-2 px-4 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "validador" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>8. Validador Identidad</span>
-            </button>
-            <button 
-              onClick={() => setActiveTab("copilot")}
-              className={`py-2 px-4 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "copilot" ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30" : "text-[#879391] hover:text-white"
-              }`}
-            >
-              <Code className="w-3.5 h-3.5 text-[#6bd8cb]" />
-              <span>Co-Pilot adaptativo</span>
-            </button>
-          </nav>
-
-          {/* Tab Body Content */}
-          <div className="p-6 space-y-6">
-            {activeTab === "sintetizador" && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
-                  <span className="font-bold text-[#6bd8cb]">Sintetizador de Entrevistas</span>
-                  <p className="mt-0.5 text-[#879391] leading-relaxed">
-                    Cruza el manuscrito de la llamada del reclutador con los requerimientos vacantes de la búsqueda.
-                  </p>
+              {/* Header: name + badge */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-5">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-mono text-[#879391] uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                    {cand.id} • F2 Evaluación Interna
+                  </span>
+                  <h1 className="text-xl font-bold text-white tracking-tight">{cand.name}</h1>
                 </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`px-3 py-1 rounded-full border text-xs font-bold ${phaseColors[cand.currentPhase]}`}>
+                    {getPhaseLabel(cand.currentPhase)}
+                  </span>
+                  <div className="px-3 py-1 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] text-xs font-bold font-mono">
+                    Fit: {cand.score}%
+                  </div>
+                </div>
+              </div>
 
+              {/* Metadata grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.01] space-y-2">
-                    <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider block">Puntos Fuertes (Pros)</span>
-                    <ul className="list-disc pl-4 text-xs space-y-1 text-white/80">
-                      {cand.toolsDetails.sintetizador.pros.map((pro, index) => (
-                        <li key={index}>{pro}</li>
-                      ))}
-                    </ul>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Puesto Vacante</span>
+                    <div className="flex items-center gap-2 text-xs text-white font-semibold">
+                      {cand.role}
+                    </div>
                   </div>
-
-                  <div className="p-4 rounded-xl border border-amber-500/10 bg-amber-500/[0.01] space-y-2">
-                    <span className="text-xs text-amber-400 font-bold uppercase tracking-wider block">Déficit o Brechas Técnicas (Cons)</span>
-                    <ul className="list-disc pl-4 text-xs space-y-1 text-white/80">
-                      {cand.toolsDetails.sintetizador.contras.map((con, index) => (
-                        <li key={index}>{con}</li>
-                      ))}
-                    </ul>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Cliente</span>
+                    <div className="flex items-center gap-2 text-xs text-[#c4c1fb]">
+                      <Building2 className="w-4 h-4 text-[#c4c1fb]/70" />
+                      <span>{cand.client}</span>
+                    </div>
                   </div>
-
-                  <div className="p-4 rounded-xl border border-rose-500/10 bg-rose-500/[0.01] space-y-2">
-                    <span className="text-xs text-rose-400 font-bold uppercase tracking-wider block">Señales de Alerta (Riesgos)</span>
-                    <ul className="list-disc pl-4 text-xs space-y-1 text-white/80">
-                      {cand.toolsDetails.sintetizador.riesgos.map((risk, index) => (
-                        <li key={index}>{risk}</li>
-                      ))}
-                    </ul>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Ubicación</span>
+                    <div className="flex items-center gap-2 text-xs text-[#879391]">
+                      <MapPin className="w-4 h-4 text-[#6bd8cb]/70" />
+                      <span>{cand.location}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Contacto</span>
+                    <div className="flex items-center gap-2 text-xs text-[#879391]">
+                      <Phone className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                      <span>{cand.contactNumber}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-[#879391] mt-1.5">
+                      <Mail className="w-3.5 h-3.5 text-[#c4c1fb]" />
+                      <span className="truncate">{cand.email}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Última actividad</span>
+                    <div className="flex items-center gap-1.5 text-xs text-[#879391]">
+                      <Clock className="w-3.5 h-3.5 text-amber-400/70" />
+                      <span>{cand.lastActivity}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Entrada al WIP</span>
+                    <p className="text-xs text-[#879391]">{new Date(cand.entryDate).toLocaleString("es-ES")}</p>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {activeTab === "inconsistencias" && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="p-4 rounded-xl border border-white/5 bg-rose-950/20 text-xs text-white/90">
-                  <span className="font-bold text-rose-450">Detector de Inconsistencias Cronológicas</span>
-                  <p className="mt-0.5 text-[#879391]">
-                    Analiza secuencias temporales en la hoja de vida para alertar sobre huecos desocupados o solapamientos.
-                  </p>
+            {/* ── Trazabilidad de Notas del Pipeline (Invertido: F2 arriba -> F1 centro -> Postulante abajo) ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-6 text-left relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 gap-3">
+                <div>
+                  <span className="text-[9px] font-mono text-[#6bd8cb] bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded border border-[#6bd8cb]/20 uppercase font-bold tracking-widest inline-block mb-1">
+                    TRAZABILIDAD DE RECLUTAMIENTO
+                  </span>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-[#6bd8cb]" />
+                    <span>Historial y Trazabilidad de Notas del Candidato</span>
+                  </h3>
                 </div>
 
-                <div className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center flex flex-col items-center justify-center gap-2">
-                  <Check className="w-8 h-8 text-emerald-400" />
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">Línea temporal impecable</span>
-                  <p className="text-xs text-[#879391]">No se detectaron brechas sin justificar en su trayectoria profesional.</p>
+                {/* Global Edit Button covering all notes */}
+                <div>
+                  {!isEditingNotes ? (
+                    <button
+                      onClick={() => setIsEditingNotes(true)}
+                      className="px-4 py-2 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/15 text-[#6bd8cb] hover:bg-[#6bd8cb] hover:text-[#101415] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-[#6bd8cb]/10"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Editar Historial de Notas</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveNotes}
+                        disabled={isSavingNotes}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#6bd8cb] to-[#0d9488] text-[#101415] hover:opacity-90 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20 disabled:opacity-50"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>{isSavingNotes ? "Guardando..." : "Guardar Todos los Cambios"}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditInitialNotes(cand.initialNotes || "");
+                          setEditF1Notes(cand.f1Notes || "");
+                          setEditF2Notes(cand.f2Notes || "");
+                          setIsEditingNotes(false);
+                        }}
+                        className="px-3.5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Cancelar</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
 
-            {activeTab === "preguntas" && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
-                  <span className="font-bold text-[#6bd8cb]">Generador de Preguntas Técnicas STAR</span>
-                  <p className="mt-0.5 text-[#879391]">
-                    Preguntas de comportamiento y código personalizadas según el stack funcional de la vacante.
-                  </p>
-                </div>
+              <div className="relative pl-6 md:pl-8 space-y-6 border-l-2 border-white/10 ml-2 md:ml-3 pt-1 pb-1">
 
-                <div className="space-y-3">
-                  {cand.toolsDetails.preguntas.map((q, idx) => (
-                    <div key={idx} className="p-4 rounded-xl border border-white/5 bg-white/[0.01] space-y-2">
-                      <div className="flex justify-between items-start gap-3">
-                        <span className="w-5 h-5 rounded bg-[#c4c1fb] text-[#101415] flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
-                          {idx + 1}
+                {/* ── 01 (ARRIBA). FASE 2: EVALUACIÓN INTERNA (MÓDULO ACTUAL) ── */}
+                <div className="relative space-y-2">
+                  {/* Step Node Icon */}
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-[#6bd8cb] text-[#6bd8cb] flex items-center justify-center text-[10px] font-mono font-bold shadow-md shadow-[#6bd8cb]/20">
+                    01
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/5 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#6bd8cb]/15 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                        <span className="text-xs font-bold text-[#6bd8cb] uppercase tracking-wider">
+                          Fase 2: Evaluación Interna (Módulo Actual)
                         </span>
-                        <span className="text-xs text-white leading-relaxed flex-grow text-left font-semibold">{q}</span>
                       </div>
-                      <div className="pt-2 border-t border-white/5 flex items-center justify-between">
-                        <button
-                          onClick={() => handleCopyText(q, `q-${idx}`)}
-                          className="text-[10px] text-[#6bd8cb] hover:underline flex items-center gap-1 font-bold cursor-pointer"
-                        >
-                          <Copy className="w-3 h-3" />
-                          <span>{copiedTextType === `q-${idx}` ? "Copiado!" : "Copiar plantilla de pregunta"}</span>
-                        </button>
-                        <span className="text-[9px] uppercase tracking-wider font-bold text-[#c4c1fb]">Método STAR</span>
+                      <span className="text-[9.5px] font-mono text-[#6bd8cb]/80 bg-[#6bd8cb]/10 px-2 py-0.5 rounded border border-[#6bd8cb]/20">
+                        campo: f2_evaluacion.notas_reclutador
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editF2Notes}
+                        onChange={e => setEditF2Notes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de evaluación técnica y screening de esta fase..."
+                        className="w-full bg-[#101415]/90 border border-[#6bd8cb]/50 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-[#6bd8cb] focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-[#6bd8cb]/20 rounded-xl text-xs text-white leading-relaxed font-medium">
+                        {cand.f2Notes ? (
+                          cand.f2Notes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin notas de evaluación asignadas para esta fase. Usa "Editar Historial de Notas" para agregar anotaciones.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 02 (CENTRO). FASE 1: DESCUBRIMIENTO & SOURCING ── */}
+                <div className="relative space-y-2">
+                  {/* Step Node Icon */}
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-[#c4c1fb]/40 text-[#c4c1fb] flex items-center justify-center text-[10px] font-mono font-bold shadow-md">
+                    02
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-[#c4c1fb]/25 bg-[#c4c1fb]/5 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#c4c1fb]/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Compass className="w-3.5 h-3.5 text-[#c4c1fb]" />
+                        <span className="text-xs font-bold text-[#c4c1fb] uppercase tracking-wider">
+                          Fase 1: Descubrimiento & Sourcing
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-[#c4c1fb]/70 bg-[#c4c1fb]/10 px-2 py-0.5 rounded border border-[#c4c1fb]/20">
+                        campo: f1_descubrimiento.notas_reclutador
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editF1Notes}
+                        onChange={e => setEditF1Notes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de sourcing y filtro inicial de Fase 1..."
+                        className="w-full bg-[#101415]/90 border border-[#c4c1fb]/40 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-[#c4c1fb] focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-[#c4c1fb]/15 rounded-xl text-xs text-white leading-relaxed">
+                        {cand.f1Notes ? (
+                          cand.f1Notes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin notas registradas durante la Fase 1.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 03 (ABAJO). NOTAS INICIALES DEL POSTULANTE ── */}
+                <div className="relative space-y-2">
+                  {/* Step Node Icon */}
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-white/20 text-white/60 flex items-center justify-center text-[10px] font-mono font-bold shadow-md">
+                    03
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.02] space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
+                      <div className="flex items-center gap-2">
+                        <UserCheck className="w-3.5 h-3.5 text-white/70" />
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">
+                          Notas Iniciales del Postulante
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-[#879391] bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                        campo: postulantes.notas_iniciales
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editInitialNotes}
+                        onChange={e => setEditInitialNotes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas iniciales del postulante..."
+                        className="w-full bg-[#101415]/90 border border-white/20 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-white focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-white/5 rounded-xl text-xs text-white/90 leading-relaxed italic">
+                        {cand.initialNotes ? (
+                          cand.initialNotes
+                        ) : (
+                          <span className="text-white/30 not-italic">Sin notas iniciales registradas en el perfil del postulante.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* ── Diagnostic Tools Tabs ── */}
+            <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden">
+              {/* Tab header */}
+              <div className="px-6 py-3 border-b border-white/10 bg-[#101415]/60">
+                <div className="flex items-center gap-2 mb-3">
+                  <Cpu className="w-4 h-4 text-[#c4c1fb] animate-pulse" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">Herramientas de Diagnóstico IA — F2</span>
+                </div>
+                <nav className="flex items-center overflow-x-auto gap-1 select-none">
+                  {([
+                    { key: "sintetizador", icon: <FileText className="w-3.5 h-3.5" />, label: "5. Sintetizador" },
+                    { key: "inconsistencias", icon: <AlertTriangle className="w-3.5 h-3.5 text-[#ffb4ab]" />, label: "6. Detector Crono" },
+                    { key: "preguntas", icon: <Zap className="w-3.5 h-3.5" />, label: "7. Preguntas STAR" },
+                    { key: "validador", icon: <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />, label: "8. Validador ID" },
+                    { key: "copilot", icon: <Code className="w-3.5 h-3.5 text-[#6bd8cb]" />, label: "Co-Pilot" }
+                  ] as { key: DiagTab; icon: React.ReactNode; label: string }[]).map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                        activeTab === tab.key
+                          ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30"
+                          : "text-[#879391] hover:text-white"
+                      }`}
+                    >
+                      {tab.icon}
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Tab body */}
+              <div className="p-6 space-y-5">
+
+                {/* 5. Sintetizador */}
+                {activeTab === "sintetizador" && (
+                  <div className="space-y-5 animate-fadeIn">
+                    <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
+                      <span className="font-bold text-[#6bd8cb]">Sintetizador de Entrevistas</span>
+                      <p className="mt-0.5 text-[#879391] leading-relaxed">
+                        Cruza el manuscrito de la llamada del reclutador con los requerimientos vacantes de la búsqueda.
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="p-4 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.02] space-y-2">
+                        <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider block">Puntos Fuertes (Pros)</span>
+                        <ul className="list-disc pl-4 text-xs space-y-1 text-white/80">
+                          {cand.toolsDetails.sintetizador.pros.map((pro, i) => <li key={i}>{pro}</li>)}
+                        </ul>
+                      </div>
+                      <div className="p-4 rounded-xl border border-amber-500/10 bg-amber-500/[0.02] space-y-2">
+                        <span className="text-xs text-amber-400 font-bold uppercase tracking-wider block">Déficit o Brechas (Cons)</span>
+                        <ul className="list-disc pl-4 text-xs space-y-1 text-white/80">
+                          {cand.toolsDetails.sintetizador.contras.map((c, i) => <li key={i}>{c}</li>)}
+                        </ul>
+                      </div>
+                      <div className="p-4 rounded-xl border border-rose-500/10 bg-rose-500/[0.02] space-y-2">
+                        <span className="text-xs text-rose-400 font-bold uppercase tracking-wider block">Señales de Alerta (Riesgos)</span>
+                        <ul className="list-disc pl-4 text-xs space-y-1 text-white/80">
+                          {cand.toolsDetails.sintetizador.riesgos.map((r, i) => <li key={i}>{r}</li>)}
+                        </ul>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                )}
+
+                {/* 6. Detector Crono */}
+                {activeTab === "inconsistencias" && (
+                  <div className="space-y-5 animate-fadeIn">
+                    <div className="p-4 rounded-xl border border-white/5 bg-rose-950/20 text-xs text-white/90">
+                      <span className="font-bold text-rose-400">Detector de Inconsistencias Cronológicas</span>
+                      <p className="mt-0.5 text-[#879391]">
+                        Analiza secuencias temporales en la hoja de vida para alertar sobre huecos desocupados o solapamientos.
+                      </p>
+                    </div>
+                    <div className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center flex flex-col items-center gap-2">
+                      <Check className="w-8 h-8 text-emerald-400" />
+                      <span className="text-xs font-bold text-white uppercase tracking-wider">Línea temporal impecable</span>
+                      <p className="text-xs text-[#879391]">No se detectaron brechas sin justificar en su trayectoria profesional.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 7. Preguntas STAR */}
+                {activeTab === "preguntas" && (
+                  <div className="space-y-5 animate-fadeIn">
+                    <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
+                      <span className="font-bold text-[#6bd8cb]">Generador de Preguntas Técnicas STAR</span>
+                      <p className="mt-0.5 text-[#879391]">
+                        Preguntas de comportamiento y código personalizadas según el stack funcional de la vacante.
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      {cand.toolsDetails.preguntas.map((q, idx) => (
+                        <div key={idx} className="p-4 rounded-xl border border-white/5 bg-white/[0.01] space-y-2">
+                          <div className="flex gap-3 items-start">
+                            <span className="w-5 h-5 rounded bg-[#c4c1fb] text-[#101415] flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
+                              {idx + 1}
+                            </span>
+                            <span className="text-xs text-white leading-relaxed flex-grow font-semibold">{q}</span>
+                          </div>
+                          <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                            <button
+                              onClick={() => handleCopyText(q, `q-${idx}`)}
+                              className="text-[10px] text-[#6bd8cb] hover:underline flex items-center gap-1 font-bold cursor-pointer"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>{copiedTextType === `q-${idx}` ? "¡Copiado!" : "Copiar plantilla"}</span>
+                            </button>
+                            <span className="text-[9px] uppercase tracking-wider font-bold text-[#c4c1fb]">Método STAR</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 8. Validador */}
+                {activeTab === "validador" && (
+                  <div className="space-y-5 animate-fadeIn">
+                    <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
+                      <span className="font-bold text-[#6bd8cb]">Validador de Identidad y Entorno</span>
+                      <p className="mt-0.5 text-[#879391]">
+                        Chequeo por IP, geolocalización latente y verificación de entorno de test sin proxies sospechosos.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-xl bg-black/30 border border-white/5 space-y-1">
+                        <span className="text-[9px] text-[#879391] uppercase font-bold tracking-wider block">Dirección IP Escaneada</span>
+                        <code className="text-xs font-mono text-[#6bd8cb] block">{cand.toolsDetails.validador.ip}</code>
+                      </div>
+                      <div className="p-4 rounded-xl bg-black/30 border border-white/5 space-y-1">
+                        <span className="text-[9px] text-[#879391] uppercase font-bold tracking-wider block">Geolocalización declarada</span>
+                        <code className="text-xs font-mono text-[#c4c1fb] block">{cand.toolsDetails.validador.location}</code>
+                      </div>
+                    </div>
+                    <div className={`p-4 rounded-xl border flex items-center gap-3 text-xs font-bold ${
+                      cand.toolsDetails.validador.verificationStatus === "success"
+                        ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400"
+                        : "border-rose-500/20 bg-rose-500/5 text-rose-400"
+                    }`}>
+                      <ShieldCheck className="w-5 h-5 shrink-0" />
+                      <div>
+                        <span className="block">
+                          {cand.toolsDetails.validador.verificationStatus === "success"
+                            ? "VERIFICADO — ENTORNO ÍNTEGRO"
+                            : "ALERTA — POSIBLE FRAUDE DETECTADO"}
+                        </span>
+                        <p className="font-normal text-[#879391] leading-relaxed mt-0.5">{cand.toolsDetails.validador.envStatus}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Co-Pilot */}
+                {activeTab === "copilot" && (
+                  <div className="space-y-5 animate-fadeIn">
+                    <div className="p-4 rounded-xl border border-white/5 bg-indigo-950/20 text-xs text-white/90">
+                      <span className="font-bold text-[#c4c1fb]">Entorno de Pair-Programming Adaptativo (AI Co-Pilot)</span>
+                      <p className="mt-0.5 text-[#879391]">Colaboración en vivo de código asistida por IA y telemetría de esfuerzo técnico.</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
+                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Nivel Dificultad</span>
+                        <span className="text-base font-bold text-white block mt-1">{cand.toolsDetails.copilot.difficultyLevel}</span>
+                      </div>
+                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
+                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Tasa Completación</span>
+                        <span className="text-base font-bold text-[#6bd8cb] block mt-1">{cand.toolsDetails.copilot.completionRate}%</span>
+                      </div>
+                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
+                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Esfuerzo Estimado</span>
+                        <span className="text-base font-bold text-[#c4c1fb] block mt-1">{cand.toolsDetails.copilot.effortScore} / 5 pts</span>
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-xl border border-white/5 bg-[#15181a]">
+                      <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold block mb-1">Comentario del Evaluador Co-Pilot</span>
+                      <p className="text-xs text-[#879391] leading-relaxed italic">
+                        &quot;{cand.toolsDetails.copilot.summary}&quot;
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+
+          {/* ══════════════════════════════════
+              SIDEBAR (col-span-1)
+          ══════════════════════════════════ */}
+          <div className="space-y-6">
+
+            {/* ── Acciones F2 ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-5 text-left">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider pb-2 border-b border-white/5">
+                Acciones del Pipeline F2
+              </h3>
+
+              {/* Cambio de Estado */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold text-[#879391] block">Cambio de Estado Interno</span>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => handleTransitionState("05_screening")}
+                    disabled={cand.currentPhase === "05_screening"}
+                    className="w-full py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/15 hover:text-white transition-all text-xs font-bold text-amber-400 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    <span>05 - Screening</span>
+                  </button>
+                  <button
+                    onClick={() => handleTransitionState("06_assessment")}
+                    disabled={cand.currentPhase === "06_assessment"}
+                    className="w-full py-2.5 rounded-xl border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 hover:bg-[#6bd8cb]/15 hover:text-white transition-all text-xs font-bold text-[#6bd8cb] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    <span>06 - Assessment</span>
+                  </button>
+                  <button
+                    onClick={() => handleTransitionState("07_en_duda_evaluacion")}
+                    disabled={cand.currentPhase === "07_en_duda_evaluacion"}
+                    className="w-full py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/15 hover:text-white transition-all text-xs font-bold text-amber-500 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                    <span>07 - En Duda</span>
+                  </button>
+                  <button
+                    onClick={() => handleTransitionState("08_descartado_interno")}
+                    disabled={cand.currentPhase === "08_descartado_interno"}
+                    className="w-full py-2.5 rounded-xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/15 hover:text-white transition-all text-xs font-bold text-rose-400 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Ban className="w-4 h-4" />
+                    <span>08 - Descartar</span>
+                  </button>
                 </div>
+              </div>
+
+              {/* Avanzar Fase */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold text-[#879391] block">Avance de Fase</span>
+                <button
+                  onClick={() => setIsAdvanceModalOpen(true)}
+                  className="w-full py-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500 hover:text-stone-950 transition-all text-xs font-black text-emerald-400 flex items-center justify-center gap-2 cursor-pointer shadow shadow-emerald-500/5"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>Avanzar a Fase 3 (Cliente)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ── Datos del Pipeline ── */}
+            {activePipelineItem && (
+              <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-4 text-left">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider pb-2 border-b border-white/5">
+                  Trazabilidad del Pipeline
+                </h3>
+
+                <div className="space-y-2 text-xs">
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">ID Pipeline</span>
+                    <span className="font-mono text-white/80 select-all text-[10px]">{activePipelineItem.id}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">ID Búsqueda</span>
+                    <span className="font-mono text-white/80 select-all text-[10px]">{activePipelineItem.claves_conexion.id_busqueda}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">Estado en Pipeline</span>
+                    <span className="text-[#c4c1fb] font-bold block mt-0.5">{activePipelineItem.flujo.estado_actual}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">Última Modificación</span>
+                    <span className="text-white/80 block mt-0.5 text-[10px]">
+                      {activePipelineItem.flujo.fecha_ultimo_cambio
+                        ? new Date(activePipelineItem.flujo.fecha_ultimo_cambio).toLocaleString()
+                        : "No especificado"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Historial SLA */}
+                {activePipelineItem.flujo.historial_estados && activePipelineItem.flujo.historial_estados.length > 0 ? (
+                  <div className="pt-4 border-t border-white/5 space-y-4">
+                    <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider block">
+                      Historial y Trazabilidad de Estados (SLA)
+                    </span>
+                    <div className="relative pl-6 border-l border-white/10 space-y-5 ml-2 pt-1 pb-1">
+                      {activePipelineItem.flujo.historial_estados.map((entry, idx) => (
+                        <div key={idx} className="relative space-y-1">
+                          <div className={`absolute -left-[29.5px] top-1 w-2.5 h-2.5 rounded-full border border-[#101415] shadow-sm ${
+                            idx === 0 ? "bg-[#c4c1fb] ring-4 ring-[#c4c1fb]/20" : "bg-[#879391]"
+                          }`} />
+                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1">
+                            <span className={`text-xs font-bold ${idx === 0 ? "text-white" : "text-white/60"}`}>
+                              {entry.estado}
+                            </span>
+                            <span className="text-[10px] text-[#879391] font-mono">
+                              {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-4 border-t border-white/5">
+                    <p className="text-[11px] text-[#879391] italic">
+                      No se registra historial previo de transiciones para esta postulación.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
-            {activeTab === "validador" && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
-                  <span className="font-bold text-[#6bd8cb]">Validador de Identidad y Entorno</span>
-                  <p className="mt-0.5 text-[#879391]">
-                    Chequeo por IP, geolocalización latente y verificación de entorno de test sin proxies sospechosos.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-xl bg-black/30 border border-white/5 space-y-1">
-                    <span className="text-[9px] text-[#879391] uppercase font-bold tracking-wider block">Dirección IP Escaneada</span>
-                    <code className="text-xs font-mono text-[#6bd8cb] block">{cand.toolsDetails.validador.ip}</code>
-                  </div>
-                  <div className="p-4 rounded-xl bg-black/30 border border-white/5 space-y-1">
-                    <span className="text-[9px] text-[#879391] uppercase font-bold tracking-wider block">Geolocalización declarada</span>
-                    <code className="text-xs font-mono text-[#c4c1fb] block">{cand.toolsDetails.validador.location}</code>
-                  </div>
-                </div>
+            {/* ── Score visual ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 text-center space-y-3">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-white/30 block">Fit Score F2</span>
+              <div className="relative inline-flex items-center justify-center w-24 h-24 mx-auto">
+                <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+                  <circle
+                    cx="48" cy="48" r="40"
+                    fill="none"
+                    stroke="#6bd8cb"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 40}`}
+                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - cand.score / 100)}`}
+                    className="transition-all duration-700"
+                  />
+                </svg>
+                <span className="absolute text-xl font-black text-[#6bd8cb] font-mono">{cand.score}%</span>
               </div>
-            )}
-
-            {activeTab === "copilot" && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="p-4 rounded-xl border border-white/5 bg-indigo-950/20 text-xs text-white/90">
-                  <span className="font-bold text-[#c4c1fb]">Entorno de Pair-Programming Adaptativo (AI Co-Pilot)</span>
-                  <p className="mt-0.5 text-[#879391]">
-                    Colaboración en vivo de código asistida por IA y telemetría de esfuerzo técnico.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-white/5 pt-4">
-                  <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                    <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Nivel Dificultad</span>
-                    <span className="text-base font-bold text-white block mt-1">{cand.toolsDetails.copilot.difficultyLevel}</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                    <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Tasa Completación</span>
-                    <span className="text-base font-bold text-[#6bd8cb] block mt-1">{cand.toolsDetails.copilot.completionRate}%</span>
-                  </div>
-                  <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                    <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Esfuerzo Estimado</span>
-                    <span className="text-base font-bold text-[#c4c1fb] block mt-1">{cand.toolsDetails.copilot.effortScore} / 5 pts</span>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl border border-white/5 bg-[#15181a]">
-                  <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold block mb-1">Comentario del Evaluador Co-Pilot</span>
-                  <p className="text-xs text-[#879391] leading-relaxed italic">
-                    "{cand.toolsDetails.copilot.summary}"
-                  </p>
-                </div>
+              <div className="flex items-center justify-center gap-1.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`w-3.5 h-3.5 ${i < Math.round(cand.score / 20) ? "text-amber-400 fill-amber-400" : "text-white/10"}`}
+                  />
+                ))}
               </div>
-            )}
+              <p className="text-[10px] text-[#879391]">
+                {cand.score >= 85 ? "Candidato destacado — alta prioridad" : cand.score >= 70 ? "Candidato apto — seguimiento recomendado" : "Candidato en evaluación"}
+              </p>
+            </div>
 
-            {activeTab === "general" && (
-              <div className="space-y-4 animate-fadeIn text-xs text-[#879391]">
-                <p>Ingreso registrado al pipeline: <span className="text-white font-semibold">{new Date(cand.entryDate).toLocaleString()}</span></p>
-                <p>Actividad reciente: <span className="text-[#6bd8cb] font-semibold">{cand.lastActivity}</span></p>
-              </div>
-            )}
           </div>
         </div>
-
       </div>
-      {/* Modal Emergente Mejorado: Confirmar Cambio de Fase a Cliente (Fase 3) */}
+
+      {/* ── Modal: Confirmar Avance a Fase 3 ── */}
       {isAdvanceModalOpen && cand && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div 
+          <div
             className="relative w-full max-w-md bg-[#15181a] border border-[#6bd8cb]/30 rounded-3xl p-6 shadow-2xl space-y-5 text-left animate-scaleUp"
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
-            {/* Header badge & close button */}
             <div className="flex justify-between items-start">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#6bd8cb]/20 to-[#0d9488]/30 border border-[#6bd8cb]/40 flex items-center justify-center text-[#6bd8cb] shadow-lg shadow-[#6bd8cb]/10">
                 <UserCheck className="w-6 h-6" />
@@ -737,7 +1008,6 @@ export default function EvaluacionDetallePage() {
               </button>
             </div>
 
-            {/* Content text */}
             <div className="space-y-2">
               <span className="text-[10px] font-bold text-[#6bd8cb] uppercase tracking-wider bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded-full border border-[#6bd8cb]/20 inline-block">
                 Promoción de Pipeline
@@ -750,7 +1020,6 @@ export default function EvaluacionDetallePage() {
               </p>
             </div>
 
-            {/* Candidate Card Summary */}
             <div className="p-3.5 rounded-2xl border border-white/10 bg-white/[0.02] flex items-center justify-between text-xs">
               <div>
                 <span className="font-bold text-white block">{cand.name}</span>
@@ -761,7 +1030,6 @@ export default function EvaluacionDetallePage() {
               </span>
             </div>
 
-            {/* Action Buttons: Cancelar & Confirmar */}
             <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/5">
               <button
                 onClick={() => setIsAdvanceModalOpen(false)}
@@ -790,7 +1058,6 @@ export default function EvaluacionDetallePage() {
           </div>
         </div>
       )}
-
-    </div>
+    </main>
   );
 }

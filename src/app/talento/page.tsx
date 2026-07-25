@@ -967,7 +967,7 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                   </div>
                 </div>
 
-                {/* COLUMN 4: DESCARTADO */}
+                {/* COLUMN 4: DESCARTADO (NO SELECCIONAR) */}
                 <div 
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, "Descartado")}
@@ -975,7 +975,7 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                 >
                   <div className="flex justify-between items-center pb-2 border-b border-white/5">
                     <div className="flex flex-col">
-                      <span className="text-xs font-bold text-white tracking-wide uppercase">DESCARTADO</span>
+                      <span className="text-xs font-bold text-white tracking-wide uppercase">DESCARTADO (NO SELECCIONAR)</span>
                       <span className="text-[10px] text-[#879391] mt-0.5">Descartes y archivados</span>
                     </div>
                     <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-rose-500">

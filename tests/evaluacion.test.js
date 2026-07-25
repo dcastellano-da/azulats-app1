@@ -15,7 +15,7 @@ describe('Módulo de Evaluación - Capa de Lógica y Datos', () => {
     assert.strictEqual(typeof first.role, 'string');
     assert.strictEqual(typeof first.client, 'string');
     assert.strictEqual(typeof first.score, 'number');
-    assert.ok(['05_screening', '06_assessment', '07_descartado_interno'].includes(first.currentPhase));
+    assert.ok(['05_screening', '06_assessment', '08_descartado_interno'].includes(first.currentPhase));
     
     // Tools details validation
     assert.ok(first.toolsDetails, 'Debe tener la sección toolsDetails');
@@ -66,7 +66,7 @@ describe('Módulo de Evaluación - Capa de Lógica y Datos', () => {
         client: 'Client-2',
         location: 'Madrid',
         score: 70,
-        currentPhase: '07_descartado_interno', // should be excluded from active WIP and cycle calculations
+        currentPhase: '08_descartado_interno', // should be excluded from active WIP and cycle calculations
         entryDate: new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString(),
         cNPS: null, // should be excluded from cNPS average
         lastActivity: 'Inactive',

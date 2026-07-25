@@ -1,17 +1,27 @@
+import { PipelineItem } from "@/actions/pipeline";
+import { Candidato } from "@/actions/candidatos";
+import { Busqueda } from "@/actions/busquedas";
+
 export interface PresentacionCandidate {
   id: string;
+  pipeId?: string;
   name: string;
   role: string;
   client: string;
   location: string;
   score: number; // Fit rating 0-100
-  currentPhase: "08_shortlist" | "09_entrevista_cliente" | "10_standby";
+  currentPhase: "09_shortlist" | "10_entrevista_cliente" | "11_standby";
   entryDate: string; // ISO string to check WIP blockage times
   cNPS?: number; // Candidate Net Promoter Score [1-10]
   lastActivity: string;
   experienceYears: number;
   contactNumber: string;
   email: string;
+  initialNotes?: string;
+  f1Notes?: string;
+  f2Notes?: string;
+  f3Notes?: string;
+  recruiterNotes?: string;
   toolsDetails: {
     analitica: {
       transcriptSnippets: { speaker: string; text: string }[];
@@ -45,6 +55,121 @@ export interface PresentacionCandidate {
   };
 }
 
+export const generateDefaultPresentacionToolsDetails = (candName: string, role: string, score: number) => {
+  return {
+    analitica: {
+      transcriptSnippets: [
+        { speaker: "Candidato", text: `Postulación activa para el perfil ${role}.` },
+        { speaker: "Reclutador", text: "Expediente trasladado a revisión técnica de cliente." }
+      ],
+      sentimentScore: score > 80 ? 90 : 75,
+      globalSentiment: score > 80 ? ("Positivo" as const) : ("Neutro" as const),
+      salaryAlert: false,
+      salaryRequested: "45.000 € brutos/año",
+      salaryOffered: "48.000 € brutos/año maximum",
+      microExpressionsDetected: ["Entusiasmo y seguridad en entrevista", "Alineación de valores corporativos"]
+    },
+    traductor: {
+      originalCVText: `Perfil profesional experimentado en la posición de ${role}.`,
+      translatedCVText: `Classified Summary: Experienced professional matching the ${role} requirements.`,
+      cvTranslated: false
+    },
+    briefing: {
+      generated: true,
+      content: `El candidato ${candName} ha sido seleccionado para la fase de presentación al cliente para la vacante de ${role}.\n\nDemuestra sólida solvencia técnica con un ${score}% de fit score.\n\nPretensión salarial dentro de la banda presupuestada.`
+    },
+    agenda: {
+      suggestedSlots: [
+        "Miércoles 22 Julio - 10:00h CEST",
+        "Jueves 23 Julio - 16:00h CEST"
+      ],
+      isScheduled: false
+    },
+    tracker: {
+      hoursSinceSent: 24,
+      slaExceeded: false,
+      totalRemindersSent: 0
+    }
+  };
+};
+
+export const mapPipelineToPresentacionCandidates = (
+  pipelineItems: PipelineItem[],
+  candidatosList: Candidato[],
+  busquedasList: Busqueda[]
+): PresentacionCandidate[] => {
+  const candMap = new Map(candidatosList.map(c => [c.id, c]));
+  const busqMap = new Map(busquedasList.map(b => [b.id, b]));
+
+  const result: PresentacionCandidate[] = [];
+
+  for (const pipe of pipelineItems) {
+    const cand = candMap.get(pipe.claves_conexion?.id_candidato);
+    const busq = busqMap.get(pipe.claves_conexion?.id_busqueda);
+
+    const stateStr = (pipe.flujo?.estado_actual || "").toLowerCase();
+
+    // Map pipeline states to Presentacion phases (09_shortlist, 10_entrevista_cliente, 11_standby)
+    let currentPhase: PresentacionCandidate["currentPhase"] | null = null;
+    if (stateStr.includes("09") || stateStr.includes("shortlist") || stateStr.includes("presentado") || stateStr.includes("enviado")) {
+      currentPhase = "09_shortlist";
+    } else if (stateStr.includes("10") || stateStr.includes("entrevista") || stateStr.includes("cliente")) {
+      currentPhase = "10_entrevista_cliente";
+    } else if (stateStr.includes("11") || stateStr.includes("standby") || stateStr.includes("back-up") || stateStr.includes("backup")) {
+      currentPhase = "11_standby";
+    }
+
+    if (!currentPhase) {
+      continue;
+    }
+
+    const candName = cand?.nombre_completo || "Candidato";
+    const role = cand?.puesto || busq?.perfil_busqueda || "Especialista Tech";
+    const client = busq?.cliente || "Cliente";
+    const location = cand?.ubicacion || "España / Remoto";
+    const score = pipe.f1_descubrimiento?.analisis_semantico?.fit_score ?? pipe.f2_evaluacion?.puntaje_tecnico ?? pipe.evaluacion?.puntaje_tecnico ?? 87;
+    const entryDate = pipe.flujo?.fecha_ultimo_cambio || pipe.createdAt || new Date().toISOString();
+    const email = cand?.email || "candidato@email.com";
+    const contactNumber = cand?.telefono_movil || "+34 600 000 000";
+
+    const initialNotes = cand?.notas_iniciales || "";
+    const f1Notes = pipe.f1_descubrimiento?.notas_reclutador || "";
+    const f2Notes = pipe.f2_evaluacion?.notas_reclutador || pipe.evaluacion?.notas_reclutador || "";
+    const f3Notes = (pipe as any)?.f3_presentacion?.notas_reclutador || 
+                    (pipe as any)?.presentacion?.notas_reclutador || 
+                    (pipe as any)?.f3_cliente?.notas_reclutador || 
+                    (pipe as any)?.f3?.notas_reclutador || "";
+
+    result.push({
+      id: cand?.id || pipe.claves_conexion?.id_candidato || pipe.id,
+      pipeId: pipe.id,
+      name: candName,
+      role,
+      client,
+      location,
+      score,
+      currentPhase,
+      entryDate,
+      cNPS: 9,
+      lastActivity: pipe.flujo?.fecha_ultimo_cambio 
+        ? `Último cambio: ${new Date(pipe.flujo.fecha_ultimo_cambio).toLocaleDateString("es-ES")}` 
+        : "Registro de presentación sincronizado desde backend",
+      experienceYears: 5,
+      contactNumber,
+      email,
+      initialNotes,
+      f1Notes,
+      f2Notes,
+      f3Notes,
+      recruiterNotes: f3Notes || f2Notes,
+      toolsDetails: generateDefaultPresentacionToolsDetails(candName, role, score)
+    });
+  }
+
+  return result;
+};
+
+
 // Initial mock dataset for Presentacion page
 export const INITIAL_PRESENTACION_CANDIDATES: PresentacionCandidate[] = [
   {
@@ -54,7 +179,7 @@ export const INITIAL_PRESENTACION_CANDIDATES: PresentacionCandidate[] = [
     client: "Inditex S.A.",
     location: "A Coruña, España / Remoto",
     score: 87,
-    currentPhase: "08_shortlist",
+    currentPhase: "09_shortlist",
     entryDate: new Date(Date.now() - 40 * 60 * 60 * 1000).toISOString(), // 40 hours ago
     cNPS: 9,
     lastActivity: "CV y Briefing enviado al Hiring Manager de Inditex S.A.",
@@ -105,7 +230,7 @@ export const INITIAL_PRESENTACION_CANDIDATES: PresentacionCandidate[] = [
     client: "Telefónica S.A.",
     location: "Madrid, España / Remoto",
     score: 93,
-    currentPhase: "08_shortlist",
+    currentPhase: "09_shortlist",
     entryDate: new Date(Date.now() - 56 * 60 * 60 * 1000).toISOString(), // 56 hours ago (SLA overload warning > 48h)
     cNPS: 10,
     lastActivity: "Expediente enviado a Telefónica S.A. Esperando confirmación de agenda.",
@@ -155,7 +280,7 @@ export const INITIAL_PRESENTACION_CANDIDATES: PresentacionCandidate[] = [
     client: "SEAT S.A.",
     location: "Barcelona, España",
     score: 95,
-    currentPhase: "09_entrevista_cliente",
+    currentPhase: "10_entrevista_cliente",
     entryDate: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(), // 72 hours ago
     cNPS: 8,
     lastActivity: "Entrevista técnica completada con el equipo automotriz de SEAT S.A.",
@@ -204,7 +329,7 @@ export const INITIAL_PRESENTACION_CANDIDATES: PresentacionCandidate[] = [
     client: "Banco Santander",
     location: "Madrid, España / Remoto",
     score: 82,
-    currentPhase: "09_entrevista_cliente",
+    currentPhase: "10_entrevista_cliente",
     entryDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     cNPS: 7,
     lastActivity: "Segunda ronda de entrevista agendada con el Director de Ciberseguridad.",
@@ -254,7 +379,7 @@ export const INITIAL_PRESENTACION_CANDIDATES: PresentacionCandidate[] = [
     client: "Inditex S.A.",
     location: "Madrid, España / Remoto",
     score: 78,
-    currentPhase: "10_standby",
+    currentPhase: "11_standby",
     entryDate: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
     cNPS: 5,
     lastActivity: "Candidato colocado en Stand-by tras entrevista por Inditex S.A. Evalúan perfiles alternativos.",
@@ -300,7 +425,7 @@ export const INITIAL_PRESENTACION_CANDIDATES: PresentacionCandidate[] = [
 
 // Helper calculations for Metrics Stage 3
 export interface PresentacionKPIs {
-  blockageTimeHours: number; // Avg hours candidates wait in 08_shortlist and 10_standby
+  blockageTimeHours: number; // Avg hours candidates wait in 09_shortlist and 11_standby
   avgCNPS: number;
   calibrationAccuracy: number; // Percentage of candidates interviewed (09) or in standby (10) out of total shortlist candidates
   activeWipCount: number;
@@ -312,9 +437,9 @@ export function calculatePresentacionKPIs(candidates: PresentacionCandidate[]): 
   const activeWipCount = candidates.length;
   const isWipOverloaded = activeWipCount > 10;
 
-  // 1. Average Blockage Time: candidates waiting for feedback (08_shortlist or 10_standby)
+  // 1. Average Blockage Time: candidates waiting for feedback (09_shortlist or 11_standby)
   const blockageCandidates = candidates.filter(
-    (c) => c.currentPhase === "08_shortlist" || c.currentPhase === "10_standby"
+    (c) => c.currentPhase === "09_shortlist" || c.currentPhase === "11_standby"
   );
   
   const now = new Date();
@@ -334,9 +459,9 @@ export function calculatePresentacionKPIs(candidates: PresentacionCandidate[]): 
   const sumNps = candidatesWithNps.reduce((acc, c) => acc + (c.cNPS || 0), 0);
   const avgCNPS = candidatesWithNps.length > 0 ? Math.round((sumNps / candidatesWithNps.length) * 10) / 10 : 0;
 
-  // 3. Calibration Accuracy: (09_entrevista_cliente + 10_standby) / Total candidates
+  // 3. Calibration Accuracy: (10_entrevista_cliente + 11_standby) / Total candidates
   const acceptedToInterview = candidates.filter(
-    (c) => c.currentPhase === "09_entrevista_cliente" || c.currentPhase === "10_standby"
+    (c) => c.currentPhase === "10_entrevista_cliente" || c.currentPhase === "11_standby"
   ).length;
 
   const calibrationAccuracy = activeWipCount > 0 ? Math.round((acceptedToInterview / activeWipCount) * 100) : 0;
