@@ -17,6 +17,7 @@ export interface EvaluacionCandidate {
   f1Notes?: string;
   f2Notes?: string;
   recruiterNotes?: string;
+  url_cv?: string;
   toolsDetails: {
     sintetizador: {
       pros: string[];

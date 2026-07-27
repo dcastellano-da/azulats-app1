@@ -1,31 +1,159 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from "react";
-import { X, Upload, FileText, Trash2, AlertCircle, Sparkles, Loader2 } from "lucide-react";
-import { importarCandidatoIA_API } from "@/actions/candidatos";
+import { 
+  X, 
+  Upload, 
+  FileText, 
+  Trash2, 
+  AlertCircle, 
+  Sparkles, 
+  CheckCircle2, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Globe, 
+  RefreshCw, 
+  FileCheck,
+  Check,
+  Briefcase,
+  FileEdit,
+  Share2
+} from "lucide-react";
+import { importarCandidatoIA_API, actualizarCandidatoAPI, getCandidatosAPI, Candidato } from "@/actions/candidatos";
+import { crearPipelineAPI, actualizarPipelineAPI } from "@/actions/pipeline";
 
-interface ImportarIaModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: (nombreCompleto: string) => void;
+export interface SearchOption {
+  id: string;
+  client?: string;
+  role?: string;
+  perfil_busqueda?: string;
+  cliente?: string;
 }
 
-export default function ImportarIaModal({ isOpen, onClose, onSuccess }: ImportarIaModalProps) {
+export interface ImportarIaModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (nombreCompleto: string, candidateData?: Partial<Candidato> | null, selectedSearchId?: string) => void;
+  onCandidateCreated?: (nombreCompleto: string, candidateData?: Partial<Candidato> | null, selectedSearchId?: string) => void;
+  mode?: "talento" | "descubrimiento";
+  searches?: SearchOption[];
+  defaultSearchId?: string;
+  targetEstadoRevision?: "Pendiente" | "Revisado" | "Descartado" | "Seleccionado";
+}
+
+type ModalStepState = "idle" | "processing" | "result" | "error";
+
+interface ProcessingStep {
+  title: string;
+  subtitle: string;
+}
+
+const PROCESSING_STEPS: ProcessingStep[] = [
+  {
+    title: "1. Lectura y validación de documento",
+    subtitle: "Comprobando formato y preparando el archivo para procesamiento"
+  },
+  {
+    title: "2. Inferencia y análisis con IA (Gemini)",
+    subtitle: "Extrayendo contacto, historial laboral, habilidades e idiomas"
+  },
+  {
+    title: "3. Sincronización de perfil y asignación de estado",
+    subtitle: "Estructurando ficha, guardando estado y vinculando a la búsqueda activa"
+  }
+];
+
+export default function ImportarIaModal({ 
+  isOpen, 
+  onClose, 
+  onSuccess,
+  onCandidateCreated,
+  mode = "talento",
+  searches = [],
+  defaultSearchId,
+  targetEstadoRevision
+}: ImportarIaModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [notasIniciales, setNotasIniciales] = useState("");
+  const [notasText, setNotasText] = useState("");
+  const [selectedSearchId, setSelectedSearchId] = useState<string>("");
+  const [canalIngreso, setCanalIngreso] = useState<string>("LinkedIn");
+  const [existingChannels, setExistingChannels] = useState<string[]>([
+    "Headhunting",
+    "LinkedIn",
+    "Referido",
+    "InfoJob",
+    "Otros"
+  ]);
+  const [isCustomChannel, setIsCustomChannel] = useState(false);
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Step visualization state
+  const [stepState, setStepState] = useState<ModalStepState>("idle");
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [extractedCandidato, setExtractedCandidato] = useState<Partial<Candidato> | null>(null);
 
-  const handleClose = () => {
-    if (isProcessing) return;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialize selected search ID and dynamic channels when modal opens or searches change
+  useEffect(() => {
+    if (isOpen) {
+      if (defaultSearchId) {
+        setSelectedSearchId(defaultSearchId);
+      } else if (searches.length > 0) {
+        setSelectedSearchId(searches[0].id);
+      }
+
+      // Load existing channels dynamically from DB
+      getCandidatosAPI().then((res) => {
+        if (res.success && res.data) {
+          const defaults = ["Headhunting", "LinkedIn", "Referido", "InfoJob", "Otros"];
+          const dbChannels = res.data
+            .map((c: Candidato) => c.canal_ingreso)
+            .filter((ch: string | null | undefined): ch is string => Boolean(ch && ch.trim()));
+          const uniqueChannels = Array.from(new Set([...defaults, ...dbChannels]));
+          setExistingChannels(uniqueChannels);
+        }
+      }).catch(err => {
+        console.warn("Error loading channels in ImportarIaModal:", err);
+      });
+    }
+  }, [isOpen, defaultSearchId, searches]);
+
+  const resetState = () => {
     setFile(null);
     setFileError(null);
     setErrorMessage(null);
-    setNotasIniciales("");
+    setNotasText("");
+    setCanalIngreso("LinkedIn");
+    setIsCustomChannel(false);
+    setStepState("idle");
+    setCurrentStepIndex(0);
+    setProgressPercent(0);
+    setExtractedCandidato(null);
+    if (searches.length > 0) {
+      setSelectedSearchId(defaultSearchId || searches[0].id);
+    } else {
+      setSelectedSearchId("");
+    }
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+    }
+  };
+
+  const handleClose = () => {
+    if (stepState === "processing") return;
+    
+    // If we finished successfully and user closes modal, trigger onSuccess
+    if (stepState === "result" && extractedCandidato?.nombre_completo) {
+      onSuccess(extractedCandidato.nombre_completo, extractedCandidato, selectedSearchId);
+    }
+    
+    resetState();
     onClose();
   };
 
@@ -38,6 +166,9 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
     }
     return () => {
       document.body.style.overflow = "";
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+      }
     };
   }, [isOpen]);
 
@@ -46,14 +177,12 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
   const validateFile = (selected?: File) => {
     if (!selected) return;
 
-    // Weight boundary check: size > 5MB
     if (selected.size > 5 * 1024 * 1024) {
       setFile(null);
       setFileError("El archivo supera el tamaño máximo permitido de 5MB.");
       return;
     }
 
-    // Type checking: PDF, DOC, DOCX
     const allowedTypes = [
       "application/pdf",
       "application/msword",
@@ -91,7 +220,7 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
     e.preventDefault();
     e.stopPropagation();
     setIsDragActive(false);
-    if (!isProcessing && e.dataTransfer.files && e.dataTransfer.files[0]) {
+    if (stepState === "idle" && e.dataTransfer.files && e.dataTransfer.files[0]) {
       validateFile(e.dataTransfer.files[0]);
     }
   };
@@ -107,8 +236,41 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
   };
 
   const triggerFileSelect = () => {
-    if (!isProcessing) {
+    if (stepState === "idle") {
       fileInputRef.current?.click();
+    }
+  };
+
+  const startStepProgressAnimation = () => {
+    setCurrentStepIndex(0);
+    setProgressPercent(15);
+
+    let currentP = 15;
+    let stepIdx = 0;
+
+    progressTimerRef.current = setInterval(() => {
+      if (stepIdx === 0 && currentP < 35) {
+        currentP += 5;
+      } else if (stepIdx === 0 && currentP >= 35) {
+        stepIdx = 1;
+        setCurrentStepIndex(1);
+        currentP = 40;
+      } else if (stepIdx === 1 && currentP < 80) {
+        currentP += 4;
+      } else if (stepIdx === 1 && currentP >= 80) {
+        stepIdx = 2;
+        setCurrentStepIndex(2);
+        currentP = 85;
+      } else if (stepIdx === 2 && currentP < 95) {
+        currentP += 1;
+      }
+      setProgressPercent(Math.min(currentP, 95));
+    }, 450);
+  };
+
+  const stopStepProgressAnimation = () => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
     }
   };
 
@@ -118,198 +280,633 @@ export default function ImportarIaModal({ isOpen, onClose, onSuccess }: Importar
       return;
     }
 
-    setIsProcessing(true);
+    if ((mode === "descubrimiento" || searches.length > 0) && !selectedSearchId) {
+      setErrorMessage("Por favor, selecciona la Búsqueda Activa a la que se asociará el talento.");
+      return;
+    }
+
+    setStepState("processing");
     setErrorMessage(null);
+    startStepProgressAnimation();
 
     const formData = new FormData();
     formData.append("cv", file);
-    if (notasIniciales.trim()) {
-      formData.append("notas_iniciales", notasIniciales.trim());
+    
+    // Only pass initial candidate notes when NOT in descubrimiento mode
+    if (mode !== "descubrimiento" && notasText.trim()) {
+      formData.append("notas_iniciales", notasText.trim());
     }
 
     try {
       const response = await importarCandidatoIA_API(formData);
-      if (response.success && response.status === 201) {
-        const nombre = response.data?.nombre_completo || "Candidato Desconocido";
-        onSuccess(nombre);
+
+      if (response.success && (response.status === 201 || response.status === 200)) {
+        const data: Partial<Candidato> = response.data || {};
+
+        // 1. Enforce estado_revision and canal_ingreso
+        const newStatus = targetEstadoRevision || (mode === "descubrimiento" ? "Seleccionado" : null);
+        const updatePayload: Partial<Candidato> = {};
+        if (newStatus) updatePayload.estado_revision = newStatus;
+        if (canalIngreso.trim()) updatePayload.canal_ingreso = canalIngreso.trim();
+
+        if (Object.keys(updatePayload).length > 0 && data.id) {
+          try {
+            await actualizarCandidatoAPI(data.id, updatePayload);
+            if (updatePayload.estado_revision) data.estado_revision = updatePayload.estado_revision;
+            if (updatePayload.canal_ingreso) data.canal_ingreso = updatePayload.canal_ingreso;
+          } catch (err) {
+            console.warn("[ImportarIaModal] Warning setting estado_revision / canal_ingreso:", err);
+          }
+        }
+
+        // 2. Link candidate to search in pipeline if selected
+        if (selectedSearchId && data.id) {
+          try {
+            const pipeRes = await crearPipelineAPI(selectedSearchId, data.id);
+            
+            // In descubrimiento mode, store notes directly in pipeline_entrevistas.f1_descubrimiento.notas_reclutador
+            if (mode === "descubrimiento" && notasText.trim() && pipeRes.success && pipeRes.data?.id) {
+              await actualizarPipelineAPI(pipeRes.data.id, {
+                f1_descubrimiento: {
+                  notas_reclutador: notasText.trim()
+                }
+              });
+            }
+          } catch (err) {
+            console.warn("[ImportarIaModal] Warning linking to pipeline or updating recruiter notes:", err);
+          }
+        }
+
+        stopStepProgressAnimation();
+        setCurrentStepIndex(2);
+        setProgressPercent(100);
+        setExtractedCandidato(data);
+
+        setTimeout(() => {
+          setStepState("result");
+        }, 500);
       } else {
+        stopStepProgressAnimation();
+        setStepState("error");
         setErrorMessage(response.message || "Error al procesar la importación con IA.");
       }
     } catch (err: any) {
+      stopStepProgressAnimation();
+      setStepState("error");
       setErrorMessage("Error de red inesperado al conectar con el servidor.");
-    } finally {
-      setIsProcessing(false);
     }
   };
 
+  const handleFinish = () => {
+    const nombre = extractedCandidato?.nombre_completo || "Candidato";
+    resetState();
+    onSuccess(nombre, extractedCandidato, selectedSearchId);
+    onClose();
+  };
+
+  const handleImportAnother = () => {
+    const nombre = extractedCandidato?.nombre_completo || "Candidato";
+    if (onCandidateCreated) {
+      onCandidateCreated(nombre, extractedCandidato, selectedSearchId);
+    }
+    
+    // Reset file and form fields to idle state without closing modal
+    setFile(null);
+    setFileError(null);
+    setErrorMessage(null);
+    setNotasText("");
+    setStepState("idle");
+    setCurrentStepIndex(0);
+    setProgressPercent(0);
+    setExtractedCandidato(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return "IA";
+    const parts = name.trim().split(" ");
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const parseSkills = (skillsRaw?: string | null): string[] => {
+    if (!skillsRaw) return [];
+    return skillsRaw
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  };
+
+  // Find active search label for display in result
+  const activeSearchObj = searches.find(s => s.id === selectedSearchId);
+  const activeSearchLabel = activeSearchObj 
+    ? `${activeSearchObj.role || activeSearchObj.perfil_busqueda || activeSearchObj.id} (${activeSearchObj.client || activeSearchObj.cliente || "Empresa"})`
+    : selectedSearchId;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-auto">
       {/* Backdrop overlay */}
       <div
-        className="absolute inset-0 bg-[#000000]/70 backdrop-blur-sm transition-opacity duration-300"
+        className="absolute inset-0 bg-[#000000]/75 backdrop-blur-sm transition-opacity duration-300"
         onClick={handleClose}
       />
 
       {/* Modal box */}
-      <div className="relative z-10 w-full max-w-md bg-[#15181a]/95 border border-white/10 rounded-3xl p-6 shadow-2xl text-white backdrop-blur-md flex flex-col space-y-6">
+      <div className="relative z-10 w-full max-w-lg bg-[#15181a]/95 border border-white/10 rounded-3xl p-6 shadow-2xl text-white backdrop-blur-md flex flex-col space-y-5 transition-all">
         
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[#6bd8cb]" />
-            <h3 className="text-base font-bold text-white tracking-tight">Importar con IA</h3>
-          </div>
-          <button
-            onClick={handleClose}
-            disabled={isProcessing}
-            className={`w-8 h-8 rounded-lg border border-white/5 bg-white/5 flex items-center justify-center text-[#c4c1fb] transition-all ${
-              isProcessing ? "opacity-30 cursor-not-allowed" : "hover:bg-white/10 hover:text-white cursor-pointer"
-            }`}
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Informative description */}
-        <div className="text-xs text-[#879391] leading-relaxed">
-          Sube un CV y nuestra IA extraerá los datos de contacto, habilidades e idiomas para crear la ficha automáticamente.
-        </div>
-
-        {/* Drag and Drop Container */}
-        <div className="flex flex-col">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            disabled={isProcessing}
-            className="hidden"
-          />
-
-          {!file ? (
-            <div
-              onDragEnter={handleDrag}
-              onDragOver={handleDrag}
-              onDragLeave={handleDrag}
-              onDrop={handleDrop}
-              onClick={triggerFileSelect}
-              className={`w-full min-h-[140px] rounded-2xl border border-dashed flex flex-col items-center justify-center p-5 text-center cursor-pointer transition-all duration-200 ${
-                isDragActive
-                  ? "border-[#6bd8cb] bg-[#6bd8cb]/10"
-                  : "border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30"
-              } ${isProcessing ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
-            >
-              <Upload className="w-8 h-8 text-[#6bd8cb] mb-2" />
-              <p className="text-xs font-bold text-white mb-0.5">Arrastra y suelta tu CV aquí</p>
-              <p className="text-[10px] text-[#879391] font-medium">o haz clic para explorar en el ordenador</p>
-              <p className="text-[9px] text-[#c4c1fb] mt-2.5 bg-[#c4c1fb]/5 px-2.5 py-0.5 rounded border border-[#c4c1fb]/10 animate-pulse">
-                PDF, DOC, DOCX • Máx 5MB
+        <div className="flex items-center justify-between border-b border-white/5 pb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#6bd8cb]/15 border border-[#6bd8cb]/30 flex items-center justify-center text-[#6bd8cb]">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white tracking-tight leading-none">
+                {mode === "descubrimiento" ? "Parser Ingesta CV con IA" : "Importar Candidato con IA"}
+              </h3>
+              <p className="text-[10px] text-[#879391] mt-1 font-medium">
+                {stepState === "idle" && (mode === "descubrimiento" ? "Sube el CV y asócialo a una búsqueda activa" : "Extrae la información clave del CV de forma automática")}
+                {stepState === "processing" && "Ejecutando motor de inferencia Genkit + Gemini"}
+                {stepState === "result" && "Resultado del análisis y perfil generado"}
+                {stepState === "error" && "Hubo un inconveniente durante la importación"}
               </p>
-              {fileError && (
-                <div className="mt-3 flex items-center gap-1.5 text-rose-400 text-[10px] font-semibold bg-rose-500/5 px-2 py-1 rounded border border-rose-500/20">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <span>{fileError}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span title="ID de componente emergente para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+              ID: {mode === "descubrimiento" ? "M-IMP-02" : "M-IMP-01"}
+            </span>
+            <button
+              onClick={handleClose}
+              disabled={stepState === "processing"}
+              className={`w-8 h-8 rounded-lg border border-white/5 bg-white/5 flex items-center justify-center text-[#c4c1fb] transition-all ${
+                stepState === "processing" ? "opacity-30 cursor-not-allowed" : "hover:bg-white/10 hover:text-white cursor-pointer"
+              }`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* ----------------- STATE 1: IDLE ----------------- */}
+        {stepState === "idle" && (
+          <>
+            {/* Campo Obligatorio: Búsqueda Activa (Modo Descubrimiento o si hay búsquedas) */}
+            {(mode === "descubrimiento" || searches.length > 0) && (
+              <div className="flex flex-col text-left space-y-1.5">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Briefcase className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                    Búsqueda Activa Asociada *
+                  </span>
+                  <span className="text-[9px] text-[#6bd8cb] font-semibold lowercase">fase: 01 - nuevo en revisión</span>
+                </label>
+                <select
+                  value={selectedSearchId}
+                  onChange={(e) => setSelectedSearchId(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all cursor-pointer"
+                >
+                  {searches.map((s) => {
+                    const label = `${s.id} - ${s.role || s.perfil_busqueda || "Posición"} (${s.client || s.cliente || "Cliente"})`;
+                    return (
+                      <option key={s.id} value={s.id} className="bg-[#15181a] text-white">
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
+
+            <div className="flex flex-col">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="hidden"
+              />
+
+              {!file ? (
+                <div
+                  onDragEnter={handleDrag}
+                  onDragOver={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDrop={handleDrop}
+                  onClick={triggerFileSelect}
+                  className={`w-full min-h-[140px] rounded-2xl border border-dashed flex flex-col items-center justify-center p-5 text-center cursor-pointer transition-all duration-200 ${
+                    isDragActive
+                      ? "border-[#6bd8cb] bg-[#6bd8cb]/10"
+                      : "border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30"
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 flex items-center justify-center text-[#6bd8cb] mb-2.5">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-bold text-white mb-1">Arrastra y suelta el CV aquí</p>
+                  <p className="text-[10px] text-[#879391] font-medium">o haz clic para examinar tus archivos</p>
+                  <span className="text-[10px] text-[#c4c1fb] mt-2.5 bg-[#c4c1fb]/10 px-3 py-0.5 rounded-full border border-[#c4c1fb]/20 font-medium">
+                    PDF, DOC, DOCX • Máx 5MB
+                  </span>
+                  {fileError && (
+                    <div className="mt-2.5 flex items-center gap-1.5 text-rose-400 text-[11px] font-semibold bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{fileError}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-3.5 rounded-2xl border border-[#6bd8cb]/40 bg-[#6bd8cb]/10 transition-all">
+                  <div className="flex items-center gap-3 max-w-[80%]">
+                    <div className="w-9 h-9 rounded-xl bg-[#6bd8cb]/20 border border-[#6bd8cb]/30 flex items-center justify-center text-[#6bd8cb] shrink-0">
+                      <FileText className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{file.name}</p>
+                      <p className="text-[10px] text-[#879391] mt-0.5">
+                        {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.name.split('.').pop()?.toUpperCase()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={removeFile}
+                    className="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 hover:bg-rose-500/20 transition-all cursor-pointer"
+                    title="Quitar Archivo"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="flex items-center justify-between p-3.5 rounded-2xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/5">
-              <div className="flex items-center gap-2 max-w-[80%]">
-                <div className="w-8 h-8 rounded-lg bg-[#6bd8cb]/20 flex items-center justify-center text-[#6bd8cb] shrink-0">
-                  <FileText className="w-4.5 h-4.5" />
+
+            {/* Campo Canal de Ingreso */}
+            <div className="flex flex-col text-left space-y-1.5">
+              <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <Share2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                  Canal de Ingreso (Sourcing)
+                </span>
+                <span className="text-[9px] text-[#879391] font-mono">
+                  {existingChannels.length} en DB
+                </span>
+              </label>
+              <div className="space-y-2">
+                <select
+                  value={isCustomChannel || (!existingChannels.includes(canalIngreso) && canalIngreso !== "") ? "OTHER_CUSTOM" : canalIngreso}
+                  onChange={(e) => {
+                    if (e.target.value === "OTHER_CUSTOM") {
+                      setIsCustomChannel(true);
+                      setCanalIngreso("");
+                    } else {
+                      setIsCustomChannel(false);
+                      setCanalIngreso(e.target.value);
+                    }
+                  }}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all cursor-pointer font-medium"
+                >
+                  <option value="" className="bg-[#15181a]">-- Sin especificar --</option>
+                  <optgroup label="Canales detectados en la Base de Datos">
+                    {existingChannels.map((ch) => (
+                      <option key={ch} value={ch} className="bg-[#15181a] text-white">
+                        {ch}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <option value="OTHER_CUSTOM" className="bg-[#15181a] text-[#6bd8cb] font-semibold">
+                    + Escribir nuevo canal personalizado...
+                  </option>
+                </select>
+
+                {(isCustomChannel || (!existingChannels.includes(canalIngreso) && canalIngreso !== "")) && (
+                  <input
+                    type="text"
+                    value={canalIngreso}
+                    onChange={(e) => setCanalIngreso(e.target.value)}
+                    placeholder="Escribe la vía de sourcing específica (ej: Headhunting, LinkedIn, Referido...)..."
+                    className="w-full bg-[#15181a] border border-[#6bd8cb]/40 rounded-2xl px-4 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Campo de Notas (dinámico según modo) */}
+            <div className="flex flex-col text-left space-y-1.5">
+              <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <FileEdit className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                  {mode === "descubrimiento" ? "Notas del Reclutador (F1 Descubrimiento)" : "Notas iniciales"}
+                </span>
+                <span className="text-[9px] text-[#879391] font-normal lowercase">(opcional)</span>
+              </label>
+              <textarea
+                value={notasText}
+                onChange={(e) => setNotasText(e.target.value)}
+                placeholder={
+                  mode === "descubrimiento"
+                    ? "Añade observaciones del reclutador para la fase F1 Descubrimiento (pipeline_entrevistas.f1_descubrimiento.notas_reclutador)..."
+                    : "Añade anotaciones o contexto relevante sobre este perfil..."
+                }
+                rows={2}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder:text-white/30 resize-y min-h-[60px]"
+              />
+            </div>
+
+            {/* Global errors */}
+            {errorMessage && (
+              <div className="flex gap-2.5 p-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 text-rose-400 text-xs leading-relaxed text-left font-medium">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2 justify-end">
+              <button
+                onClick={handleClose}
+                className="px-4.5 py-2.5 rounded-xl text-xs font-bold text-[#c4c1fb] border border-[#c4c1fb]/20 bg-white/5 hover:bg-white/10 transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              
+              <button
+                onClick={handleProcess}
+                disabled={!file}
+                className={`px-5 py-2.5 rounded-xl text-xs font-bold text-[#101415] bg-[#6bd8cb] hover:bg-[#6bd8cb]/95 transition-all shadow-md flex items-center gap-2 ${
+                  !file ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                }`}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Procesar PDF</span>
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ----------------- STATE 2: PROCESSING (PASOS DEL PROCESO) ----------------- */}
+        {stepState === "processing" && (
+          <div className="py-2 flex flex-col space-y-6">
+            
+            {/* Progress Bar Header */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#6bd8cb] font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 animate-spin" />
+                  Procesando CV con Inteligencia Artificial...
+                </span>
+                <span className="text-xs font-bold text-[#c4c1fb]">{progressPercent}%</span>
+              </div>
+
+              {/* Visual Progress Track */}
+              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-[#6bd8cb] to-[#c4c1fb] transition-all duration-500 ease-out"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Stepper Timeline */}
+            <div className="space-y-4">
+              {PROCESSING_STEPS.map((step, idx) => {
+                const isDone = idx < currentStepIndex || (idx === currentStepIndex && progressPercent === 100);
+                const isCurrent = idx === currentStepIndex && progressPercent < 100;
+
+                return (
+                  <div 
+                    key={idx}
+                    className={`flex items-start gap-3.5 p-3.5 rounded-2xl border transition-all ${
+                      isCurrent 
+                        ? "bg-[#6bd8cb]/10 border-[#6bd8cb]/40 text-white shadow-lg" 
+                        : isDone 
+                        ? "bg-white/5 border-white/10 text-white" 
+                        : "bg-white/[0.02] border-white/5 text-[#879391]"
+                    }`}
+                  >
+                    {/* Step Icon */}
+                    <div className="mt-0.5 shrink-0">
+                      {isDone ? (
+                        <div className="w-6 h-6 rounded-full bg-[#6bd8cb] flex items-center justify-center text-[#101415]">
+                          <Check className="w-4 h-4 stroke-[3]" />
+                        </div>
+                      ) : isCurrent ? (
+                        <div className="w-6 h-6 rounded-full border-2 border-[#6bd8cb] border-t-transparent animate-spin flex items-center justify-center" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center text-xs font-bold text-[#879391]">
+                          {idx + 1}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step Info */}
+                    <div className="text-left flex-1 min-w-0">
+                      <p className={`text-xs font-bold ${isCurrent ? "text-[#6bd8cb]" : isDone ? "text-white" : "text-[#879391]"}`}>
+                        {step.title}
+                      </p>
+                      <p className="text-[10px] text-[#879391] mt-0.5 leading-snug">
+                        {step.subtitle}
+                      </p>
+                    </div>
+
+                    {/* Active Badge */}
+                    {isCurrent && (
+                      <span className="text-[9px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/20 px-2 py-0.5 rounded-md border border-[#6bd8cb]/30 animate-pulse shrink-0">
+                        En ejecución
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="text-[10px] text-[#879391] text-center italic bg-white/5 p-2.5 rounded-xl border border-white/5">
+              Por favor no cierres esta ventana mientras la IA analiza y registra la información.
+            </div>
+          </div>
+        )}
+
+        {/* ----------------- STATE 3: RESULT (RESULTADO FINAL DEL PROCESO) ----------------- */}
+        {stepState === "result" && extractedCandidato && (
+          <div className="flex flex-col space-y-4 text-left animate-fade-in">
+            
+            {/* Banner de Éxito y Asignación de Estados */}
+            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#6bd8cb]/15 border border-[#6bd8cb]/40 text-[#6bd8cb]">
+              <div className="w-9 h-9 rounded-xl bg-[#6bd8cb]/20 flex items-center justify-center shrink-0 mt-0.5">
+                <CheckCircle2 className="w-5 h-5 text-[#6bd8cb]" />
+              </div>
+              <div className="text-xs">
+                <h4 className="font-bold text-white">¡Perfil Ingestado e Importado Exitosamente!</h4>
+                <div className="mt-1.5 flex flex-wrap gap-2 text-[10px]">
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
+                    Talento: Seleccionado
+                  </span>
+                  {mode === "descubrimiento" && (
+                    <span className="bg-[#c4c1fb]/20 text-[#c4c1fb] border border-[#c4c1fb]/30 px-2 py-0.5 rounded font-bold">
+                      Descubrimiento: 01 - Nuevo en Revisión
+                    </span>
+                  )}
                 </div>
-                <div className="text-left min-w-0">
-                  <p className="text-xs font-bold text-white truncate">{file.name}</p>
-                  <p className="text-[9px] text-[#879391]">
-                    {(file.size / (1024 * 1024)).toFixed(2)} MB • {file.name.split('.').pop()?.toUpperCase()}
+                {activeSearchLabel && mode === "descubrimiento" && (
+                  <p className="text-[10px] text-[#879391] mt-1">
+                    Búsqueda vinculada: <span className="text-white font-semibold">{activeSearchLabel}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Card del Candidato Extraído */}
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3.5">
+              
+              {/* Header Candidato */}
+              <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#6bd8cb] to-[#c4c1fb] p-0.5 shrink-0">
+                  <div className="w-full h-full bg-[#15181a] rounded-[14px] flex items-center justify-center text-[#6bd8cb] font-bold text-sm">
+                    {getInitials(extractedCandidato.nombre_completo)}
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-bold text-white truncate">
+                    {extractedCandidato.nombre_completo || "Sin Nombre"}
+                  </h4>
+                  <p className="text-xs text-[#6bd8cb] font-medium truncate mt-0.5">
+                    {extractedCandidato.puesto || "Puesto no especificado"}
                   </p>
                 </div>
               </div>
 
+              {/* Metadata Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                <div className="flex items-center gap-2 text-[#879391] bg-white/5 p-2 rounded-xl border border-white/5 truncate">
+                  <Mail className="w-4 h-4 text-[#c4c1fb] shrink-0" />
+                  <span className="truncate text-white text-[11px]">
+                    {extractedCandidato.email || "No especificado"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-[#879391] bg-white/5 p-2 rounded-xl border border-white/5 truncate">
+                  <Phone className="w-4 h-4 text-[#c4c1fb] shrink-0" />
+                  <span className="truncate text-white text-[11px]">
+                    {extractedCandidato.telefono_movil || "No especificado"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-[#879391] bg-white/5 p-2 rounded-xl border border-white/5 truncate">
+                  <MapPin className="w-4 h-4 text-[#c4c1fb] shrink-0" />
+                  <span className="truncate text-white text-[11px]">
+                    {extractedCandidato.ubicacion || "No especificada"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-[#879391] bg-white/5 p-2 rounded-xl border border-white/5 truncate">
+                  <Globe className="w-4 h-4 text-[#c4c1fb] shrink-0" />
+                  <span className="truncate text-white text-[11px]">
+                    Inglés: <strong className="text-[#6bd8cb]">{extractedCandidato.nivel_ingles || "No indicado"}</strong>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-[#879391] bg-[#6bd8cb]/10 p-2 rounded-xl border border-[#6bd8cb]/20 truncate col-span-1 sm:col-span-2">
+                  <Share2 className="w-4 h-4 text-[#6bd8cb] shrink-0" />
+                  <span className="truncate text-white text-[11px]">
+                    Canal de Ingreso: <strong className="text-[#6bd8cb] font-semibold">{extractedCandidato.canal_ingreso || canalIngreso || "No especificado"}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Skills section */}
+              {parseSkills(extractedCandidato.skills_principales).length > 0 && (
+                <div className="space-y-1 pt-0.5">
+                  <span className="text-[10px] font-bold text-[#c4c1fb] uppercase tracking-wider block">
+                    Habilidades Destacadas
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                    {parseSkills(extractedCandidato.skills_principales).map((skill, index) => (
+                      <span 
+                        key={index}
+                        className="text-[10px] bg-[#6bd8cb]/10 text-[#6bd8cb] border border-[#6bd8cb]/20 px-2.5 py-0.5 rounded-lg font-medium"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sección de Notas según el modo */}
+              {mode === "descubrimiento" ? (
+                notasText.trim() && (
+                  <div className="space-y-1 pt-0.5 border-t border-white/5">
+                    <span className="text-[10px] font-bold text-[#6bd8cb] uppercase tracking-wider block">
+                      Notas del Reclutador (F1 Descubrimiento)
+                    </span>
+                    <p className="text-[11px] text-[#879391] bg-white/5 p-2.5 rounded-xl border border-[#6bd8cb]/20 leading-relaxed max-h-20 overflow-y-auto">
+                      {notasText.trim()}
+                    </p>
+                  </div>
+                )
+              ) : (
+                (extractedCandidato.resumen || extractedCandidato.notas_iniciales) && (
+                  <div className="space-y-1 pt-0.5 border-t border-white/5">
+                    <span className="text-[10px] font-bold text-[#c4c1fb] uppercase tracking-wider block">
+                      Resumen del Perfil
+                    </span>
+                    <p className="text-[11px] text-[#879391] bg-white/5 p-2.5 rounded-xl border border-white/5 leading-relaxed max-h-20 overflow-y-auto">
+                      {extractedCandidato.resumen || extractedCandidato.notas_iniciales}
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* Result Actions */}
+            <div className="flex gap-3 pt-1 justify-end">
               <button
-                onClick={removeFile}
-                disabled={isProcessing}
-                className="w-8 h-8 rounded-lg bg-red-950/20 border border-[#ffb4ab]/20 flex items-center justify-center text-[#ffb4ab] hover:bg-red-950/40 transition-all cursor-pointer disabled:opacity-50"
-                title="Quitar Archivo"
+                onClick={handleImportAnother}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-[#c4c1fb] border border-[#c4c1fb]/20 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-1.5 cursor-pointer"
               >
-                <Trash2 className="w-4.5 h-4.5" />
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Importar otro CV</span>
+              </button>
+
+              <button
+                onClick={handleFinish}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-[#101415] bg-[#6bd8cb] hover:bg-[#6bd8cb]/95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <FileCheck className="w-4 h-4" />
+                <span>{mode === "descubrimiento" ? "Finalizar y Ver en Pipeline" : "Finalizar y Ver en Lista"}</span>
               </button>
             </div>
-          )}
-        </div>
-
-        {/* Campo: Notas Iniciales */}
-        <div className="flex flex-col text-left space-y-1">
-          <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase">
-            Notas iniciales (Opcional)
-          </label>
-          <textarea
-            value={notasIniciales}
-            onChange={(e) => setNotasIniciales(e.target.value)}
-            placeholder="Añade anotaciones o detalles sobre este postulante..."
-            disabled={isProcessing}
-            rows={3}
-            className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder:text-white/30 resize-y min-h-[70px] disabled:opacity-50"
-          />
-        </div>
-
-        {/* Global errors */}
-        {errorMessage && (
-          <div className="flex gap-2.5 p-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 text-rose-400 text-xs leading-relaxed text-left font-medium">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>{errorMessage}</span>
           </div>
         )}
 
-        {/* Footer Actions */}
-        <div className="flex gap-3 pt-2 justify-end">
-          <button
-            onClick={handleClose}
-            disabled={isProcessing}
-            className={`px-4.5 py-2.5 rounded-xl text-xs font-bold text-[#c4c1fb] border border-[#c4c1fb]/20 bg-white/5 transition-all ${
-              isProcessing ? "opacity-30 cursor-not-allowed" : "hover:bg-white/10 cursor-pointer"
-            }`}
-          >
-            Cancelar
-          </button>
-          
-          <button
-            onClick={handleProcess}
-            disabled={isProcessing || !file}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold text-[#101415] bg-[#6bd8cb] hover:bg-[#6bd8cb]/95 transition-all shadow-md flex items-center gap-1.5 ${
-              isProcessing || !file ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-            }`}
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Procesando...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Procesar PDF</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Loading overlay panel blocker */}
-        {isProcessing && (
-          <div className="absolute inset-0 bg-[#15181a]/80 backdrop-blur-md rounded-3xl flex flex-col items-center justify-center p-6 space-y-4">
-            <div className="relative w-16 h-16 flex items-center justify-center">
-              <div className="absolute inset-0 border-4 border-[#6bd8cb]/20 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-[#6bd8cb] border-t-transparent rounded-full animate-spin"></div>
-              <Sparkles className="w-6 h-6 text-[#6bd8cb] animate-pulse" />
+        {/* ----------------- STATE 4: ERROR ----------------- */}
+        {stepState === "error" && (
+          <div className="py-4 flex flex-col items-center justify-center text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+              <AlertCircle className="w-6 h-6" />
             </div>
-            <div className="text-center space-y-1">
-              <h4 className="text-sm font-bold text-white">Inferencia de IA en Curso</h4>
-              <p className="text-[10px] text-[#879391] max-w-[200px] leading-relaxed">
-                Gemini está extrayendo información estructurada del CV. Por favor no cierres este modal.
+            
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-white">Error al Procesar el CV</h4>
+              <p className="text-xs text-rose-400 max-w-xs leading-relaxed">
+                {errorMessage || "No se pudo extraer la información del documento."}
               </p>
             </div>
+
+            <div className="flex gap-3 pt-2 justify-center">
+              <button
+                onClick={resetState}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-white/10 hover:bg-white/15 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Intentar de nuevo</span>
+              </button>
+            </div>
           </div>
         )}
+
       </div>
     </div>
   );

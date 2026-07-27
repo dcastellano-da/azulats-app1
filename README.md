@@ -160,6 +160,17 @@ El **F3 Cliente Evaluación** (`/presentacion`) administra la fase de presentaci
 *   **KPIs de Negocio:** Tarjetas de métricas de *Stakeholder Blockage Time*, *Calibration Accuracy*, *cNPS del Cliente* y alerta de saturación de cola (WIP > 10).
 *   **Consola de Herramientas de IA para Calibración (Slide-over):** Analítica de Entrevistas Zoom/Meet, Traductor y Estandarizador de Perfiles ATS, Generador de Executive Candidate Briefings por IA, Orquestador de Agendas Condicional y Bot Rastreador de SLA.
 
+### Módulo J: Sistema de Identificadores Alfanuméricos Únicos (`ID: P-xxx` y `ID: M-xxx`)
+Para simplificar la interacción en los prompts de desarrollo y la localización exacta de vistas y ventanas emergentes:
+*   **Identificadores de Página (`P-xxx`)**: Insignia translúcida monospaciada en la cabecera de todas las rutas (`P-TAL-01`, `P-TAL-02`, `P-DIS-01`, `P-DIS-02`, `P-EVA-01`, `P-EVA-02`, `P-PRE-01`, `P-PRE-02`, `P-CIE-01`, `P-CIE-02`, `P-BUS-01`, `P-DSH-01`, `P-CFG-01`, `P-LGN-01`).
+*   **Identificadores de Ventanas Emergentes / Modales (`M-xxx`)**: Insignia de desarrollo en las modales principales: `M-IMP-01` (Modal Ingesta CV en Talento), `M-IMP-02` (Modal Parser Ingesta CV en Descubrimiento), `M-REJ-01` (Modal Motivo Rechazo), `M-ADV-01` (Modal Promoción a F2), `M-TRI-01` (Modal Triage Bot), `M-SEM-01` (Modal Match Semántico IA) y `M-BOL-01` (Modal Búsquedas Booleanas & X-Ray).
+*   **Usabilidad & Micro-interacciones**: Texto seleccionable (`select-all`) para fácil copiado en portapapeles y tooltip explicativo al pasar el cursor.
+
+### Módulo K: Homologación Global del Botón "CV" y Canal de Ingreso Dinámico
+*   **Botonera Unificada "CV" en Todo el Pipeline**: Botón del documento PDF con ícono `<FileText />` y etiqueta visible `"CV"` presente uniformemente en Kanban, Lista Detallada (columna ACCIONES) y cabeceras de expediente en todas las etapas (`/talento`, `/descubrimiento`, `/evaluacion`, `/presentacion`, `/cierre` y sus vistas de detalle `/[id]`).
+*   **Canal de Ingreso Dinámico (`canal_ingreso`)**: Campo que consulta en tiempo real todos los canales únicos existentes en la base de datos backend (`getCandidatosAPI`), agregando la opción `+ Escribir nuevo canal personalizado...` para crear vías de sourcing al vuelo. Sincronizado en la ficha del candidato (`/talento/[id]`) y en las modales de ingesta con IA (`M-IMP-01` y `M-IMP-02`), mostrando el estado real `No especificado` cuando el canal es nulo.
+*   **Gestión Global de Motivo de Rechazo**: Traslado de los campos de motivo de descarte y fecha de resolución desde Cierre a la raíz de `PipelineItem` (`motivo_rechazo`, `resolucion.estado_final`, `resolucion.fecha_resolucion`), permitiendo su consulta y edición interactiva en `/descubrimiento/[id]`.
+
 ---
 
 ## Ejecución del Servidor Local and Tests
@@ -213,6 +224,12 @@ git add .
 git commit -m "Texto del cambio" 
 git push origin main
 ```
+
+*   **27/07/2026:** Estandarización del Botón "CV", Sistema de Identificadores Únicos (P-xxx/M-xxx) y Canal de Ingreso Dinámico:
+    *   **Botonera Unificada "CV" (Ícono + Texto):** Incorporación del botón de documento PDF con el ícono `<FileText />` acompañado de la etiqueta de texto `"CV"` en las tarjetas Kanban, columna ACCIONES de Lista Detallada y barras de navegación superiores de todas las fases del pipeline (`/talento`, `/descubrimiento`, `/evaluacion`, `/presentacion`, `/cierre` y sus fichas de detalle `/[id]`).
+    *   **Canal de Ingreso Dinámico (`canal_ingreso`):** Implementación de la extracción dinámica de canales de sourcing desde la base de datos backend en tiempo real, permitiendo seleccionar o escribir canales personalizados al vuelo en `/talento/[id]` y en la modal de ingesta `ImportarIaModal.tsx`. Corrección del valor por defecto forzado a `"LinkedIn"`, reflejando correctamente `No especificado` para registros nulos.
+    *   **Globalización de Motivo de Rechazo y Resolución:** Extracción de `motivo_rechazo` y objeto `resolucion` al nivel global de `PipelineItem` (`src/actions/pipeline.ts`), posibilitando la edición interactiva del motivo de descarte en el detalle de descubrimiento `/descubrimiento/[id]`.
+    *   **Asignación de Identificadores Únicos (`ID: P-xxx` y `ID: M-xxx`):** Incorporación de insignias monospaciadas seleccionables en todas las cabeceras de páginas y ventanas emergentes para facilitar la indicación exacta de componentes en los prompts de desarrollo. Separación explícita de `ID: M-IMP-01` (Modal Ingesta en Talento) e `ID: M-IMP-02` (Parser Ingesta en Descubrimiento).
 
 *   **25/07/2026:** Creación de la Página Dedicada de Detalle de Candidato `/presentacion/[id]`:
     *   **Navegación Standalone:** Se eliminó el contenedor deslizable lateral (slide-over) de `/presentacion` en favor de una página dedicada independiente `/presentacion/[id]` con arquitectura y maquetación homologadas a la página de Evaluación (`/evaluacion/[id]`).

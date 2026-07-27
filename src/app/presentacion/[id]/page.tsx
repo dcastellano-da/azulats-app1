@@ -179,6 +179,7 @@ export default function PresentacionDetallePage() {
           f2Notes,
           f3Notes,
           recruiterNotes: f3Notes || f2Notes,
+          url_cv: cObj?.url_cv || undefined,
           toolsDetails: generateDefaultPresentacionToolsDetails(candName, role, score)
         };
 
@@ -239,6 +240,23 @@ export default function PresentacionDetallePage() {
       triggerToast("Error al guardar notas en el servidor.");
     } finally {
       setIsSavingNotes(false);
+    }
+  };
+
+  // View CV Document PDF handler
+  const handleViewCv = (candId: string, urlCv?: string) => {
+    if (!urlCv) {
+      triggerToast("Este postulante no tiene un archivo CV adjunto.");
+      return;
+    }
+    if (urlCv.startsWith("gs://")) {
+      const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
+      const token = match ? match[2] : "";
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      window.open(downloadUrl, "_blank");
+    } else {
+      window.open(urlCv, "_blank");
     }
   };
 
@@ -523,6 +541,9 @@ export default function PresentacionDetallePage() {
                 <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
                   Fase 3: Calibración final
                 </span>
+                <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                  ID: P-PRE-02
+                </span>
                 <span className="text-xs text-[#879391]">/</span>
                 <span className="text-xs text-[#879391] font-mono">{cand.pipeId || cand.id}</span>
               </div>
@@ -534,6 +555,19 @@ export default function PresentacionDetallePage() {
 
           {/* Contextual Action Pipeline Header Links */}
           <div className="flex items-center gap-2">
+            {/* PDF CV Direct View button */}
+            <button
+              onClick={() => cand && handleViewCv(cand.id, cand.url_cv)}
+              title={cand?.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
+              className={`px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs ${
+                cand?.url_cv
+                  ? "text-[#6bd8cb] bg-white/5 border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
+                  : "text-[#879391]/40 bg-white/5 border-white/5 hover:bg-white/10"
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>CV</span>
+            </button>
             <Link
               href="/descubrimiento"
               className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#c4c1fb] hover:bg-white/5 transition-all"

@@ -26,6 +26,7 @@ export interface CierreCandidate {
   f3Notes?: string;
   f4Notes?: string;
   recruiterNotes?: string;
+  url_cv?: string;
   salaryDetails: {
     baseSalary: number; // Yearly gross in Euros
     expectedSalary: number; // Candidate's expected yearly gross
@@ -176,6 +177,7 @@ export const mapPipelineToCierreCandidates = (
       f3Notes,
       f4Notes,
       recruiterNotes: f4Notes || f3Notes || f2Notes,
+      url_cv: cand?.url_cv || undefined,
       salaryDetails: defaults.salaryDetails,
       toolsDetails: defaults.toolsDetails
     });

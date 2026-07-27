@@ -573,13 +573,14 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                 handleViewCv(cand.id, cand.url_cv);
               }}
               title={cand.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
-              className={`px-2 py-1 rounded-xl transition-all cursor-pointer flex items-center justify-center font-bold ${
+              className={`px-2 py-1 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1 font-bold text-[9px] ${
                 cand.url_cv
                   ? "text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
                   : "text-[#879391]/40 bg-white/5 border border-white/5 hover:bg-white/10"
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
+              <span>CV</span>
             </button>
 
             {/* Copy Candidate Info button */}
@@ -628,6 +629,9 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                     Maestro de Postulantes
                   </span>
                   <span className="text-[10px] font-bold text-white/40">Fase 2: Postulantes</span>
+                  <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                    ID: P-TAL-01
+                  </span>
                 </div>
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
                   Base de Postulantes
@@ -1156,13 +1160,14 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                             <button
                               onClick={() => handleViewCv(cand.id, cand.url_cv)}
                               title={cand.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
-                              className={`p-1 rounded-md transition-all cursor-pointer flex items-center justify-center border ${
+                              className={`px-2 py-1 rounded-md transition-all cursor-pointer flex items-center justify-center gap-1 text-[10px] font-bold border ${
                                 cand.url_cv
-                                  ? "text-[#6bd8cb] hover:bg-[#6bd8cb]/10 border-transparent hover:border-[#6bd8cb]/30"
+                                  ? "text-[#6bd8cb] bg-white/5 hover:bg-[#6bd8cb]/10 border-white/10 hover:border-[#6bd8cb]/30"
                                   : "text-[#879391]/40 border-transparent hover:bg-white/5"
                               }`}
                             >
                               <FileText className="w-3.5 h-3.5" />
+                              <span>CV</span>
                             </button>
                             <button
                               onClick={() => handleCopyCandidateData(cand)}
@@ -1220,6 +1225,14 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
       <ImportarIaModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
+        onCandidateCreated={(nombreCompleto) => {
+          setToast({
+            type: "success",
+            message: `Candidato ${nombreCompleto} importado con éxito`
+          });
+          setTimeout(() => setToast(null), 5000);
+          loadCandidatos();
+        }}
         onSuccess={handleImportSuccess}
       />
 

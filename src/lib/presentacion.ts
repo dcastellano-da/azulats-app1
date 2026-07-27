@@ -22,6 +22,7 @@ export interface PresentacionCandidate {
   f2Notes?: string;
   f3Notes?: string;
   recruiterNotes?: string;
+  url_cv?: string;
   toolsDetails: {
     analitica: {
       transcriptSnippets: { speaker: string; text: string }[];
@@ -162,6 +163,7 @@ export const mapPipelineToPresentacionCandidates = (
       f2Notes,
       f3Notes,
       recruiterNotes: f3Notes || f2Notes,
+      url_cv: cand?.url_cv || undefined,
       toolsDetails: generateDefaultPresentacionToolsDetails(candName, role, score)
     });
   }

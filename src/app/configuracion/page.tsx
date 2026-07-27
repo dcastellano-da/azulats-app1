@@ -173,6 +173,9 @@ export default function ConfiguracionPage() {
                     Configuración General
                   </span>
                   <span className="text-[10px] font-bold text-white/40">Ref: AJ-90</span>
+                  <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                    ID: P-CFG-01
+                  </span>
                 </div>
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
                   Ajustes del Sistema

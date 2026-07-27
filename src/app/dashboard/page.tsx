@@ -103,6 +103,9 @@ export default function DashboardPage() {
                 <span className="px-2 py-0.5 text-[10px] font-bold bg-[#6bd8cb]/15 text-[#6bd8cb] border border-[#6bd8cb]/25 rounded-md animate-pulse">
                   BETA V1.2
                 </span>
+                <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                  ID: P-DSH-01
+                </span>
               </div>
               <p className="text-xs text-[#879391]">Recruitment Business Analytics • Azul ATS</p>
             </div>

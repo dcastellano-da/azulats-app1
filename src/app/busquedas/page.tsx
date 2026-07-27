@@ -141,6 +141,9 @@ export default function BusquedasPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] uppercase font-bold text-[#c4c1fb] tracking-widest">Maestro de Búsquedas</span>
                   <span className="text-[10px] px-1.5 py-0.5 bg-[#879391]/10 text-[#879391] border border-white/5 rounded">Ref: Módulo C</span>
+                  <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                    ID: P-BUS-01
+                  </span>
                 </div>
                 <h1 className="text-2xl font-extrabold tracking-tight text-white mt-0.5">Gestión de Posiciones</h1>
               </div>

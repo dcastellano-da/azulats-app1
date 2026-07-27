@@ -53,6 +53,15 @@ export default function CandidatoDetailPage() {
   const [editNotas, setEditNotas] = useState("");
   const [editResumen, setEditResumen] = useState("");
   const [editRubros, setEditRubros] = useState("");
+  const [editCanalIngreso, setEditCanalIngreso] = useState("");
+  const [existingChannels, setExistingChannels] = useState<string[]>([
+    "Headhunting",
+    "LinkedIn",
+    "Referido",
+    "InfoJob",
+    "Otros"
+  ]);
+  const [isCustomChannel, setIsCustomChannel] = useState(false);
 
   useEffect(() => {
     if (cand) {
@@ -67,6 +76,7 @@ export default function CandidatoDetailPage() {
       setEditNotas(cand.notas_iniciales || "");
       setEditResumen(cand.resumen || "");
       setEditRubros(cand.rubros || "");
+      setEditCanalIngreso(cand.canal_ingreso || "");
     }
   }, [cand]);
 
@@ -95,7 +105,18 @@ export default function CandidatoDetailPage() {
     try {
       const response = await getCandidatosAPI();
       if (response.success && response.data) {
-        const found = response.data.find((c: Candidato) => c.id === id);
+        const allCands: Candidato[] = response.data;
+        const found = allCands.find((c: Candidato) => c.id === id);
+
+        // Collect all unique non-empty canal_ingreso values from backend DB
+        const dbChannels = allCands
+          .map(c => c.canal_ingreso)
+          .filter((ch): ch is string => Boolean(ch && ch.trim()));
+
+        const defaults = ["Headhunting", "LinkedIn", "Referido", "InfoJob", "Otros"];
+        const uniqueChannels = Array.from(new Set([...defaults, ...dbChannels]));
+        setExistingChannels(uniqueChannels);
+
         if (found) {
           setCand(found);
           setStatus(found.estado_revision);
@@ -211,11 +232,15 @@ export default function CandidatoDetailPage() {
           otros_idiomas: editOtrosIdiomas.trim(),
           notas_iniciales: editNotas.trim(),
           resumen: editResumen.trim(),
-          rubros: editRubros.trim()
+          rubros: editRubros.trim(),
+          canal_ingreso: editCanalIngreso
         };
 
         const response = await actualizarCandidatoAPI(id, payload);
         if (response.success) {
+          if (editCanalIngreso.trim()) {
+            setExistingChannels(prev => Array.from(new Set([...prev, editCanalIngreso.trim()])));
+          }
           setFeedback({
             type: "success",
             message: "Ficha de candidato actualizada correctamente."
@@ -250,6 +275,7 @@ export default function CandidatoDetailPage() {
       setEditNotas(cand.notas_iniciales || "");
       setEditResumen(cand.resumen || "");
       setEditRubros(cand.rubros || "");
+      setEditCanalIngreso(cand.canal_ingreso || "");
     }
     setIsEditing(false);
     setFeedback(null);
@@ -337,7 +363,11 @@ Notas iniciales: ${cand.notas_iniciales || 'Ninguna'}`;
           </Link>
 
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-mono text-[#879391]">ID: {id}</span>
+            <span className="text-[10px] font-mono text-[#879391]">Cand ID: {id}</span>
+            <span className="text-white/20">•</span>
+            <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+              ID: P-TAL-02
+            </span>
             <span className="text-white/20">•</span>
             <span className="text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider hidden sm:inline-block">
               DAW Console Active
@@ -477,14 +507,51 @@ Notas iniciales: ${cand.notas_iniciales || 'Ninguna'}`;
                           className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
                         />
                       </div>
-                      <div>
-                        <label className="text-[9px] font-bold text-[#c4c1fb] tracking-wider uppercase block text-left">Ubicación</label>
-                        <input
-                          type="text"
-                          value={editUbicacion}
-                          onChange={(e) => setEditUbicacion(e.target.value)}
-                          className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
-                        />
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[9px] font-bold text-[#6bd8cb] tracking-wider uppercase block text-left">
+                            Canal de Ingreso (Dinámico DB)
+                          </label>
+                          <span className="text-[9px] text-[#879391] font-mono">
+                            {existingChannels.length} en DB
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-1.5">
+                          <select
+                            value={isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "") ? "OTHER_CUSTOM" : editCanalIngreso}
+                            onChange={(e) => {
+                              if (e.target.value === "OTHER_CUSTOM") {
+                                setIsCustomChannel(true);
+                                setEditCanalIngreso("");
+                              } else {
+                                setIsCustomChannel(false);
+                                setEditCanalIngreso(e.target.value);
+                              }
+                            }}
+                            className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none cursor-pointer font-medium"
+                          >
+                            <option value="">-- Sin especificar --</option>
+                            <optgroup label="Canales detectados en la Base de Datos">
+                              {existingChannels.map((ch) => (
+                                <option key={ch} value={ch}>
+                                  {ch}
+                                </option>
+                              ))}
+                            </optgroup>
+                            <option value="OTHER_CUSTOM">+ Escribir nuevo canal personalizado...</option>
+                          </select>
+
+                          {(isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "")) && (
+                            <input
+                              type="text"
+                              value={editCanalIngreso}
+                              onChange={(e) => setEditCanalIngreso(e.target.value)}
+                              placeholder="Escribe el nombre del nuevo canal de ingreso..."
+                              className="w-full bg-[#101415] border border-[#6bd8cb]/40 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
+                            />
+                          )}
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -560,6 +627,24 @@ Notas iniciales: ${cand.notas_iniciales || 'Ninguna'}`;
                     <div>
                       <p className="text-[9px] font-bold uppercase tracking-wider text-white/40">Origen del Perfil</p>
                       <p className="text-white font-medium">{cand.origen}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 flex items-center justify-center text-[#6bd8cb] font-mono text-[9px] font-bold">
+                      SRC
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-white/40">Canal de Ingreso</p>
+                      {cand.canal_ingreso ? (
+                        <span className="inline-block mt-0.5 text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
+                          {cand.canal_ingreso}
+                        </span>
+                      ) : (
+                        <span className="inline-block mt-0.5 text-xs font-medium text-white/40 italic">
+                          No especificado
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -68,6 +68,7 @@ interface SourcedCandidate {
   };
   rejectionReason?: string;
   reuniones?: Reunion[];
+  url_cv?: string;
 }
 
 const SEMANTIC_MATCH_DB: Record<string, SemanticMatchResult> = {
@@ -211,10 +212,10 @@ const mapSinglePipelineToSourcedCandidate = (
     }
   }
 
-  let blockReason = pipe?.cierre?.motivo_rechazo || undefined;
+  let blockReason = (pipe as any)?.resolucion?.motivo_rechazo || (pipe as any)?.motivo_rechazo || pipe?.cierre?.motivo_rechazo || undefined;
   let missingField: SourcedCandidate["missingField"] = undefined;
   if (phase1State === "03_bloqueado" && pipe) {
-    blockReason = pipe.cierre?.motivo_rechazo || "Falta información";
+    blockReason = (pipe as any)?.resolucion?.motivo_rechazo || (pipe as any)?.motivo_rechazo || pipe?.cierre?.motivo_rechazo || "Falta información";
     if (blockReason.toLowerCase().includes("cv")) {
       missingField = "cv";
     } else if (blockReason.toLowerCase().includes("salario") || blockReason.toLowerCase().includes("pretensión")) {
@@ -225,7 +226,7 @@ const mapSinglePipelineToSourcedCandidate = (
   }
 
   const score = pipe?.f1_descubrimiento?.analisis_semantico?.fit_score ?? 80;
-  const rejectionReason = phase1State === "04_rechazado" ? (pipe?.cierre?.motivo_rechazo || "No cumple barra mínima") : undefined;
+  const rejectionReason = (pipe as any)?.resolucion?.motivo_rechazo || (pipe as any)?.motivo_rechazo || pipe?.cierre?.motivo_rechazo || (phase1State === "04_rechazado" ? "No cumple barra mínima" : undefined);
 
   let socialLinks: SourcedCandidate["socialLinks"] = {
     portfolio: cand.linkedin_url || ""
@@ -254,7 +255,8 @@ const mapSinglePipelineToSourcedCandidate = (
     recruiterNotes: pipe?.f1_descubrimiento?.notas_reclutador || undefined,
     socialLinks,
     rejectionReason,
-    reuniones: pipe?.f1_descubrimiento?.reuniones || []
+    reuniones: pipe?.f1_descubrimiento?.reuniones || [],
+    url_cv: cand.url_cv || undefined
   };
 };
 
@@ -532,6 +534,23 @@ export default function SourcedCandidateDetailPage() {
     }
   };
 
+  // View CV Document PDF handler
+  const handleViewCv = (candId: string, urlCv?: string) => {
+    if (!urlCv) {
+      alert("Este postulante no tiene un archivo CV adjunto.");
+      return;
+    }
+    if (urlCv.startsWith("gs://")) {
+      const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
+      const token = match ? match[2] : "";
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      window.open(downloadUrl, "_blank");
+    } else {
+      window.open(urlCv, "_blank");
+    }
+  };
+
   // Auth Guard
   useEffect(() => {
     if (!authLoading && !user) {
@@ -706,15 +725,26 @@ export default function SourcedCandidateDetailPage() {
           }
         };
 
+        const nowIso = new Date().toISOString();
+
+        if (editRejectionReason.trim()) {
+          pipePayload.motivo_rechazo = editRejectionReason.trim();
+          pipePayload.resolucion = {
+            estado_final: cand.phase1State === "04_rechazado" ? "Descartado" : cand.phase1State,
+            motivo_rechazo: editRejectionReason.trim(),
+            fecha_resolucion: nowIso
+          };
+        }
+
         if (cand.phase1State === "03_bloqueado") {
           pipePayload.cierre = {
-            fecha_cierre: new Date().toISOString(),
-            motivo_rechazo: editBlockReason.trim()
+            fecha_cierre: nowIso,
+            motivo_rechazo: editBlockReason.trim() || editRejectionReason.trim()
           };
         } else if (cand.phase1State === "04_rechazado") {
           pipePayload.cierre = {
-            fecha_cierre: new Date().toISOString(),
-            motivo_rechazo: editRejectionReason
+            fecha_cierre: nowIso,
+            motivo_rechazo: editRejectionReason.trim()
           };
         }
 
@@ -1211,15 +1241,33 @@ export default function SourcedCandidateDetailPage() {
             <span>Volver a F1 Descubrimiento</span>
           </Link>
 
-          {!isEditing ? (
-            <button 
-              onClick={() => setIsEditing(true)}
-              className="px-3.5 py-1.5 rounded-xl border border-white/10 hover:border-[#6bd8cb]/40 bg-[#15181a]/50 text-xs font-bold flex items-center gap-1.5 hover:text-[#6bd8cb] transition-all cursor-pointer"
+          <div className="flex items-center gap-2">
+            <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+              ID: P-DIS-02
+            </span>
+            {/* PDF CV Direct View button */}
+            <button
+              onClick={() => cand && handleViewCv(cand.id, cand.url_cv)}
+              title={cand?.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
+              className={`px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs ${
+                cand?.url_cv
+                  ? "text-[#6bd8cb] bg-white/5 border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
+                  : "text-[#879391]/40 bg-white/5 border-white/5 hover:bg-white/10"
+              }`}
             >
-              <Edit2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
-              <span>Editar Candidatura</span>
+              <FileText className="w-3.5 h-3.5" />
+              <span>CV</span>
             </button>
-          ) : (
+
+            {!isEditing ? (
+              <button 
+                onClick={() => setIsEditing(true)}
+                className="px-3.5 py-1.5 rounded-xl border border-white/10 hover:border-[#6bd8cb]/40 bg-[#15181a]/50 text-xs font-bold flex items-center gap-1.5 hover:text-[#6bd8cb] transition-all cursor-pointer"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                <span>Editar Candidatura</span>
+              </button>
+            ) : (
             <div className="flex gap-2">
               <button 
                 onClick={handleSave}
@@ -1240,6 +1288,7 @@ export default function SourcedCandidateDetailPage() {
               </button>
             </div>
           )}
+        </div>
         </div>
 
         {/* Detail Body */}
@@ -1437,31 +1486,61 @@ export default function SourcedCandidateDetailPage() {
                 </div>
               )}
 
-              {cand.phase1State === "04_rechazado" && (
-                <div className="p-4 border border-rose-500/25 bg-rose-500/5 rounded-2xl space-y-2 text-left">
-                  <div className="flex items-center gap-2 text-rose-400 font-bold text-xs">
-                    <Ban className="w-4 h-4 shrink-0" />
-                    <span>Candidato Descartado en Fase Inicial</span>
+              {(cand.phase1State === "04_rechazado" || cand.rejectionReason || isEditing) && (
+                <div className="p-4 border border-rose-500/25 bg-rose-500/5 rounded-2xl space-y-3 text-left">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-rose-400 font-bold text-xs">
+                      <Ban className="w-4 h-4 shrink-0" />
+                      <span>Resolución & Motivo de Rechazo / Descarte</span>
+                    </div>
+                    {cand.lastChangeDate && (
+                      <span className="text-[10px] text-rose-300/70 font-mono">
+                        {cand.lastChangeDate}
+                      </span>
+                    )}
                   </div>
+
                   {isEditing ? (
-                    <div className="space-y-1">
-                      <label className="block text-[9px] uppercase font-bold text-rose-300">Motivo del Rechazo</label>
-                      <select 
-                        value={editRejectionReason}
-                        onChange={(e) => setEditRejectionReason(e.target.value)}
-                        className="bg-[#15181a] border border-rose-500/35 p-2 text-xs rounded-lg text-white w-full"
-                      >
-                        <option value="Presupuesto">Presupuesto</option>
-                        <option value="Falta de Skills Técnicos">Falta de Skills Técnicos</option>
-                        <option value="Nivel de Inglés">Nivel de Inglés</option>
-                        <option value="Cultura">Cultura</option>
-                        <option value="Oferta Declinada">Oferta Declinada</option>
-                      </select>
+                    <div className="space-y-2">
+                      <label className="block text-[10px] uppercase font-bold text-rose-300">
+                        Motivo del Rechazo / Descarte (Resolución)
+                      </label>
+                      <div className="space-y-2">
+                        <select 
+                          value={["Presupuesto", "Falta de Skills Técnicos", "Nivel de Inglés", "Cultura", "Oferta Declinada", "No cumple barra mínima"].includes(editRejectionReason) ? editRejectionReason : "Otro"}
+                          onChange={(e) => {
+                            if (e.target.value !== "Otro") {
+                              setEditRejectionReason(e.target.value);
+                            }
+                          }}
+                          className="bg-[#15181a] border border-rose-500/35 p-2 text-xs rounded-lg text-white w-full focus:border-rose-400 focus:outline-none"
+                        >
+                          <option value="Presupuesto">Presupuesto</option>
+                          <option value="Falta de Skills Técnicos">Falta de Skills Técnicos</option>
+                          <option value="Nivel de Inglés">Nivel de Inglés</option>
+                          <option value="Cultura">Cultura</option>
+                          <option value="Oferta Declinada">Oferta Declinada</option>
+                          <option value="No cumple barra mínima">No cumple barra mínima</option>
+                          <option value="Otro">Otro motivo (Personalizado...)</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={editRejectionReason}
+                          onChange={(e) => setEditRejectionReason(e.target.value)}
+                          placeholder="Escribe o edita el motivo detallado de rechazo..."
+                          className="bg-[#15181a] border border-rose-500/35 p-2 text-xs rounded-lg text-white w-full focus:border-rose-400 focus:outline-none"
+                        />
+                      </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-rose-200/90">
-                      Motivo: <span className="font-mono bg-rose-950/45 px-2 py-0.5 rounded border border-rose-500/10 uppercase tracking-wide text-[10px]">{cand.rejectionReason || "Sin especificar"}</span>
-                    </p>
+                    <div className="space-y-1">
+                      <p className="text-xs text-rose-200/90 flex items-center gap-2">
+                        <span className="font-semibold text-rose-300">Motivo:</span>
+                        <span className="font-mono bg-rose-950/60 text-rose-200 px-2.5 py-1 rounded-md border border-rose-500/20 text-xs">
+                          {cand.rejectionReason || editRejectionReason || "Sin especificar"}
+                        </span>
+                      </p>
+                    </div>
                   )}
                 </div>
               )}

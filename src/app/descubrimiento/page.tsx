@@ -29,6 +29,7 @@ import {
   Send,
   FileText,
   Check,
+  CheckCircle2,
   Copy,
   UserCheck,
   RefreshCw,
@@ -43,6 +44,7 @@ import {
   ChevronsRight,
   X
 } from "lucide-react";
+import ImportarIaModal from "../components/ImportarIaModal";
 import { analyzeSemanticMatchLive, generateBooleanQueryLive, SemanticMatchResult } from "@/lib/gemini";
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, Candidato, crearCandidatoAPI } from "@/actions/candidatos";
@@ -74,6 +76,7 @@ interface SourcedCandidate {
     portfolio?: string;
   };
   rejectionReason?: string;
+  url_cv?: string;
 }
 
 const SEMANTIC_MATCH_DB: Record<string, SemanticMatchResult> = {
@@ -271,10 +274,10 @@ const mapPipelineToSourcedCandidates = (
       }
     }
 
-    let blockReason = pipe.cierre?.motivo_rechazo || undefined;
+    let blockReason = (pipe as any).resolucion?.motivo_rechazo || pipe.motivo_rechazo || pipe.cierre?.motivo_rechazo || undefined;
     let missingField: SourcedCandidate["missingField"] = undefined;
     if (phase1State === "03_bloqueado") {
-      blockReason = pipe.cierre?.motivo_rechazo || "Falta información";
+      blockReason = (pipe as any).resolucion?.motivo_rechazo || pipe.motivo_rechazo || pipe.cierre?.motivo_rechazo || "Falta información";
       if (blockReason.toLowerCase().includes("cv")) {
         missingField = "cv";
       } else if (blockReason.toLowerCase().includes("salario") || blockReason.toLowerCase().includes("pretensión")) {
@@ -285,7 +288,7 @@ const mapPipelineToSourcedCandidates = (
     }
 
     const score = pipe.f1_descubrimiento?.analisis_semantico?.fit_score ?? (cand ? 80 : 85);
-    const rejectionReason = phase1State === "04_rechazado" ? (pipe.cierre?.motivo_rechazo || "No cumple barra mínima") : undefined;
+    const rejectionReason = (pipe as any).resolucion?.motivo_rechazo || pipe.motivo_rechazo || pipe.cierre?.motivo_rechazo || (phase1State === "04_rechazado" ? "No cumple barra mínima" : undefined);
 
     let socialLinks: SourcedCandidate["socialLinks"] = undefined;
     if (cand?.linkedin_url) {
@@ -313,7 +316,8 @@ const mapPipelineToSourcedCandidates = (
       motivationNote: cand?.notas_iniciales || undefined,
       recruiterNotes: pipe.f1_descubrimiento?.notas_reclutador || undefined,
       socialLinks,
-      rejectionReason
+      rejectionReason,
+      url_cv: cand?.url_cv || undefined
     };
   });
 };
@@ -532,6 +536,7 @@ export default function DescubrimientoPage() {
 
   // Ingest Inteligente State (Parser LLM)
   const [isIngestOpen, setIsIngestOpen] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [ingestCvText, setIngestCvText] = useState("");
   const [ingestJobId, setIngestJobId] = useState("REQ-001");
   const [parsingCv, setParsingCv] = useState(false);
@@ -703,18 +708,39 @@ export default function DescubrimientoPage() {
 
         const blockReason = customFieldUpdates.blockReason || updates.blockReason;
         const rejectionReason = customFieldUpdates.rejectionReason || updates.rejectionReason;
+        const nowIso = new Date().toISOString();
 
         if (nextState === "03_bloqueado") {
+          const reason = blockReason || "Falta información (cv/salario/ingles)";
+          payload.motivo_rechazo = reason;
+          payload.resolucion = {
+            estado_final: "03_bloqueado",
+            motivo_rechazo: reason,
+            fecha_resolucion: nowIso
+          };
           payload.cierre = {
-            motivo_rechazo: blockReason || "Falta información (cv/salario/ingles)",
-            fecha_cierre: new Date().toISOString()
+            motivo_rechazo: reason,
+            fecha_cierre: nowIso
           };
         } else if (nextState === "04_rechazado") {
+          const reason = rejectionReason || "Descartado en Fase Inicial";
+          payload.motivo_rechazo = reason;
+          payload.resolucion = {
+            estado_final: "04_rechazado",
+            motivo_rechazo: reason,
+            fecha_resolucion: nowIso
+          };
           payload.cierre = {
-            motivo_rechazo: rejectionReason || "Descartado en Fase Inicial",
-            fecha_cierre: new Date().toISOString()
+            motivo_rechazo: reason,
+            fecha_cierre: nowIso
           };
         } else {
+          payload.motivo_rechazo = null;
+          payload.resolucion = {
+            estado_final: nextState,
+            motivo_rechazo: null,
+            fecha_resolucion: nowIso
+          };
           payload.cierre = {
             motivo_rechazo: null,
             fecha_cierre: null
@@ -928,6 +954,27 @@ export default function DescubrimientoPage() {
       setParsingCv(false);
       setIsIngestOpen(false);
       setIngestCvText("");
+    }
+  };
+
+  // View CV Document PDF handler
+  const handleViewCv = (candId: string, urlCv?: string) => {
+    if (!urlCv) {
+      setToast({
+        type: "error",
+        message: "Este postulante no tiene un archivo CV adjunto."
+      });
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
+    if (urlCv.startsWith("gs://")) {
+      const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
+      const token = match ? match[2] : "";
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      window.open(downloadUrl, "_blank");
+    } else {
+      window.open(urlCv, "_blank");
     }
   };
 
@@ -1356,6 +1403,22 @@ export default function DescubrimientoPage() {
           >
             <span>Detalles</span>
           </Link>
+          {/* PDF CV Direct View button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewCv(cad.id, cad.url_cv);
+            }}
+            title={cad.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
+            className={`px-2 py-1 rounded transition-all cursor-pointer flex items-center justify-center gap-1 font-bold shrink-0 text-[9px] ${
+              cad.url_cv
+                ? "text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
+                : "text-[#879391]/40 bg-white/5 border border-white/5 hover:bg-white/10"
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>CV</span>
+          </button>
           {/* Enrich foot trigger if links are not fully loaded */}
           {!cad.socialLinks?.github && cad.phase1State !== "04_rechazado" && (
             <button
@@ -1475,6 +1538,9 @@ export default function DescubrimientoPage() {
                     Fase 1: Atracción & Sourcing
                   </span>
                   <span className="text-[10px] font-bold text-white/40">Ref: Descubrimiento Inicial</span>
+                  <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                    ID: P-DIS-01
+                  </span>
                 </div>
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
                   Pipeline de Descubrimiento
@@ -2167,6 +2233,22 @@ export default function DescubrimientoPage() {
                             >
                               <span>Detalles</span>
                             </Link>
+                            {/* PDF CV Direct View button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewCv(cad.id, cad.url_cv);
+                              }}
+                              title={cad.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
+                              className={`px-2.5 py-1 rounded transition-all cursor-pointer flex items-center justify-center gap-1 font-bold shrink-0 text-[10px] ${
+                                cad.url_cv
+                                  ? "text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
+                                  : "text-[#879391]/40 bg-white/5 border border-white/5 hover:bg-white/10"
+                              }`}
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>CV</span>
+                            </button>
                             {/* AI Semantic Fit Dialog */}
                             <button
                               onClick={() => handleSemanticMatch(cad)}
@@ -2277,7 +2359,12 @@ export default function DescubrimientoPage() {
                   <span className="font-bold font-mono">WA</span>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white leading-tight">Chat de Triage: WhatsApp Bot</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white leading-tight">Chat de Triage: WhatsApp Bot</h3>
+                    <span title="ID de componente emergente para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                      ID: M-TRI-01
+                    </span>
+                  </div>
                   <p className="text-[10px] text-[#879391]">Destrabando canal para {triageCand.name}</p>
                 </div>
               </div>
@@ -2345,97 +2432,42 @@ export default function DescubrimientoPage() {
         </div>
       )}
 
-      {/* --- MOCK DIALOG/MODAL: INGESTA INTELIGENTE (LLM Parser Simulation) --- */}
-      {isIngestOpen && (
-        <div className="fixed inset-0 bg-[#101415]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <form 
-            onSubmit={handleIngestSubmit}
-            className="glass-panel w-full max-w-lg rounded-3xl overflow-hidden border border-white/10 flex flex-col p-6 space-y-4 text-left"
-          >
-            <div>
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4.5 h-4.5 text-[#6bd8cb]" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-[#c4c1fb]">Ingesta Inteligente de CV (Parser LLM)</h3>
-              </div>
-              <p className="text-[11px] text-[#879391] mt-1">
-                Pega el texto crudo de un currículum o perfil de LinkedIn. El sistema utilizará nuestro parser vectorial para asignarle un fit semántico y registrarlo en las columnas.
-              </p>
-            </div>
+      {/* --- MODAL: PARSER INGESTA CV (IMPORTAR CON IA EN DESCUBRIMIENTO) --- */}
+      <ImportarIaModal
+        isOpen={isIngestOpen}
+        onClose={() => setIsIngestOpen(false)}
+        mode="descubrimiento"
+        searches={currentSearches}
+        defaultSearchId={
+          selectedSearch !== "Todos"
+            ? currentSearches.find(s => `${s.client} - ${s.role}` === selectedSearch || s.id === selectedSearch)?.id
+            : currentSearches[0]?.id
+        }
+        targetEstadoRevision="Seleccionado"
+        onCandidateCreated={(nombreCompleto) => {
+          setToast({
+            type: "success",
+            message: `Candidato ${nombreCompleto} registrado en Talento ("Seleccionado") e ingresado en Descubrimiento ("01 - Nuevo en Revisión").`
+          });
+          setTimeout(() => setToast(null), 6000);
+          fetchBackEndData();
+        }}
+        onSuccess={(nombreCompleto) => {
+          setIsIngestOpen(false);
+          setToast({
+            type: "success",
+            message: `Candidato ${nombreCompleto} registrado en Talento ("Seleccionado") e ingresado en Descubrimiento ("01 - Nuevo en Revisión").`
+          });
+          setTimeout(() => setToast(null), 6000);
+          fetchBackEndData();
+        }}
+      />
 
-            <div className="space-y-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] text-white/50 font-bold uppercase tracking-wider">Vacante / Búsqueda Asociada</label>
-                <select
-                  value={ingestJobId}
-                  onChange={(e) => setIngestJobId(e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none cursor-pointer focus:border-[#6bd8cb]"
-                >
-                  {currentSearches.map((b) => (
-                    <option key={b.id} value={b.id} className="bg-[#15181a] text-white">
-                      {b.id} - {b.role} ({b.client})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] text-white/50 font-bold uppercase tracking-wider">Texto del Currículum (OCR Raw Text)</label>
-                <textarea
-                  rows={6}
-                  required
-                  placeholder="Ej: JAVIER GALDÓN - ARQUITECTO RUST & C++ - Madrid. Ingeniero sénior con experto en WebAssembly, rust compiler, crates..."
-                  value={ingestCvText}
-                  onChange={(e) => setIngestCvText(e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-[#879391] focus:outline-none focus:border-[#6bd8cb] resize-none"
-                />
-              </div>
-            </div>
-
-            {/* Quick autocomplete demo buttons */}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setIngestCvText(`JAVIER GALDÓN\nSenior Rust Software Architect\nExperiencia: 8 años construyendo motores de compilación y compilando a WASM para SEAT.\nSkills: Rust, WebAssembly, C++.\nContacto: javier.galdon@example.es`)}
-                className="px-2.5 py-1 rounded bg-[#c4c1fb]/10 hover:bg-[#c4c1fb]/20 border border-[#c4c1fb]/15 text-[9px] text-[#c4c1fb] font-bold transition-all cursor-pointer"
-              >
-                Cargar Demo (Rust Architect)
-              </button>
-              <button
-                type="button"
-                onClick={() => setIngestCvText(`ANA BELÉN SILVA\nUI/UX Specialist & Frontend Developer\nMadrid / Remoto. Expert en Figma, React y desarrollo web responsivo para Telefónica.\nGitHub: anasilva-ux`)}
-                className="px-2.5 py-1 rounded bg-[#c4c1fb]/10 hover:bg-[#c4c1fb]/20 border border-[#c4c1fb]/15 text-[9px] text-[#c4c1fb] font-bold transition-all cursor-pointer"
-              >
-                Cargar Demo (UI/UX Designer)
-              </button>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
-              <button
-                type="button"
-                onClick={() => setIsIngestOpen(false)}
-                className="px-4 py-2 border border-white/10 hover:bg-white/5 rounded-xl text-xs font-bold cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={parsingCv}
-                className="px-4 py-2 bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-              >
-                {parsingCv ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Procesando CV...</span>
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>Guardar y Procesar</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+      {/* --- TOAST FEEDBACK NOTIFICATION --- */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-[#15181a] border border-[#6bd8cb]/40 text-[#6bd8cb] px-4.5 py-3 rounded-2xl shadow-2xl backdrop-blur-md animate-fade-in">
+          <CheckCircle2 className="w-5 h-5 text-[#6bd8cb]" />
+          <span className="text-xs font-bold text-white">{toast.message}</span>
         </div>
       )}
 
@@ -2446,7 +2478,10 @@ export default function DescubrimientoPage() {
             <div>
               <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <Ban className="w-4 h-4 text-rose-400" />
-                Especificar Motivo de Rechazo
+                <span>Especificar Motivo de Rechazo</span>
+                <span title="ID de componente emergente para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                  ID: M-REJ-01
+                </span>
               </h3>
               <p className="text-[10px] text-[#879391] mt-1">
                 Por favor, elige el motivo principal para archivar al candidato en la Fase Inicial de descubrimiento.
@@ -2495,6 +2530,9 @@ export default function DescubrimientoPage() {
                 <Cpu className="w-4 h-4 text-[#c4c1fb]" />
                 <Sparkles className="w-3.5 h-3.5 text-[#6bd8cb] animate-pulse" />
                 <span>Análisis Semántico de Inteligencia Artificial</span>
+                <span title="ID de componente emergente para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                  ID: M-SEM-01
+                </span>
               </h3>
               <button
                 onClick={() => setIsSemanticOpen(false)}
@@ -2634,6 +2672,9 @@ export default function DescubrimientoPage() {
                 <Search className="w-4 h-4 text-[#c4c1fb]" />
                 <Sparkles className="w-3.5 h-3.5 text-[#6bd8cb] animate-pulse" />
                 <span>Búsquedas Booleanas y X-Ray AI</span>
+                <span title="ID de componente emergente para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                  ID: M-BOL-01
+                </span>
               </h3>
               <button
                 onClick={() => setIsBooleanSearchOpen(false)}
@@ -2844,9 +2885,14 @@ export default function DescubrimientoPage() {
 
             {/* Content text */}
             <div className="space-y-2">
-              <span className="text-[10px] font-bold text-[#6bd8cb] uppercase tracking-wider bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded-full border border-[#6bd8cb]/20 inline-block">
-                Promoción de Pipeline
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-[#6bd8cb] uppercase tracking-wider bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded-full border border-[#6bd8cb]/20 inline-block">
+                  Promoción de Pipeline
+                </span>
+                <span title="ID de componente emergente para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                  ID: M-ADV-01
+                </span>
+              </div>
               <h3 className="text-lg font-extrabold text-white tracking-tight">
                 ¿Avanzar a Fase 2 (Evaluación Interna)?
               </h3>

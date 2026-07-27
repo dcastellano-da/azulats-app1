@@ -19,6 +19,7 @@ import {
   AlertCircle,
   Clock,
   Check,
+  CheckCircle2,
   Copy,
   UserCheck,
   RefreshCw,
@@ -98,6 +99,23 @@ export default function PresentacionPage() {
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // View CV Document PDF handler
+  const handleViewCv = (candId: string, urlCv?: string) => {
+    if (!urlCv) {
+      triggerToast("Este postulante no tiene un archivo CV adjunto.");
+      return;
+    }
+    if (urlCv.startsWith("gs://")) {
+      const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
+      const token = match ? match[2] : "";
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      window.open(downloadUrl, "_blank");
+    } else {
+      window.open(urlCv, "_blank");
+    }
   };
 
   // Fetch backend data
@@ -503,6 +521,9 @@ export default function PresentacionPage() {
                   </span>
                   <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/25 rounded-md animate-pulse">
                     EVALUACIÓN CLIENTE
+                  </span>
+                  <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                    ID: P-PRE-01
                   </span>
                 </div>
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
@@ -971,7 +992,7 @@ export default function PresentacionPage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "09_shortlist").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} onViewCv={handleViewCv} />
                 ))}
                 {countShortlist === 0 && <EmptyColumnText text="Ninguna presentación" />}
               </div>
@@ -995,7 +1016,7 @@ export default function PresentacionPage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "10_entrevista_cliente").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} onViewCv={handleViewCv} />
                 ))}
                 {countEntrevista === 0 && <EmptyColumnText text="Ninguna reunión agendada" />}
               </div>
@@ -1019,7 +1040,7 @@ export default function PresentacionPage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "11_standby").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} onViewCv={handleViewCv} />
                 ))}
                 {countStandby === 0 && <EmptyColumnText text="Ningún recurso en reserva" />}
               </div>
@@ -1092,14 +1113,32 @@ export default function PresentacionPage() {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <button
-                          onClick={() => handleViewDetails(cad)}
-                          className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
-                          title="Ver expediente y detalles completos"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Detalles</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5 text-[10px]">
+                          <button
+                            onClick={() => handleViewDetails(cad)}
+                            className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+                            title="Ver expediente y detalles completos"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Detalles</span>
+                          </button>
+                          {/* PDF CV Direct View button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewCv(cad.id, cad.url_cv);
+                            }}
+                            title={cad.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
+                            className={`px-2.5 py-1 rounded transition-all cursor-pointer flex items-center justify-center gap-1 font-bold shrink-0 text-[10px] ${
+                              cad.url_cv
+                                ? "text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
+                                : "text-[#879391]/40 bg-white/5 border border-white/5 hover:bg-white/10"
+                            }`}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>CV</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1128,12 +1167,14 @@ function KanbanCard({
   cad, 
   onSelect, 
   onTransition,
-  onDragStart 
+  onDragStart,
+  onViewCv
 }: { 
   cad: PresentacionCandidate; 
   onSelect: (cad: PresentacionCandidate) => void;
   onTransition: (id: string, phase: PresentacionCandidate["currentPhase"]) => void;
   onDragStart: (e: React.DragEvent, id: string) => void;
+  onViewCv: (id: string, urlCv?: string) => void;
 }) {
   const getWipTimerStatus = (entryIso: string) => {
     const entry = new Date(entryIso);
@@ -1207,6 +1248,23 @@ function KanbanCard({
         >
           <Eye className="w-3 h-3 shrink-0" />
           <span>Detalles</span>
+        </button>
+
+        {/* PDF CV Direct View button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewCv(cad.id, cad.url_cv);
+          }}
+          title={cad.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
+          className={`px-2 py-1 rounded transition-all cursor-pointer flex items-center justify-center gap-1 font-bold shrink-0 text-[9px] ${
+            cad.url_cv
+              ? "text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
+              : "text-[#879391]/40 bg-white/5 border border-white/5 hover:bg-white/10"
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>CV</span>
         </button>
         {cad.currentPhase === "09_shortlist" && (
           <button

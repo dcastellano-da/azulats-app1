@@ -73,6 +73,12 @@ export interface PipelineItem {
     notas_reclutador?: string | null;
     reuniones?: Reunion[] | null;
   } | null;
+  motivo_rechazo?: string | null;
+  resolucion?: {
+    estado_final?: string | null;
+    motivo_rechazo?: string | null;
+    fecha_resolucion?: string | null;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

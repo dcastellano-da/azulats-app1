@@ -22,6 +22,7 @@ export interface Candidato {
   notas_iniciales?: string | null;
   resumen?: string | null;
   rubros?: string | null;
+  canal_ingreso?: string | null;
 }
 
 export interface APIResponse {

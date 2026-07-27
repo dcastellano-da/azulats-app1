@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Clock,
   Check,
+  CheckCircle2,
   Copy,
   UserCheck,
   RefreshCw,
@@ -109,6 +110,23 @@ export default function CierrePage() {
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // View CV Document PDF handler
+  const handleViewCv = (candId: string, urlCv?: string) => {
+    if (!urlCv) {
+      triggerToast("Este postulante no tiene un archivo CV adjunto.");
+      return;
+    }
+    if (urlCv.startsWith("gs://")) {
+      const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
+      const token = match ? match[2] : "";
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      window.open(downloadUrl, "_blank");
+    } else {
+      window.open(urlCv, "_blank");
+    }
   };
 
   // Fetch backend data
@@ -606,6 +624,9 @@ export default function CierrePage() {
                   <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-md animate-pulse">
                     CONTRATACIÓN Y OFERTAS
                   </span>
+                  <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                    ID: P-CIE-01
+                  </span>
                 </div>
                 <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
                   Cierre y Negociación de Candidatos
@@ -1075,7 +1096,7 @@ export default function CierrePage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "12_oferta_extendida").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} onViewCv={handleViewCv} />
                 ))}
                 {countNego === 0 && <EmptyColumnText text="Ninguna propuesta activa" />}
               </div>
@@ -1099,7 +1120,7 @@ export default function CierrePage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "13_contratado").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} onViewCv={handleViewCv} />
                 ))}
                 {countWon === 0 && <EmptyColumnText text="Ninguna contratación" />}
               </div>
@@ -1123,7 +1144,7 @@ export default function CierrePage() {
 
               <div className="flex-grow space-y-3.5 overflow-y-auto">
                 {filteredCandidates.filter(c => c.currentPhase === "14_rechazado_cliente" || c.currentPhase === "15_candidato_se_baja").map((cad) => (
-                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} />
+                  <KanbanCard key={cad.id} cad={cad} onSelect={handleViewDetails} onTransition={handleTransitionState} onDragStart={handleDragStart} onViewCv={handleViewCv} />
                 ))}
                 {countInactive === 0 && <EmptyColumnText text="Ningún finalizado inactivo" />}
               </div>
@@ -1151,7 +1172,7 @@ export default function CierrePage() {
                   <th className="px-5 py-4 cursor-pointer hover:text-white text-center" onClick={() => toggleSort("score")}>
                     Fit Score {renderSortIcon("score")}
                   </th>
-                  <th className="px-5 py-4 text-right">Herramientas IA Cierre</th>
+                  <th className="px-5 py-4 text-right">ACCIONES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 font-medium">
@@ -1180,22 +1201,18 @@ export default function CierrePage() {
                       </td>
                       <td className="px-5 py-4">
                         <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full inline-block ${
-                          cad.currentPhase === "12_oferta_extendida" ? "bg-amber-500/10 text-amber-400 border border-amber-500/15" :
-                          cad.currentPhase === "13_contratado" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : 
-                          "bg-rose-500/10 text-rose-400 border border-rose-500/15"
+                          cad.currentPhase === "13_contratado" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                          cad.currentPhase === "12_oferta_extendida" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                          "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                         }`}>
-                          {getPhaseLabel(cad.currentPhase).substring(5)}
+                          {cad.currentPhase === "12_oferta_extendida" ? "12 - Oferta Extendida" :
+                           cad.currentPhase === "13_contratado" ? "13 - Contratado" :
+                           cad.currentPhase === "14_rechazado_cliente" ? "14 - Rechazado Cliente" : "15 - Desistido"}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-center">
-                        <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full inline-block font-mono ${
-                          cad.feedbackStatus === "entregado_manual" 
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25" 
-                            : cad.currentPhase === "12_oferta_extendida" || cad.currentPhase === "13_contratado" 
-                            ? "bg-white/5 text-white/50 border border-white/5" 
-                            : "bg-rose-500/10 text-rose-455 border border-[#ffb4ab]/25"
-                        }`}>
-                          {cad.feedbackStatus === "entregado_manual" ? "Cualitativo Entregado" : "Pendiente"}
+                        <span className="text-[11px] text-[#879391] italic">
+                          {cad.feedbackStatus === "entregado_manual" ? "Feedback entregado" : "Pendiente de envío"}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-center">
@@ -1204,14 +1221,32 @@ export default function CierrePage() {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <button
-                          onClick={() => handleViewDetails(cad)}
-                          className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
-                          title="Ver expediente y detalles completos"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Detalles</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5 text-[10px]">
+                          <button
+                            onClick={() => handleViewDetails(cad)}
+                            className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+                            title="Ver expediente y detalles completos"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Detalles</span>
+                          </button>
+                          {/* PDF CV Direct View button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewCv(cad.id, cad.url_cv);
+                            }}
+                            title={cad.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
+                            className={`px-2.5 py-1 rounded transition-all cursor-pointer flex items-center justify-center gap-1 font-bold shrink-0 text-[10px] ${
+                              cad.url_cv
+                                ? "text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
+                                : "text-[#879391]/40 bg-white/5 border border-white/5 hover:bg-white/10"
+                            }`}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>CV</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1232,9 +1267,10 @@ interface KanbanCardProps {
   onSelect: (c: CierreCandidate) => void;
   onTransition: (id: string, phase: CierreCandidate["currentPhase"]) => void;
   onDragStart: (e: React.DragEvent, id: string) => void;
+  onViewCv?: (id: string, urlCv?: string) => void;
 }
 
-function KanbanCard({ cad, onSelect, onTransition, onDragStart }: KanbanCardProps) {
+function KanbanCard({ cad, onSelect, onTransition, onDragStart, onViewCv }: KanbanCardProps) {
   return (
     <div
       draggable
@@ -1273,7 +1309,7 @@ function KanbanCard({ cad, onSelect, onTransition, onDragStart }: KanbanCardProp
       </div>
 
       {/* Extra actions button */}
-      <div className="flex justify-between items-center text-[10px] bg-white/[0.02] p-2.5 rounded-xl border border-white/5 mt-2">
+      <div className="flex justify-between items-center text-[10px] bg-white/[0.02] p-2.5 rounded-xl border border-white/5 mt-2 flex-wrap gap-1.5">
         {cad.currentPhase === "12_oferta_extendida" && (
           <div className="flex items-center gap-1">
             <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
@@ -1307,6 +1343,22 @@ function KanbanCard({ cad, onSelect, onTransition, onDragStart }: KanbanCardProp
         >
           <Eye className="w-3.5 h-3.5" />
           <span>Detalles</span>
+        </button>
+        {/* PDF CV Direct View button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewCv && onViewCv(cad.id, cad.url_cv);
+          }}
+          title={cad.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
+          className={`px-2 py-1 rounded transition-all cursor-pointer flex items-center justify-center gap-1 font-bold shrink-0 text-[9px] ${
+            cad.url_cv
+              ? "text-[#6bd8cb] bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
+              : "text-[#879391]/40 bg-white/5 border border-white/5 hover:bg-white/10"
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>CV</span>
         </button>
       </div>
 
