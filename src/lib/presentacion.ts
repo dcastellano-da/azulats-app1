@@ -23,6 +23,8 @@ export interface PresentacionCandidate {
   f3Notes?: string;
   recruiterNotes?: string;
   url_cv?: string;
+  canal_ingreso?: string | null;
+  reuniones?: any[] | null;
   toolsDetails: {
     analitica: {
       transcriptSnippets: { speaker: string; text: string }[];
@@ -164,6 +166,7 @@ export const mapPipelineToPresentacionCandidates = (
       f3Notes,
       recruiterNotes: f3Notes || f2Notes,
       url_cv: cand?.url_cv || undefined,
+      canal_ingreso: cand?.canal_ingreso || null,
       toolsDetails: generateDefaultPresentacionToolsDetails(candName, role, score)
     });
   }

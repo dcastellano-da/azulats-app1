@@ -180,4 +180,57 @@ describe('Descubrimiento - Detalle & Sincronización IA - Etapa 3', () => {
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.data.f1_descubrimiento.outreach.variante_enviada, 'B');
   });
+
+  test('actualizarPipelineAPI debería guardar reuniones incluyendo etiqueta de fase y permitir ordenamiento por fecha descendente', async () => {
+    global.fetch = async (url, options) => {
+      assert.strictEqual(url, 'http://localhost:8080/api/v1/pipeline/pipe-003');
+      assert.strictEqual(options.method, 'PATCH');
+
+      const body = JSON.parse(options.body);
+      assert.strictEqual(body.f1_descubrimiento.reuniones.length, 2);
+      assert.strictEqual(body.f1_descubrimiento.reuniones[0].fase, 'F1 - Descubrimiento');
+
+      return {
+        status: 200,
+        json: async () => ({
+          status: 'success',
+          data: body
+        })
+      };
+    };
+
+    const reunionesInput = [
+      {
+        id_reunion: 'reu-1',
+        fecha_hora: '2026-07-20T10:00:00Z',
+        objetivo: 'Entrevista Inicial',
+        fase: 'F1 - Descubrimiento'
+      },
+      {
+        id_reunion: 'reu-2',
+        fecha_hora: '2026-07-25T15:00:00Z',
+        objetivo: 'Evaluación Técnica',
+        fase: 'F2 - Evaluación'
+      }
+    ];
+
+    const res = await actualizarPipelineAPI('pipe-003', {
+      f1_descubrimiento: {
+        reuniones: reunionesInput
+      }
+    });
+
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(res.status, 200);
+
+    // Verify descending sort logic by fecha_hora
+    const sorted = [...res.data.f1_descubrimiento.reuniones].sort((a, b) => {
+      return new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime();
+    });
+
+    assert.strictEqual(sorted[0].id_reunion, 'reu-2'); // Newer date first (2026-07-25)
+    assert.strictEqual(sorted[0].fase, 'F2 - Evaluación');
+    assert.strictEqual(sorted[1].id_reunion, 'reu-1'); // Older date second (2026-07-20)
+    assert.strictEqual(sorted[1].fase, 'F1 - Descubrimiento');
+  });
 });

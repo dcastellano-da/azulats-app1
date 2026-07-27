@@ -217,13 +217,26 @@ Para simplificar la interacción en los prompts de desarrollo y la localización
     ```
 11. Abre [http://localhost:3000](http://localhost:3000) en el navegador.
 
----
+--------------------------------------------------------------------------------------------------------
 ## Despliegue en hosting Pruebas de Firebase
 ```bash
 git add .   
 git commit -m "Texto del cambio" 
 git push origin main
 ```
+
+*   **27/07/2026:** Integración Multietapa de "Canal de Ingreso (Sourcing)", Sección Dinámica de "Reuniones" y Mutabilidad de Puesto:
+    *   **Corrección de Peticiones en Modal `M-IMP-01` / `M-IMP-02`:** Solución al bucle infinito de peticiones al endpoint `/api/v1/candidatos` ocasionado por un ciclo de re-renders al abrir el modal de ingesta de candidato por IA.
+    *   **Extensión del Campo "Canal de Ingreso (Sourcing)" (`canal_ingreso`):**
+        - Inclusión del selector opcional de `canal_ingreso` y su guardado en el servidor a través de `ImportarIaModal.tsx` (`M-IMP-01` y `M-IMP-02`) y las Server Actions `importarCandidatoIA_API`, `crearCandidatoAPI` y `actualizarCandidatoAPI`.
+        - Mapeo y habilitación del selector en el modo de edición de `P-TAL-02` (`/talento/[id]`).
+        - Integración completa de visualización, edición y persistencia del canal de ingreso en las pantallas de detalle del pipeline: `P-EVA-02` (`/evaluacion/[id]`), `P-PRE-02` (`/presentacion/[id]`) y `P-CIE-02` (`/cierre/[id]`).
+    *   **Sección Dinámica de "Reuniones" y Fase Origen (`Reuniones`):**
+        - Reestructuración de la sección en `P-DIS-02` (`/descubrimiento/[id]`): cambio de título a `"Reuniones"`, ordenación automática de la lista por fecha descendente, e incorporación de la insignia/badge de la fase de creación (`fase`, ej. `F1 - Descubrimiento`).
+        - Extensión de la interfaz `Reunion` (`src/actions/pipeline.ts`) con el parámetro opcional `fase?: string | null`.
+        - Replicación completa de la sección `REUNIONES` en `P-EVA-02` (`/evaluacion/[id]`), `P-PRE-02` (`/presentacion/[id]`) y `P-CIE-02` (`/cierre/[id]`), incluyendo modales interactivos de creación, edición y eliminación, asignando las etiquetas origen `F2 - Evaluación`, `F3 - Presentación` y `F4 - Cierre` respectivamente y sincronizándolas en tiempo real vía `actualizarPipelineAPI`.
+    *   **Modificación del Cargo/Puesto (`puesto_postulacion`):** Remoción de `puesto` de la lista de campos inmutables en `actualizarCandidatoAPI` ([src/actions/candidatos.ts](file:///Users/dcastellano/Documents/devs/da-rh1/azulats-app1/src/actions/candidatos.ts)) y mapeo de la propiedad `puesto_postulacion` en el payload `PATCH /api/v1/candidatos/:id`, permitiendo mutar el puesto del postulante sin errores HTTP 400.
+    *   **Pruebas Automáticas:** Actualización y validación de la suite de pruebas unitarias (`tests/descubrimiento_etapa3.test.js` y `tests/candidatos_etapa2.test.js`), alcanzando un **100% de éxito en 34 pruebas pasadas** y compilación limpia de producción en Next.js (`npm run build`).
 
 *   **27/07/2026:** Estandarización del Botón "CV", Sistema de Identificadores Únicos (P-xxx/M-xxx) y Canal de Ingreso Dinámico:
     *   **Botonera Unificada "CV" (Ícono + Texto):** Incorporación del botón de documento PDF con el ícono `<FileText />` acompañado de la etiqueta de texto `"CV"` en las tarjetas Kanban, columna ACCIONES de Lista Detallada y barras de navegación superiores de todas las fases del pipeline (`/talento`, `/descubrimiento`, `/evaluacion`, `/presentacion`, `/cierre` y sus fichas de detalle `/[id]`).

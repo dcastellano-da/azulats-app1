@@ -143,11 +143,13 @@ describe('Postulantes - Integración de Campos - Etapa 2 (Escritura y Validació
 
       const body = JSON.parse(options.body);
       assert.strictEqual(body.telefono_movil, '+5491199887766');
+      assert.strictEqual(body.puesto_postulacion, 'Lead Architect');
       assert.strictEqual(body.skills_principales, 'Figma, Tailwind, Next.js');
       assert.strictEqual(body.nivel_ingles, 'B2');
       assert.strictEqual(body.notas_iniciales, 'Anotaciones actualizadas.');
       assert.strictEqual(body.resumen, 'Resumen actualizado.');
       assert.strictEqual(body.rubros, 'Otros rubros.');
+      assert.strictEqual(body.canal_ingreso, 'Headhunting Directo');
 
       return {
         status: 200,
@@ -161,12 +163,14 @@ describe('Postulantes - Integración de Campos - Etapa 2 (Escritura y Validació
     };
 
     const updatePayload = {
+      puesto: 'Lead Architect',
       telefono_movil: '+5491199887766',
       skills_principales: 'Figma, Tailwind, Next.js',
       nivel_ingles: 'B2',
       notas_iniciales: 'Anotaciones actualizadas.',
       resumen: 'Resumen actualizado.',
-      rubros: 'Otros rubros.'
+      rubros: 'Otros rubros.',
+      canal_ingreso: 'Headhunting Directo'
     };
 
     const response = await actualizarCandidatoAPI('candidato-edit-id', updatePayload);
@@ -175,6 +179,7 @@ describe('Postulantes - Integración de Campos - Etapa 2 (Escritura y Validació
     assert.strictEqual(response.data.telefono_movil, '+5491199887766');
     assert.strictEqual(response.data.resumen, 'Resumen actualizado.');
     assert.strictEqual(response.data.rubros, 'Otros rubros.');
+    assert.strictEqual(response.data.canal_ingreso, 'Headhunting Directo');
   });
 
   test('actualizarCandidatoAPI debería rechazar intentos de modificar metadatos inmutables', async () => {
@@ -196,6 +201,7 @@ describe('Postulantes - Integración de Campos - Etapa 2 (Escritura y Validació
       const body = options.body;
       assert.ok(body instanceof FormData);
       assert.strictEqual(body.get('notas_iniciales'), 'Importante perfil referido.');
+      assert.strictEqual(body.get('canal_ingreso'), 'LinkedIn Outbound');
       
       return {
         status: 201,
@@ -204,7 +210,8 @@ describe('Postulantes - Integración de Campos - Etapa 2 (Escritura y Validació
           data: {
             id: 'mock-imported-id',
             nombre_completo: 'John Doe',
-            notas_iniciales: 'Importante perfil referido.'
+            notas_iniciales: 'Importante perfil referido.',
+            canal_ingreso: 'LinkedIn Outbound'
           }
         })
       };
@@ -213,6 +220,7 @@ describe('Postulantes - Integración de Campos - Etapa 2 (Escritura y Validació
     const mockFormData = new FormData();
     mockFormData.append('cv', new Blob(['fake-cv'], { type: 'application/pdf' }), 'cv_john.pdf');
     mockFormData.append('notas_iniciales', 'Importante perfil referido.');
+    mockFormData.append('canal_ingreso', 'LinkedIn Outbound');
 
     const response = await importarCandidatoIA_API(mockFormData);
     assert.strictEqual(response.success, true);

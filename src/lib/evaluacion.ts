@@ -18,6 +18,8 @@ export interface EvaluacionCandidate {
   f2Notes?: string;
   recruiterNotes?: string;
   url_cv?: string;
+  canal_ingreso?: string | null;
+  reuniones?: any[] | null;
   toolsDetails: {
     sintetizador: {
       pros: string[];

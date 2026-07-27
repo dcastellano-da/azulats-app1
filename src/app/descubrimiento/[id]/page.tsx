@@ -31,7 +31,8 @@ import {
   ChevronsRight,
   Calendar,
   Video,
-  Plus
+  Plus,
+  Share2
 } from "lucide-react";
 import { analyzeSemanticMatchLive, generateOutreachMessageLive, SemanticMatchResult } from "@/lib/gemini";
 
@@ -69,6 +70,7 @@ interface SourcedCandidate {
   rejectionReason?: string;
   reuniones?: Reunion[];
   url_cv?: string;
+  canal_ingreso?: string | null;
 }
 
 const SEMANTIC_MATCH_DB: Record<string, SemanticMatchResult> = {
@@ -256,7 +258,8 @@ const mapSinglePipelineToSourcedCandidate = (
     socialLinks,
     rejectionReason,
     reuniones: pipe?.f1_descubrimiento?.reuniones || [],
-    url_cv: cand.url_cv || undefined
+    url_cv: cand.url_cv || undefined,
+    canal_ingreso: cand.canal_ingreso || null
   };
 };
 
@@ -277,6 +280,15 @@ export default function SourcedCandidateDetailPage() {
   const [editRole, setEditRole] = useState("");
   const [editClient, setEditClient] = useState("");
   const [editLocation, setEditLocation] = useState("");
+  const [editCanalIngreso, setEditCanalIngreso] = useState("");
+  const [existingChannels, setExistingChannels] = useState<string[]>([
+    "Headhunting",
+    "LinkedIn",
+    "Referido",
+    "InfoJob",
+    "Otros"
+  ]);
+  const [isCustomChannel, setIsCustomChannel] = useState(false);
   const [editMotivation, setEditMotivation] = useState("");
   const [editRecruiterNotes, setEditRecruiterNotes] = useState("");
   const [editScore, setEditScore] = useState(80);
@@ -373,7 +385,8 @@ export default function SourcedCandidateDetailPage() {
                 fecha_hora: formattedFechaHora,
                 link_reunion: meetingForm.link_reunion.trim(),
                 objetivo: meetingForm.objetivo.trim(),
-                notas: meetingForm.notas.trim()
+                notas: meetingForm.notas.trim(),
+                fase: m.fase || "F1 - Descubrimiento"
               }
             : m
         );
@@ -383,7 +396,8 @@ export default function SourcedCandidateDetailPage() {
           fecha_hora: formattedFechaHora,
           link_reunion: meetingForm.link_reunion.trim(),
           objetivo: meetingForm.objetivo.trim(),
-          notas: meetingForm.notas.trim()
+          notas: meetingForm.notas.trim(),
+          fase: "F1 - Descubrimiento"
         };
         updatedMeetings = [...currentMeetings, newMeeting];
       }
@@ -611,6 +625,12 @@ export default function SourcedCandidateDetailPage() {
         throw new Error(candRes.message || "Error al obtener candidatos.");
       }
       const candidatesList = candRes.data as Candidato[];
+
+      const dbChannels = candidatesList
+        .map(c => c.canal_ingreso)
+        .filter((ch): ch is string => Boolean(ch && ch.trim()));
+      const defaults = ["Headhunting", "LinkedIn", "Referido", "InfoJob", "Otros"];
+      setExistingChannels(Array.from(new Set([...defaults, ...dbChannels])));
       
       const candidateId = foundPipeItem ? foundPipeItem.claves_conexion.id_candidato : id;
       const foundCandidate = candidatesList.find(c => c.id === candidateId);
@@ -661,6 +681,8 @@ export default function SourcedCandidateDetailPage() {
     setEditRole(c.role || "");
     setEditClient(c.client || "");
     setEditLocation(c.location || "");
+    setEditCanalIngreso(c.canal_ingreso || "");
+    setIsCustomChannel(false);
     setEditMotivation(c.motivationNote || "");
     setEditRecruiterNotes(c.recruiterNotes || "");
     setEditScore(c.score || 80);
@@ -695,11 +717,15 @@ export default function SourcedCandidateDetailPage() {
       if (editLocation.trim() !== cand?.location) candPayload.ubicacion = editLocation.trim();
       if (editMotivation.trim() !== cand?.motivationNote) candPayload.notas_iniciales = editMotivation.trim();
       if (editPortfolio.trim() !== cand?.socialLinks?.portfolio) candPayload.linkedin_url = editPortfolio.trim();
+      if (editCanalIngreso.trim() !== (cand?.canal_ingreso || "")) candPayload.canal_ingreso = editCanalIngreso.trim();
 
       if (cand && Object.keys(candPayload).length > 0) {
         const res = await actualizarCandidatoAPI(cand.id, candPayload);
         if (!res.success) {
           throw new Error(res.message || "Error al actualizar la información del candidato.");
+        }
+        if (editCanalIngreso.trim()) {
+          setExistingChannels(prev => Array.from(new Set([...prev, editCanalIngreso.trim()])));
         }
       }
 
@@ -777,6 +803,7 @@ export default function SourcedCandidateDetailPage() {
                 },
                 blockReason: c.phase1State === "03_bloqueado" ? editBlockReason.trim() : c.blockReason,
                 rejectionReason: c.phase1State === "04_rechazado" ? editRejectionReason : c.rejectionReason,
+                canal_ingreso: editCanalIngreso.trim() || null,
                 lastChangeDate: "Recién editado"
               };
             }
@@ -1399,6 +1426,65 @@ export default function SourcedCandidateDetailPage() {
                     )}
                   </div>
 
+                  {/* Canal de Ingreso (Sourcing) */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block flex items-center gap-1">
+                      <Share2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                      Canal de Ingreso (Sourcing)
+                    </span>
+                    {isEditing ? (
+                      <div className="space-y-1.5">
+                        <select
+                          value={isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "") ? "OTHER_CUSTOM" : editCanalIngreso}
+                          onChange={(e) => {
+                            if (e.target.value === "OTHER_CUSTOM") {
+                              setIsCustomChannel(true);
+                              setEditCanalIngreso("");
+                            } else {
+                              setIsCustomChannel(false);
+                              setEditCanalIngreso(e.target.value);
+                            }
+                          }}
+                          className="bg-white/5 border border-white/10 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none cursor-pointer font-medium"
+                        >
+                          <option value="" className="bg-[#15181a]">-- Sin especificar (opcional) --</option>
+                          <optgroup label="Canales detectados en la Base de Datos">
+                            {existingChannels.map((ch) => (
+                              <option key={ch} value={ch} className="bg-[#15181a] text-white">
+                                {ch}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <option value="OTHER_CUSTOM" className="bg-[#15181a] text-[#6bd8cb] font-semibold">
+                            + Escribir nuevo canal personalizado...
+                          </option>
+                        </select>
+
+                        {(isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "")) && (
+                          <input
+                            type="text"
+                            value={editCanalIngreso}
+                            onChange={(e) => setEditCanalIngreso(e.target.value)}
+                            placeholder="Escribe la vía de sourcing (ej: Headhunting, LinkedIn...)..."
+                            className="bg-[#101415] border border-[#6bd8cb]/40 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none mt-1"
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs">
+                        {cand.canal_ingreso ? (
+                          <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
+                            {cand.canal_ingreso}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-white/40 italic">
+                            No especificado
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                 </div>
 
                 {/* Sourcing notes & block metrics */}
@@ -1665,116 +1751,132 @@ export default function SourcedCandidateDetailPage() {
               )}
             </div>
 
-            {/* Sección de Agendamiento Dinámico de Reuniones (Fase 1 - Descubrimiento) */}
+            {/* Sección de Agendamiento Dinámico de Reuniones */}
             <div className="glass-panel rounded-3xl p-6 border border-white/10 text-left space-y-5">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-white/5">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                      <span>Reuniones de Fase 1 - Descubrimiento</span>
-                      <span className="text-[10px] bg-white/10 text-[#6bd8cb] px-2 py-0.5 rounded-full font-mono font-bold">
-                        {((activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones) || []).length}
-                      </span>
-                    </h3>
-                    <p className="text-[10px] text-[#879391] mt-0.5">
-                      Agendamiento e historial de entrevistas correspondientes únicamente a esta fase
-                    </p>
-                  </div>
-                </div>
+              {(() => {
+                const rawMeetings: Reunion[] = (activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones) || [];
+                const sortedMeetings = [...rawMeetings].sort((a, b) => {
+                  const timeA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0;
+                  const timeB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0;
+                  return timeB - timeA;
+                });
 
-                <button
-                  onClick={handleOpenCreateMeeting}
-                  className="px-3.5 py-2 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer self-start sm:self-auto"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Nueva Reunión</span>
-                </button>
-              </div>
-
-              {/* Lista de Reuniones */}
-              {((activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones) || []).length === 0 ? (
-                <div className="p-6 text-center border border-dashed border-white/10 rounded-2xl space-y-2">
-                  <Calendar className="w-8 h-8 text-[#879391]/50 mx-auto" />
-                  <p className="text-xs text-[#879391]">No hay reuniones agendadas en esta fase.</p>
-                  <button
-                    onClick={handleOpenCreateMeeting}
-                    className="text-xs font-bold text-[#6bd8cb] hover:underline inline-flex items-center gap-1 mt-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Agendar la primera reunión
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {((activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones) || []).map((meeting) => (
-                    <div 
-                      key={meeting.id_reunion}
-                      className="p-4 rounded-2xl bg-stone-950/45 border border-white/10 hover:border-[#6bd8cb]/30 transition-all space-y-3"
-                    >
-                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-white/5 pb-2.5">
-                        <div className="space-y-0.5">
-                          <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                            <span>{meeting.objetivo || "Reunión de Descubrimiento"}</span>
-                          </h4>
-                          <div className="flex items-center gap-2 text-[11px] text-[#6bd8cb] font-mono">
-                            <Clock className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                            <span>
-                              {meeting.fecha_hora 
-                                ? new Date(meeting.fecha_hora).toLocaleString("es-ES", {
-                                    dateStyle: "full",
-                                    timeStyle: "short"
-                                  })
-                                : "Sin fecha definida"}
-                            </span>
-                          </div>
+                return (
+                  <>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-white/5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
+                          <Calendar className="w-5 h-5" />
                         </div>
-
-                        <div className="flex items-center gap-2 self-end sm:self-auto">
-                          <button
-                            onClick={() => handleOpenEditMeeting(meeting)}
-                            className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-[#6bd8cb]/40 bg-white/5 hover:bg-[#6bd8cb]/10 text-white/80 hover:text-[#6bd8cb] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                            title="Modificar datos de la reunión"
-                          >
-                            <Edit2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                            <span>Modificar</span>
-                          </button>
-                          <button
-                            onClick={() => setDeletingMeetingId(meeting.id_reunion)}
-                            className="p-1.5 rounded-lg border border-white/10 hover:border-rose-500/40 bg-white/5 hover:bg-rose-500/10 text-white/70 hover:text-rose-400 transition-all cursor-pointer"
-                            title="Eliminar reunión"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div>
+                          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                            <span>Reuniones</span>
+                            <span className="text-[10px] bg-white/10 text-[#6bd8cb] px-2 py-0.5 rounded-full font-mono font-bold">
+                              {sortedMeetings.length}
+                            </span>
+                          </h3>
+                          <p className="text-[10px] text-[#879391] mt-0.5">
+                            Agendamiento e historial de entrevistas del expediente
+                          </p>
                         </div>
                       </div>
 
-                      {meeting.link_reunion && (
-                        <div className="flex items-center gap-2">
-                          <a
-                            href={meeting.link_reunion.startsWith("http") ? meeting.link_reunion : `https://${meeting.link_reunion}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-300 text-xs font-bold transition-all inline-flex items-center gap-1.5"
-                          >
-                            <Video className="w-3.5 h-3.5 text-indigo-400" />
-                            <span className="truncate max-w-xs">{meeting.link_reunion}</span>
-                            <ExternalLink className="w-3 h-3 ml-0.5 shrink-0" />
-                          </a>
-                        </div>
-                      )}
-
-                      {meeting.notas && (
-                        <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs text-[#879391] leading-relaxed">
-                          <span className="text-[10px] uppercase font-bold text-white/40 block mb-0.5">Notas de la sesión:</span>
-                          <p className="whitespace-pre-wrap">{meeting.notas}</p>
-                        </div>
-                      )}
+                      <button
+                        onClick={handleOpenCreateMeeting}
+                        className="px-3.5 py-2 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer self-start sm:self-auto"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Nueva Reunión</span>
+                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    {/* Lista de Reuniones ordenadas por fecha descendente */}
+                    {sortedMeetings.length === 0 ? (
+                      <div className="p-6 text-center border border-dashed border-white/10 rounded-2xl space-y-2">
+                        <Calendar className="w-8 h-8 text-[#879391]/50 mx-auto" />
+                        <p className="text-xs text-[#879391]">No hay reuniones agendadas.</p>
+                        <button
+                          onClick={handleOpenCreateMeeting}
+                          className="text-xs font-bold text-[#6bd8cb] hover:underline inline-flex items-center gap-1 mt-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Agendar la primera reunión
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {sortedMeetings.map((meeting) => (
+                          <div 
+                            key={meeting.id_reunion}
+                            className="p-4 rounded-2xl bg-stone-950/45 border border-white/10 hover:border-[#6bd8cb]/30 transition-all space-y-3"
+                          >
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-white/5 pb-2.5">
+                              <div className="space-y-0.5">
+                                <h4 className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
+                                  <span className="inline-block text-[9.5px] font-bold font-mono px-2 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] uppercase tracking-wider">
+                                    {meeting.fase || "F1 - Descubrimiento"}
+                                  </span>
+                                  <span>{meeting.objetivo || "Reunión de Descubrimiento"}</span>
+                                </h4>
+                                <div className="flex items-center gap-2 text-[11px] text-[#6bd8cb] font-mono">
+                                  <Clock className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                                  <span>
+                                    {meeting.fecha_hora 
+                                      ? new Date(meeting.fecha_hora).toLocaleString("es-ES", {
+                                          dateStyle: "full",
+                                          timeStyle: "short"
+                                        })
+                                      : "Sin fecha definida"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <button
+                                  onClick={() => handleOpenEditMeeting(meeting)}
+                                  className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-[#6bd8cb]/40 bg-white/5 hover:bg-[#6bd8cb]/10 text-white/80 hover:text-[#6bd8cb] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Modificar datos de la reunión"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                                  <span>Modificar</span>
+                                </button>
+                                <button
+                                  onClick={() => setDeletingMeetingId(meeting.id_reunion)}
+                                  className="p-1.5 rounded-lg border border-white/10 hover:border-rose-500/40 bg-white/5 hover:bg-rose-500/10 text-white/70 hover:text-rose-400 transition-all cursor-pointer"
+                                  title="Eliminar reunión"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {meeting.link_reunion && (
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={meeting.link_reunion.startsWith("http") ? meeting.link_reunion : `https://${meeting.link_reunion}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-300 text-xs font-bold transition-all inline-flex items-center gap-1.5"
+                                >
+                                  <Video className="w-3.5 h-3.5 text-indigo-400" />
+                                  <span className="truncate max-w-xs">{meeting.link_reunion}</span>
+                                  <ExternalLink className="w-3 h-3 ml-0.5 shrink-0" />
+                                </a>
+                              </div>
+                            )}
+
+                            {meeting.notas && (
+                              <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs text-[#879391] leading-relaxed">
+                                <span className="text-[10px] uppercase font-bold text-white/40 block mb-0.5">Notas de la sesión:</span>
+                                <p className="whitespace-pre-wrap">{meeting.notas}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* Sección de Datos de Pipeline */}

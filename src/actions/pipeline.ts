@@ -8,6 +8,7 @@ export interface Reunion {
   link_reunion?: string | null;
   objetivo?: string | null;
   notas?: string | null;
+  fase?: string | null;
 }
 
 export interface PipelineItem {

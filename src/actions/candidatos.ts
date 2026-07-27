@@ -592,7 +592,8 @@ export async function getCandidatosAPI(): Promise<APIResponse> {
         otros_idiomas: cand.otros_idiomas || "",
         notas_iniciales: cand.notas_iniciales || "",
         resumen: cand.resumen || "",
-        rubros: cand.rubros || ""
+        rubros: cand.rubros || "",
+        canal_ingreso: cand.canal_ingreso || null
       }));
 
       return {
@@ -652,6 +653,7 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
     const notas = formData.get("notas_iniciales")?.toString()?.trim() || "";
     const resumen = formData.get("resumen")?.toString()?.trim() || "";
     const rubros = formData.get("rubros")?.toString()?.trim() || "";
+    const canalIngreso = formData.get("canal_ingreso")?.toString()?.trim() || "";
 
     // Server-side validation to enable robust 400 Bad Request simulation
     if (!nombre || !email || !puesto) {
@@ -692,6 +694,7 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
     apiFormData.append("notas_iniciales", notas);
     apiFormData.append("resumen", resumen);
     apiFormData.append("rubros", rubros);
+    if (canalIngreso) apiFormData.append("canal_ingreso", canalIngreso);
 
     const response = await fetch(url, {
       method: "POST",
@@ -769,13 +772,13 @@ export async function actualizarCandidatoAPI(id: string, payload: Partial<Candid
     }
 
     // Mutability Matrix Safeguard: Do not allow unauthorized modifications
-    const forbiddenKeys: Array<keyof Candidato> = ["id", "acepta_privacidad", "origen", "url_cv", "createdAt", "puesto"];
+    const forbiddenKeys: Array<keyof Candidato> = ["id", "acepta_privacidad", "origen", "url_cv", "createdAt"];
     const containsForbidden = forbiddenKeys.some(key => key in payload);
     if (containsForbidden) {
       return {
         status: 400,
         success: false,
-        message: "Acceso denegado: Intento de modificar metadatos históricos inmutables (ID, Origen, Consentimiento, CV original, Puesto de postulación original)."
+        message: "Acceso denegado: Intento de modificar metadatos históricos inmutables (ID, Origen, Consentimiento, CV original)."
       };
     }
 
@@ -783,6 +786,7 @@ export async function actualizarCandidatoAPI(id: string, payload: Partial<Candid
     if (payload.nombre_completo !== undefined) apiPayload.nombre_completo = payload.nombre_completo;
     if (payload.email !== undefined) apiPayload.email = payload.email;
     if (payload.linkedin_url !== undefined) apiPayload.linkedin_url = payload.linkedin_url;
+    if (payload.puesto !== undefined) apiPayload.puesto_postulacion = payload.puesto;
     if (payload.estado_revision !== undefined) {
       if (payload.estado_revision === "Pendiente") {
         apiPayload.estado_revision = "pendiente";
@@ -798,6 +802,7 @@ export async function actualizarCandidatoAPI(id: string, payload: Partial<Candid
     if (payload.notas_iniciales !== undefined) apiPayload.notas_iniciales = payload.notas_iniciales;
     if (payload.resumen !== undefined) apiPayload.resumen = payload.resumen;
     if (payload.rubros !== undefined) apiPayload.rubros = payload.rubros;
+    if (payload.canal_ingreso !== undefined) apiPayload.canal_ingreso = payload.canal_ingreso;
 
     const url = `${apiBaseUrl}/api/v1/candidatos/${id}`;
     console.log(`[Candidatos Action] PATCH a: ${url}`);
@@ -939,6 +944,10 @@ export async function importarCandidatoIA_API(formData: FormData): Promise<APIRe
     const notas = formData.get("notas_iniciales")?.toString()?.trim();
     if (notas) {
       apiFormData.append("notas_iniciales", notas);
+    }
+    const canal = formData.get("canal_ingreso")?.toString()?.trim();
+    if (canal) {
+      apiFormData.append("canal_ingreso", canal);
     }
 
     const response = await fetch(url, {

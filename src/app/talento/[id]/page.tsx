@@ -794,6 +794,47 @@ Notas iniciales: ${cand.notas_iniciales || 'Ninguna'}`;
                         className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none"
                       />
                     </div>
+
+                    {/* Canal de Ingreso */}
+                    <div className="space-y-1 text-left">
+                      <label className="text-[9px] font-black uppercase text-white/40 tracking-wider">Canal de Ingreso (Sourcing)</label>
+                      <div className="space-y-1.5">
+                        <select
+                          value={isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "") ? "OTHER_CUSTOM" : editCanalIngreso}
+                          onChange={(e) => {
+                            if (e.target.value === "OTHER_CUSTOM") {
+                              setIsCustomChannel(true);
+                              setEditCanalIngreso("");
+                            } else {
+                              setIsCustomChannel(false);
+                              setEditCanalIngreso(e.target.value);
+                            }
+                          }}
+                          className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none cursor-pointer font-medium"
+                        >
+                          <option value="" className="bg-[#15181a]">-- Sin especificar (opcional) --</option>
+                          <optgroup label="Canales detectados en la Base de Datos">
+                            {existingChannels.map((ch) => (
+                              <option key={ch} value={ch} className="bg-[#15181a] text-white">
+                                {ch}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <option value="OTHER_CUSTOM" className="bg-[#15181a] text-[#6bd8cb] font-semibold">
+                            + Escribir nuevo canal personalizado...
+                          </option>
+                        </select>
+                        {(isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "")) && (
+                          <input
+                            type="text"
+                            value={editCanalIngreso}
+                            onChange={(e) => setEditCanalIngreso(e.target.value)}
+                            placeholder="Escribe la vía de sourcing personalizada..."
+                            className="w-full bg-[#101415] border border-[#6bd8cb]/40 rounded-xl px-3 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none mt-1"
+                          />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <>

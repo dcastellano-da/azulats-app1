@@ -35,13 +35,18 @@ import {
   Languages,
   Calendar,
   Bell,
-  Sparkles
+  Sparkles,
+  Share2,
+  Plus,
+  Trash2,
+  Video,
+  ExternalLink
 } from "lucide-react";
 
 // Backend API Actions
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
-import { getPipelineAPI, PipelineItem, actualizarPipelineAPI } from "@/actions/pipeline";
+import { getPipelineAPI, PipelineItem, actualizarPipelineAPI, Reunion } from "@/actions/pipeline";
 import { 
   PresentacionCandidate, 
   generateDefaultPresentacionToolsDetails 
@@ -87,6 +92,28 @@ export default function PresentacionDetallePage() {
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [isAdvancingPhase, setIsAdvancingPhase] = useState(false);
 
+  // Meetings modal and action states
+  const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState<Reunion | null>(null);
+  const [deletingMeetingId, setDeletingMeetingId] = useState<string | null>(null);
+  const [meetingForm, setMeetingForm] = useState({
+    fecha_hora: "",
+    link_reunion: "",
+    objetivo: "",
+    notas: ""
+  });
+  const [savingMeeting, setSavingMeeting] = useState(false);
+
+  const [editCanalIngreso, setEditCanalIngreso] = useState("");
+  const [existingChannels, setExistingChannels] = useState<string[]>([
+    "Headhunting",
+    "LinkedIn",
+    "Referido",
+    "InfoJob",
+    "Otros"
+  ]);
+  const [isCustomChannel, setIsCustomChannel] = useState(false);
+
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -108,6 +135,11 @@ export default function PresentacionDetallePage() {
       let candidatesList: Candidato[] = [];
       if (candidatesRes.success && Array.isArray(candidatesRes.data)) {
         candidatesList = candidatesRes.data;
+        const dbChannels = candidatesList
+          .map(c => c.canal_ingreso)
+          .filter((ch): ch is string => Boolean(ch && ch.trim()));
+        const defaults = ["Headhunting", "LinkedIn", "Referido", "InfoJob", "Otros"];
+        setExistingChannels(Array.from(new Set([...defaults, ...dbChannels])));
       }
 
       let pipeItems: PipelineItem[] = [];
@@ -180,6 +212,8 @@ export default function PresentacionDetallePage() {
           f3Notes,
           recruiterNotes: f3Notes || f2Notes,
           url_cv: cObj?.url_cv || undefined,
+          canal_ingreso: cObj?.canal_ingreso || null,
+          reuniones: targetPipe?.f1_descubrimiento?.reuniones || [],
           toolsDetails: generateDefaultPresentacionToolsDetails(candName, role, score)
         };
 
@@ -189,6 +223,8 @@ export default function PresentacionDetallePage() {
         setEditF1Notes(f1Notes);
         setEditF2Notes(f2Notes);
         setEditF3Notes(f3Notes);
+        setEditCanalIngreso(cObj?.canal_ingreso || "");
+        setIsCustomChannel(false);
       } else {
         setError("No se encontró el expediente del candidato en el pipeline de presentación.");
       }
@@ -208,11 +244,15 @@ export default function PresentacionDetallePage() {
     if (!cand) return;
     setIsSavingNotes(true);
     try {
-      // 1. Update Candidate initial notes in backend
+      // 1. Update Candidate initial notes and canal_ingreso in backend
       if (cand.id) {
         await actualizarCandidatoAPI(cand.id, {
-          notas_iniciales: editInitialNotes.trim()
+          notas_iniciales: editInitialNotes.trim(),
+          canal_ingreso: editCanalIngreso.trim()
         });
+        if (editCanalIngreso.trim()) {
+          setExistingChannels(prev => Array.from(new Set([...prev, editCanalIngreso.trim()])));
+        }
       }
       // 2. Update Pipeline notes in backend
       if (cand.pipeId) {
@@ -231,7 +271,8 @@ export default function PresentacionDetallePage() {
         f1Notes: editF1Notes.trim(),
         f2Notes: editF2Notes.trim(),
         f3Notes: editF3Notes.trim(),
-        recruiterNotes: editF3Notes.trim() || editF2Notes.trim()
+        recruiterNotes: editF3Notes.trim(),
+        canal_ingreso: editCanalIngreso.trim() || null
       } : null);
       setIsEditingNotes(false);
       triggerToast("Historial de notas guardado correctamente.");
@@ -240,6 +281,155 @@ export default function PresentacionDetallePage() {
       triggerToast("Error al guardar notas en el servidor.");
     } finally {
       setIsSavingNotes(false);
+    }
+  };
+
+  // Meetings Handler Functions
+  const handleOpenCreateMeeting = () => {
+    setEditingMeeting(null);
+    const nowISO = new Date().toISOString().slice(0, 16);
+    setMeetingForm({
+      fecha_hora: nowISO,
+      link_reunion: "",
+      objetivo: "",
+      notas: ""
+    });
+    setIsMeetingModalOpen(true);
+  };
+
+  const handleOpenEditMeeting = (m: Reunion) => {
+    setEditingMeeting(m);
+    let formattedDate = m.fecha_hora;
+    try {
+      if (m.fecha_hora) {
+        formattedDate = new Date(m.fecha_hora).toISOString().slice(0, 16);
+      }
+    } catch (_) {}
+    setMeetingForm({
+      fecha_hora: formattedDate || "",
+      link_reunion: m.link_reunion || "",
+      objetivo: m.objetivo || "",
+      notas: m.notas || ""
+    });
+    setIsMeetingModalOpen(true);
+  };
+
+  const handleSaveMeeting = async () => {
+    if (!meetingForm.fecha_hora) {
+      alert("Por favor indica la fecha y hora de la reunión.");
+      return;
+    }
+    if (!meetingForm.objetivo.trim()) {
+      alert("Por favor especifica el objetivo de la reunión.");
+      return;
+    }
+
+    try {
+      setSavingMeeting(true);
+      const formattedFechaHora = new Date(meetingForm.fecha_hora).toISOString();
+      const currentMeetings = activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones || [];
+
+      let updatedMeetings: Reunion[] = [];
+      if (editingMeeting) {
+        updatedMeetings = currentMeetings.map(m => 
+          m.id_reunion === editingMeeting.id_reunion
+            ? {
+                ...m,
+                fecha_hora: formattedFechaHora,
+                link_reunion: meetingForm.link_reunion.trim(),
+                objetivo: meetingForm.objetivo.trim(),
+                notas: meetingForm.notas.trim(),
+                fase: m.fase || "F3 - Presentación"
+              }
+            : m
+        );
+      } else {
+        const newMeeting: Reunion = {
+          id_reunion: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `reu-${Date.now()}`,
+          fecha_hora: formattedFechaHora,
+          link_reunion: meetingForm.link_reunion.trim(),
+          objetivo: meetingForm.objetivo.trim(),
+          notas: meetingForm.notas.trim(),
+          fase: "F3 - Presentación"
+        };
+        updatedMeetings = [...currentMeetings, newMeeting];
+      }
+
+      if (activePipelineItem?.id || cand?.pipeId) {
+        const pipeId = activePipelineItem?.id || cand?.pipeId!;
+        const f1Data = activePipelineItem?.f1_descubrimiento || (cand as any)?.f1_descubrimiento || {};
+        
+        const payload = {
+          f1_descubrimiento: {
+            ...f1Data,
+            reuniones: updatedMeetings
+          }
+        };
+
+        const res = await actualizarPipelineAPI(pipeId, payload);
+        if (!res.success) {
+          throw new Error(res.message || "Error al actualizar la reunión en el pipeline.");
+        }
+
+        setActivePipelineItem(prev => prev ? {
+          ...prev,
+          f1_descubrimiento: {
+            ...prev.f1_descubrimiento,
+            reuniones: updatedMeetings
+          }
+        } : null);
+      }
+
+      setCand(prev => prev ? { ...prev, reuniones: updatedMeetings } : null);
+      setIsMeetingModalOpen(false);
+    } catch (err: any) {
+      console.error("Error al guardar la reunión:", err);
+      alert(err.message || "Ocurrió un error al guardar la reunión.");
+    } finally {
+      setSavingMeeting(false);
+    }
+  };
+
+  const confirmDeleteMeetingAction = async () => {
+    if (!deletingMeetingId) return;
+
+    try {
+      setSavingMeeting(true);
+      const currentMeetings = activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones || [];
+      const updatedMeetings = currentMeetings.filter(m => m.id_reunion !== deletingMeetingId);
+
+      if (activePipelineItem?.id || cand?.pipeId) {
+        const pipeId = activePipelineItem?.id || cand?.pipeId!;
+        const f1Data = activePipelineItem?.f1_descubrimiento || (cand as any)?.f1_descubrimiento || {};
+        
+        const payload = {
+          f1_descubrimiento: {
+            ...f1Data,
+            reuniones: updatedMeetings
+          }
+        };
+
+        const res = await actualizarPipelineAPI(pipeId, payload);
+        if (!res.success) {
+          throw new Error(res.message || "Error al eliminar la reunión del pipeline.");
+        }
+
+        setActivePipelineItem(prev => prev ? {
+          ...prev,
+          f1_descubrimiento: {
+            ...prev.f1_descubrimiento,
+            reuniones: updatedMeetings
+          }
+        } : null);
+      }
+
+      setCand(prev => prev ? { ...prev, reuniones: updatedMeetings } : null);
+      setDeletingMeetingId(null);
+    } catch (err: any) {
+      console.error("Error al eliminar la reunión:", err);
+      alert(err.message || "Ocurrió un error al eliminar la reunión.");
+    } finally {
+      setSavingMeeting(false);
     }
   };
 
@@ -626,6 +816,56 @@ export default function PresentacionDetallePage() {
                   <Mail className="w-3.5 h-3.5 text-[#879391]" />
                   {cand.email}
                 </span>
+                <span className="flex items-center gap-1.5">
+                  <Share2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                  {isEditingNotes ? (
+                    <span className="inline-flex items-center gap-1">
+                      <select
+                        value={isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "") ? "OTHER_CUSTOM" : editCanalIngreso}
+                        onChange={(e) => {
+                          if (e.target.value === "OTHER_CUSTOM") {
+                            setIsCustomChannel(true);
+                            setEditCanalIngreso("");
+                          } else {
+                            setIsCustomChannel(false);
+                            setEditCanalIngreso(e.target.value);
+                          }
+                        }}
+                        className="bg-[#101415] border border-white/10 px-2.5 py-1 text-xs rounded-lg text-white focus:border-[#6bd8cb] focus:outline-none cursor-pointer font-medium"
+                      >
+                        <option value="" className="bg-[#15181a]">-- Sin especificar (opcional) --</option>
+                        <optgroup label="Canales detectados en la Base de Datos">
+                          {existingChannels.map((ch) => (
+                            <option key={ch} value={ch} className="bg-[#15181a] text-white">
+                              {ch}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <option value="OTHER_CUSTOM" className="bg-[#15181a] text-[#6bd8cb] font-semibold">
+                          + Escribir nuevo canal personalizado...
+                        </option>
+                      </select>
+
+                      {(isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "")) && (
+                        <input
+                          type="text"
+                          value={editCanalIngreso}
+                          onChange={(e) => setEditCanalIngreso(e.target.value)}
+                          placeholder="Escribe el canal..."
+                          className="bg-[#101415] border border-[#6bd8cb]/40 px-2 py-1 text-xs rounded-lg text-white focus:border-[#6bd8cb] focus:outline-none"
+                        />
+                      )}
+                    </span>
+                  ) : cand.canal_ingreso ? (
+                    <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
+                      {cand.canal_ingreso}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-medium text-white/40 italic">
+                      No especificado
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
 
@@ -667,6 +907,134 @@ export default function PresentacionDetallePage() {
               </select>
             </div>
           </div>
+        </section>
+
+        {/* Sección de Agendamiento Dinámico de Reuniones */}
+        <section className="glass-panel p-6 rounded-3xl border border-white/10 text-left space-y-5">
+          {(() => {
+            const rawMeetings: Reunion[] = (activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones) || [];
+            const sortedMeetings = [...rawMeetings].sort((a, b) => {
+              const timeA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0;
+              const timeB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0;
+              return timeB - timeA;
+            });
+
+            return (
+              <>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-white/5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>Reuniones</span>
+                        <span className="text-[10px] bg-white/10 text-[#6bd8cb] px-2 py-0.5 rounded-full font-mono font-bold">
+                          {sortedMeetings.length}
+                        </span>
+                      </h3>
+                      <p className="text-[10px] text-[#879391] mt-0.5">
+                        Agendamiento e historial de entrevistas del expediente
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleOpenCreateMeeting}
+                    className="px-3.5 py-2 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer self-start sm:self-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Nueva Reunión</span>
+                  </button>
+                </div>
+
+                {/* Lista de Reuniones ordenadas por fecha descendente */}
+                {sortedMeetings.length === 0 ? (
+                  <div className="p-6 text-center border border-dashed border-white/10 rounded-2xl space-y-2">
+                    <Calendar className="w-8 h-8 text-[#879391]/50 mx-auto" />
+                    <p className="text-xs text-[#879391]">No hay reuniones agendadas.</p>
+                    <button
+                      onClick={handleOpenCreateMeeting}
+                      className="text-xs font-bold text-[#6bd8cb] hover:underline inline-flex items-center gap-1 mt-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Agendar la primera reunión
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {sortedMeetings.map((meeting) => (
+                      <div 
+                        key={meeting.id_reunion}
+                        className="p-4 rounded-2xl bg-stone-950/45 border border-white/10 hover:border-[#6bd8cb]/30 transition-all space-y-3"
+                      >
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-white/5 pb-2.5">
+                          <div className="space-y-0.5">
+                            <h4 className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
+                              <span className="inline-block text-[9.5px] font-bold font-mono px-2 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] uppercase tracking-wider">
+                                {meeting.fase || "F3 - Presentación"}
+                              </span>
+                              <span>{meeting.objetivo || "Reunión de Presentación"}</span>
+                            </h4>
+                            <div className="flex items-center gap-2 text-[11px] text-[#6bd8cb] font-mono">
+                              <Clock className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                              <span>
+                                {meeting.fecha_hora 
+                                  ? new Date(meeting.fecha_hora).toLocaleString("es-ES", {
+                                      dateStyle: "full",
+                                      timeStyle: "short"
+                                    })
+                                  : "Sin fecha definida"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 self-end sm:self-auto">
+                            <button
+                              onClick={() => handleOpenEditMeeting(meeting)}
+                              className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-[#6bd8cb]/40 bg-white/5 hover:bg-[#6bd8cb]/10 text-white/80 hover:text-[#6bd8cb] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                              title="Modificar datos de la reunión"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                              <span>Modificar</span>
+                            </button>
+                            <button
+                              onClick={() => setDeletingMeetingId(meeting.id_reunion)}
+                              className="p-1.5 rounded-lg border border-white/10 hover:border-rose-500/40 bg-white/5 hover:bg-rose-500/10 text-white/70 hover:text-rose-400 transition-all cursor-pointer"
+                              title="Eliminar reunión"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {meeting.link_reunion && (
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={meeting.link_reunion.startsWith("http") ? meeting.link_reunion : `https://${meeting.link_reunion}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-300 text-xs font-bold transition-all inline-flex items-center gap-1.5"
+                            >
+                              <Video className="w-3.5 h-3.5 text-indigo-400" />
+                              <span className="truncate max-w-xs">{meeting.link_reunion}</span>
+                              <ExternalLink className="w-3 h-3 ml-0.5 shrink-0" />
+                            </a>
+                          </div>
+                        )}
+
+                        {meeting.notas && (
+                          <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs text-[#879391] leading-relaxed">
+                            <span className="text-[10px] uppercase font-bold text-white/40 block mb-0.5">Notas de la sesión:</span>
+                            <p className="whitespace-pre-wrap">{meeting.notas}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </section>
 
         {/* ── Metadata & SLA Timeline Section ── */}
@@ -1211,6 +1579,142 @@ export default function PresentacionDetallePage() {
                   <UserCheck className="w-4 h-4" />
                 )}
                 <span>Confirmar Graduación a F4</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* --- MODAL CREAR / EDITAR REUNIÓN --- */}
+      {isMeetingModalOpen && (
+        <div className="fixed inset-0 bg-[#101415]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-panel w-full max-w-lg rounded-3xl overflow-hidden border border-white/10 p-6 space-y-5 text-left shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-3 border-b border-white/5">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-[#6bd8cb]" />
+                <span>{editingMeeting ? "Editar Reunión" : "Nueva Reunión"}</span>
+              </h3>
+              <button
+                onClick={() => setIsMeetingModalOpen(false)}
+                className="text-white/40 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Fecha y Hora */}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-[#879391] block">
+                  Fecha y Hora <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={meetingForm.fecha_hora}
+                  onChange={(e) => setMeetingForm(prev => ({ ...prev, fecha_hora: e.target.value }))}
+                  className="w-full bg-[#15181a] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb]"
+                />
+              </div>
+
+              {/* Objetivo */}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-[#879391] block">
+                  Objetivo de la Reunión <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Presentación de shortlist al cliente"
+                  value={meetingForm.objetivo}
+                  onChange={(e) => setMeetingForm(prev => ({ ...prev, objetivo: e.target.value }))}
+                  className="w-full bg-[#15181a] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb]"
+                />
+              </div>
+
+              {/* Link de la reunión */}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-[#879391] block flex items-center gap-1">
+                  <Video className="w-3 h-3 text-[#6bd8cb]" />
+                  Enlace de la Reunión (Google Meet, Teams, Zoom, etc.)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://meet.google.com/abc-defg-hij"
+                  value={meetingForm.link_reunion}
+                  onChange={(e) => setMeetingForm(prev => ({ ...prev, link_reunion: e.target.value }))}
+                  className="w-full bg-[#15181a] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb]"
+                />
+              </div>
+
+              {/* Notas */}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-[#879391] block">
+                  Notas u Observaciones
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Escribe aquí anotaciones relevantes acordadas en la sesión..."
+                  value={meetingForm.notas}
+                  onChange={(e) => setMeetingForm(prev => ({ ...prev, notas: e.target.value }))}
+                  className="w-full bg-[#15181a] border border-white/10 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-white/5">
+              <button
+                onClick={() => setIsMeetingModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-white/10 text-xs font-bold hover:bg-white/5 text-[#879391] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveMeeting}
+                disabled={savingMeeting}
+                className="px-4 py-2 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {savingMeeting ? <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>{savingMeeting ? "Guardando..." : (editingMeeting ? "Guardar Cambios" : "Crear Reunión")}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN DE REUNIÓN --- */}
+      {deletingMeetingId && (
+        <div className="fixed inset-0 bg-[#101415]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-panel w-full max-w-sm rounded-3xl overflow-hidden border border-rose-500/20 p-6 space-y-4 text-left shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 pb-3 border-b border-white/5">
+              <div className="p-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider text-rose-400">
+                  Eliminar Reunión
+                </h3>
+                <p className="text-[10px] text-[#879391] mt-0.5">
+                  Fase 3 • Presentación
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-[#e0e3e5] leading-relaxed">
+              ¿Estás seguro de que deseas eliminar esta reunión? Esta acción actualizará el expediente.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+              <button
+                onClick={() => setDeletingMeetingId(null)}
+                className="px-4 py-2 rounded-xl border border-white/10 text-xs font-bold hover:bg-white/5 text-[#879391] cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteMeetingAction}
+                disabled={savingMeeting}
+                className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {savingMeeting ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                <span>{savingMeeting ? "Eliminando..." : "Eliminar"}</span>
               </button>
             </div>
           </div>

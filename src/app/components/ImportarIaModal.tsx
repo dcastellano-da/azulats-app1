@@ -64,13 +64,15 @@ const PROCESSING_STEPS: ProcessingStep[] = [
   }
 ];
 
+const DEFAULT_SEARCHES: SearchOption[] = [];
+
 export default function ImportarIaModal({ 
   isOpen, 
   onClose, 
   onSuccess,
   onCandidateCreated,
   mode = "talento",
-  searches = [],
+  searches = DEFAULT_SEARCHES,
   defaultSearchId,
   targetEstadoRevision
 }: ImportarIaModalProps) {
@@ -80,7 +82,7 @@ export default function ImportarIaModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [notasText, setNotasText] = useState("");
   const [selectedSearchId, setSelectedSearchId] = useState<string>("");
-  const [canalIngreso, setCanalIngreso] = useState<string>("LinkedIn");
+  const [canalIngreso, setCanalIngreso] = useState<string>("");
   const [existingChannels, setExistingChannels] = useState<string[]>([
     "Headhunting",
     "LinkedIn",
@@ -98,8 +100,9 @@ export default function ImportarIaModal({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasLoadedChannelsRef = useRef(false);
 
-  // Initialize selected search ID and dynamic channels when modal opens or searches change
+  // Initialize selected search ID when modal opens or searches change
   useEffect(() => {
     if (isOpen) {
       if (defaultSearchId) {
@@ -107,8 +110,13 @@ export default function ImportarIaModal({
       } else if (searches.length > 0) {
         setSelectedSearchId(searches[0].id);
       }
+    }
+  }, [isOpen, defaultSearchId, searches]);
 
-      // Load existing channels dynamically from DB
+  // Load existing channels dynamically from DB ONCE when modal is opened
+  useEffect(() => {
+    if (isOpen && !hasLoadedChannelsRef.current) {
+      hasLoadedChannelsRef.current = true;
       getCandidatosAPI().then((res) => {
         if (res.success && res.data) {
           const defaults = ["Headhunting", "LinkedIn", "Referido", "InfoJob", "Otros"];
@@ -122,14 +130,19 @@ export default function ImportarIaModal({
         console.warn("Error loading channels in ImportarIaModal:", err);
       });
     }
-  }, [isOpen, defaultSearchId, searches]);
+
+    if (!isOpen) {
+      hasLoadedChannelsRef.current = false;
+    }
+  }, [isOpen]);
 
   const resetState = () => {
+    hasLoadedChannelsRef.current = false;
     setFile(null);
     setFileError(null);
     setErrorMessage(null);
     setNotasText("");
-    setCanalIngreso("LinkedIn");
+    setCanalIngreso("");
     setIsCustomChannel(false);
     setStepState("idle");
     setCurrentStepIndex(0);
@@ -292,9 +305,12 @@ export default function ImportarIaModal({
     const formData = new FormData();
     formData.append("cv", file);
     
-    // Only pass initial candidate notes when NOT in descubrimiento mode
+    // Pass initial candidate notes and sourcing channel
     if (mode !== "descubrimiento" && notasText.trim()) {
       formData.append("notas_iniciales", notasText.trim());
+    }
+    if (canalIngreso.trim()) {
+      formData.append("canal_ingreso", canalIngreso.trim());
     }
 
     try {
@@ -550,9 +566,7 @@ export default function ImportarIaModal({
                   <Share2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
                   Canal de Ingreso (Sourcing)
                 </span>
-                <span className="text-[9px] text-[#879391] font-mono">
-                  {existingChannels.length} en DB
-                </span>
+                <span className="text-[9px] text-[#879391] font-normal lowercase">(opcional)</span>
               </label>
               <div className="space-y-2">
                 <select
@@ -568,7 +582,7 @@ export default function ImportarIaModal({
                   }}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all cursor-pointer font-medium"
                 >
-                  <option value="" className="bg-[#15181a]">-- Sin especificar --</option>
+                  <option value="" className="bg-[#15181a]">-- Sin especificar (opcional) --</option>
                   <optgroup label="Canales detectados en la Base de Datos">
                     {existingChannels.map((ch) => (
                       <option key={ch} value={ch} className="bg-[#15181a] text-white">
