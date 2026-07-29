@@ -19,7 +19,8 @@ import {
   Contact,
   ShieldAlert,
   Trash2,
-  Compass
+  Compass,
+  LogOut
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -27,7 +28,7 @@ import { getCandidatosAPI, eliminarCandidatoAPI } from "@/actions/candidatos";
 
 export default function ConfiguracionPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
 
   // Navigation indicators and inputs options state
   const [selectedTimeZone, setSelectedTimeZone] = useState("Europe/Madrid");
@@ -353,6 +354,18 @@ export default function ConfiguracionPage() {
                   <span className="text-left font-medium">Estado de Cuenta:</span>
                   <span className="text-right text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full text-[9px] font-bold">Activo</span>
                 </div>
+              </div>
+
+              {/* Botón de Logout / Cerrar Sesión */}
+              <div className="w-full pt-4 border-t border-white/5">
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="w-full py-2.5 px-4 rounded-xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500 hover:text-stone-950 text-rose-400 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-rose-500/10"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Cerrar Sesión (Logout)</span>
+                </button>
               </div>
 
             </div>

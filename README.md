@@ -29,9 +29,12 @@ azulats-app1/
 │   │   │   ├── page.tsx           # Talent Mixer (Grid responsive de candidatos con filtros)
 │   │   │   └── [id]/page.tsx      # Ficha del Candidato (DAW Console faders de métricas IA)
 │   │   └── configuracion/page.tsx # Panel de Ajustes y "Zona de Peligro" (Derecho al Olvido)
+│   ├── types/
+│   │   └── screening.ts          # Interfaces TypeScript para Criterios de Screening y Resultados IA
 │   ├── actions/
-│   │   ├── busquedas.ts           # Server Actions para llamadas REST a búsquedas
-│   │   └── candidatos.ts          # Server Actions para crear, actualizar y borrar postulantes
+│   │   ├── busquedas.ts           # Server Actions para llamadas REST a búsquedas (incluye criterios_screening)
+│   │   ├── candidatos.ts          # Server Actions para crear, actualizar y borrar postulantes
+│   │   └── pipeline.ts            # Server Actions para Kanban, inferencia de IA y screening (Human-in-the-loop)
 │   ├── lib/
 │   │   └── firebase/
 │   │       ├── config.ts          # Singleton de inicialización Firebase
@@ -77,7 +80,7 @@ Hemos establecido un esquema de protección híbrida de doble capa (Edge + Clien
 
 ---
 
-## Datos Funcionales - Módulos de la Aplicación
+# Datos Funcionales - Módulos de la Aplicación
 
 ### Módulo A: Portal de Inicios de Sesión
 *   Brinda acceso seguro con tokens de sesión persistentes de 7 días.
@@ -89,13 +92,17 @@ El **Dashboard Gerencial** sirve como un centro de control analítico de recluta
 *   **KPIs de Rendimiento:** Centraliza la cuantificación rápida del volumen de búsquedas activas, postulantes en bandeja, y el tiempo promedio que toma asignar a un recurso (lead-time).
 *   **Analíticas Históricas:** Cuenta con gráficos interactivos que trazan el comportamiento histórico y la carga laboral mensual de los evaluadores de talento, conectable en fases subsecuentes al pipeline de BigQuery.
 
-### Módulo C (UI): Maestro de Búsquedas con tabla de datos y contenedor Slide-over
+### Módulo C (UI): Maestro de Búsquedas con tabla de datos (`ID: P-BUS-01`) y vista dedicada (`ID: P-BUS-02`)
 El **Maestro de Búsquedas** centraliza todas las solicitudes de personal y vacantes en curso de forma dinámica.
-*   **Búsqueda y Filtros en Tiempo Real:** Barra de búsqueda fluida (búsqueda por cargo, cliente y responsable operativo) y filtrado selectivo según el estado de la búsqueda (`preparacion_previa`, `evaluacion_tecnica`, `revision_cliente`, `oferta_cierre`).
+*   **Búsqueda y Filtros en Tiempo Real (`ID: P-BUS-01`):** Barra de búsqueda fluida (búsqueda por cargo, cliente y responsable operativo) y filtrado selectivo según el estado de la búsqueda (`preparacion_previa`, `evaluacion_tecnica`, `revision_cliente`, `oferta_cierre`).
 *   **Conexión API REST:** Carga de registros en tiempo real consumiendo el endpoint `GET /api/v1/busquedas` con cabeceras `Authorization: Bearer <token>` inyectadas automáticamente.
 *   **Estados de Carga y Error:** Inserción de un spinner de carga en el centro de la tabla durante solicitudes de red y manejo de reintentos manuales ante caídas de enlace.
-*   **Slide-over Contenedor de Alta:** Panel lateral interactivo y deslizable (Slide-over) para la creación de ofertas sin interrupciones de navegación.
-*   **Formulario de Alta de Búsquedas (Cédula de Identidad):** Formulario de alta con 6 campos obligatorios (cliente corporativo de España, perfil de búsqueda, estado_fase inhabilitado, responsable operativo, responsable validación, fecha inicio objetivo) con validación previa en cliente.
+*   **Slide-over Contenedor de Alta ("Nueva Búsqueda"):** Panel lateral interactivo y deslizable (Slide-over) para la creación de nuevas búsquedas.
+*   **Pantalla Completa de Edición (`ID: P-BUS-02` - `/busquedas/[id]`):** Vista dedicada a pantalla completa con navegación Breadcrumb (`Búsquedas / Editar Búsqueda`), insignia `ID: P-BUS-02` y botón de regreso a la lista. Reemplaza el modal lateral al pulsar el botón "Editar" o hacer clic en una fila de la tabla en `ID: P-BUS-01`.
+*   **Formulario de Búsquedas (Cédula de Identidad & Criterios de Screening):** Formulario de alta y edición a pantalla completa con validación previa en cliente. Incluye el constructor dinámico **Criterios de Screening (Máximo 5)** para configurar reglas de descarte excluyentes (`Knockout` con peso 0) o evaluativas ponderadas (`Deseable`).
+*   **Inmutabilidad y Preservación de UUIDs:** Al editar búsquedas activas en `SearchForm.tsx`, las preguntas existentes preservan su UUID v4 (`id`) original para evitar desalineaciones con los resultados previamente evaluados en los pipelines de candidatos.
+*   **Restricción de Payload en PATCH:** La Server Action `actualizarBusquedaAPI` limita strictly el cuerpo de la solicitud a `estado_busqueda`, `prioridad` y `criterios_screening` para cumplir con las políticas de backend y prevenir errores `HTTP 400`.
+*   **Alerta de Re-evaluación:** Despliegue automático de advertencia visual al modificar criterios en búsquedas activas alertando sobre el requerimiento de re-evaluar candidatos en el pipeline.
 
 ### Módulo D: Módulo de Reclutamiento (UI)
 El **Módulo de Reclutamiento** gestiona el flujo de postulantes asignados a cada búsqueda corporativa.
@@ -117,6 +124,14 @@ El **Talent Mixer** proporciona la bandeja de entrada inteligente para centraliz
 *   **Consola DAW (Faders de Calificación IA):** Faders de ecualización analógicos simulados e interactivos dentro de la ficha de detalle (`/talento/[id]`) para calificar en caliente los scores de *Hard Skills*, *Soft Skills*, *Fit Cultural* y *Seniority Index*.
 *   **Slide-over de Alta de Candidato:** Formulario con etiquetas flotantes dinámicas, Drag-and-drop de archivos PDF, control estricto de consentimiento legal y captura inteligente para alertas de error `400 Bad Request` del servidor.
 *   **Importación Asistida por IA:** Popup glassmórfico de importación con zona Drag & Drop compatible con formatos `.pdf`, `.doc` y `.docx` (máx 5MB). Realiza la llamada asíncrona a `POST /api/v1/candidatos/importar-ia` del backend, bloquea la interfaz durante la inferencia y muestra una notificación de éxito reactiva con autorefresco de la base de candidatos tras su creación (201).
+
+### Módulo H: Screening Inteligente con IA (Criterios de Aceptación/Descarte)
+El **Screening Inteligente** dota a Azul ATS de la capacidad de evaluar automáticamente a los candidatos en cualquier fase del pipeline frente a los criterios de aceptación y descarte definidos en las búsquedas mediante **Gemini 2.5 Flash** (Genkit + Vertex AI).
+*   **Inferencia Asistida por IA (`POST /api/v1/pipeline/:id/evaluar-screening`):** Modal interactivo `EvaluarScreeningModal.tsx` con chequeos pre-flight (aviso inmediato si la búsqueda carece de criterios o si el candidato no tiene CV adjunto), animación de progreso en 4 pasos y opción de reintento ante caídas de red.
+*   **Semáforo Tricolor:** Evaluación visual por criterio (`SÍ` 100% de puntos, `INFERIDO` 50% de puntos, `NO` 0 puntos).
+*   **Caja de Evidencia ("Prueba de Vida"):** Cita textual extraída directamente del CV (`evidencia_cv`) presentada en cuadro `blockquote` para auditoría inmediata del reclutador.
+*   **Alerta de Knockout (Excluyentes):** Resaltado en tono rojizo suave y bandera de alerta roja si un candidato falla un criterio excluyente (`tiene_knockout: true`).
+*   **Human-in-the-Loop & UI Optimista:** Posibilidad de modificar manualmente cualquier respuesta del semáforo en `ScreeningPanel.tsx`. Utiliza estados optimistas locales para feedback instantáneo y dispara `actualizarResultadoScreeningAction` (`PATCH /api/v1/pipeline/:id`) recalculando el Fit Score y revalidando rutas (`revalidatePath`) para sincronización en tiempo real con los tableros Kanban.
 
 ### Módulo G: F1 Descubrimiento (Atracción & Sourcing inicial)
 El **F1 Descubrimiento** brinda a los reclutadores el tablero maestro de sourcing potenciado por inteligencia artificial para detectar y evaluar candidatos.
@@ -173,7 +188,7 @@ Para simplificar la interacción en los prompts de desarrollo y la localización
 
 ---
 
-## Ejecución del Servidor Local and Tests
+# Ejecución del Servidor Local and Tests
 
 1.  **Instala las dependencias:**
     ```bash
@@ -215,15 +230,113 @@ Para simplificar la interacción en los prompts de desarrollo y la localización
     ```bash
     export PATH="/Users/dcastellano/.local/node-v20.12.2-darwin-arm64/bin:$PATH" && npx tsx --test tests/cierre.test.js
     ```
-11. Abre [http://localhost:3000](http://localhost:3000) en el navegador.
+11. **Ejecutar pruebas de Persistencia de Screening (P-BUS-02):**
+    ```bash
+    export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && node --experimental-strip-types --test tests/busquedas_screening.test.js
+    ```
+12. Abre [http://localhost:3000](http://localhost:3000) en el navegador.
+
 
 --------------------------------------------------------------------------------------------------------
-## Despliegue en hosting Pruebas de Firebase
+# Despliegue en hosting Pruebas de Firebase
 ```bash
 git add .   
 git commit -m "Texto del cambio" 
 git push origin main
 ```
+
+--------------------------------------------------------------------------------------------------------
+# Historico de Cambios (ordenados por los recientes cambios primeros)
+
+*   **29/07/2026:** Consulta Directa por ID de Documento Pipeline en `ID: P-DIS-02` (`GET /api/v1/pipeline/:id`):
+    *   **Consulta Prioritaria por ID (`getPipelineItemAPI`):** Implementada en `src/app/descubrimiento/[id]/page.tsx` la llamada directa a `GET /api/v1/pipeline/${id}` como Capa 1 de resolución. Permite recuperar inmediatamente documentos individuales de pipeline desde Firestore (ej. `6EDjceRl0vxbPbOvfRNH`) sin depender exclusivamente del filtrado por búsqueda.
+
+*   **29/07/2026:** Corrección de Atributo `Secure` en Cookies para HTTP Localhost (`src/lib/firebase/auth.ts`):
+    *   **Detección Dinámica de Protocolo HTTPS/HTTP:** Corregidas las funciones `setTokenCookie` y `clearTokenCookie` en `auth.ts` para que omitan la restricción `; Secure` cuando se ejecuta bajo el protocolo inseguro `http://localhost:3000`. Esto permite que Chrome almacene correctamente la cookie `azul_ats_token` transmitiendo el JWT real de Firebase a las Server Actions y al backend Express en el puerto 8080.
+
+*   **29/07/2026:** Botón de Logout / Cerrar Sesión en `ID: P-CFG-01` (`src/app/configuracion/page.tsx`):
+    *   **Renovación de Sesión:** Agregado el botón **"Cerrar Sesión (Logout)"** en la tarjeta de perfil de la vista de configuración (`P-CFG-01`). Permite limpiar cookies obsoletas y redirigir a la pantalla de `/login` para autenticar con un usuario de Firebase Auth real y obtener un token JWT fresco aceptado por el backend Express en el puerto 8080.
+
+*   **29/07/2026:** Conexión Garantizada al Backend Express Local en Puerto 8080 (`src/actions/pipeline.ts`):
+    *   **Fallback de Token en Server Actions:** Actualizada la función `getServerAuthToken()` en `pipeline.ts` para asignar `mock-token-recruiter` si no hay cookie `azul_ats_token` presente, evitando excepciones que desviaban las peticiones HTTP hacia mock data.
+    *   **Llamadas Reales a Express Puerto 8080:** Garantizado que la acción `getPipelineAPI()` ejecute siempre la petición `GET http://localhost:8080/api/v1/pipeline?id_busqueda=xxx` directamente contra el servidor Express local en el puerto 8080 conectado a Firestore real.
+
+*   **29/07/2026:** Herramientas de Diagnóstico e Inspección en Tiempo Real REST (`ID: P-DIS-02`):
+    *   **Inspector de Diagnóstico en Pantalla (`🐛 Debug`):** Incorporado el botón interactivo en `ScreeningPanel.tsx` que despliega en vivo el Pipeline ID, cantidad de criterios, Fit Score, bandera Knockout y el payload crudo `resultado_screening` recibido de Firestore.
+    *   **Trazabilidad en Consola de Navegador:** Agregados registros estructurados `🔍 [DIAGNÓSTICO SCREENING P-DIS-02]` en `fetchBackendData` para auditar las peticiones REST al servidor backend Express local.
+
+*   **29/07/2026:** Integración Completa de Respuesta REST de Backend en Screening (`ID: P-DIS-02`):
+    *   **Acceso Seguro a `claves_conexion.id_candidato`:** Implementado encadenamiento opcional seguro (`p.claves_conexion?.id_candidato`) en `src/app/descubrimiento/[id]/page.tsx` para evitar excepciones al iterar sobre los ítems del pipeline.
+    *   **Criterios Sintéticos de Respaldo (`effectiveCriterios`):** Agregada la generación dinámica de criterios desde `resultado_screening` cuando la búsqueda carece de la lista cargada, garantizando que el semáforo y evidencias se muestren inmediatamente al recibir el JSON del backend.
+    *   **Verificación Automatizada de Payload REST (`tests/busquedas_screening.test.js`):** Integrado test unitario para validar el contrato con la muestra JSON del backend (`3/3 pruebas aprobadas`).
+
+*   **29/07/2026:** Algoritmo de Triple Coincidencia y Pruebas de Despliegue de Screening (`ID: P-DIS-02`):
+    *   **Función `findEvaluationForCriterion`:** Implementado el algoritmo de triple coincidencia en `ScreeningPanel.tsx` (Emparejamiento por ID `id_criterio/criterio_id/id`, coincidencia por texto de pregunta y respaldo por índice `localResultado[idx]`).
+    *   **Automatización de Pruebas (`tests/busquedas_screening.test.js`):** Creado e integrado el test unitario de emparejamiento de datos de Firestore (`2/2 pruebas aprobadas`), certificando la correcta visualización de semáforos, citas de evidencias y Fit Score.
+
+*   **29/07/2026:** Corrección en Lectura y Despliegue de Resultados Almacenados en Firestore (`ID: P-DIS-02`):
+    *   **Extracción Multinivel de Propiedades (`P-DIS-02`):** Agregados fallbacks jerárquicos en `src/app/descubrimiento/[id]/page.tsx` para recuperar `resultado_screening`, `fit_score_screening` y `tiene_knockout` desde `activePipelineItem` o sus variantes de sub-objetos backend.
+    *   **Mapeo Flexible de Criterios (`ScreeningPanel.tsx`):** Ampliado el algoritmo de emparejamiento de criterios por `id_criterio`, `criterio_id`, `id` e índice de posición (`|| localResultado[idx]`), garantizando la visualización del semáforo tricolor, puntajes y evidencias previa de Firestore.
+
+*   **29/07/2026:** Unificación de Pantallas e Inferencia en Tiempo Real en Modal `ID: M-SCR-01` (`P-DIS-02`):
+    *   **Vista Única Integrada (`ID: M-SCR-01`):** Se unificó la visualización del avance del proceso en tiempo real (Stepper de 4 pasos) y la pantalla de resumen final dentro de una sola interfaz fluida e ininterrumpida en `EvaluarScreeningModal.tsx`.
+    *   **Experiencia Continuada:** Durante la inferencia se muestra la barra de progreso porcentual (`0%` a `100%`) y la animación de cada paso. Al concluir, el resumen final (Fit Score %, alerta Knockout, métricas desglosadas `SÍ/INFERIDO/NO` y citas textuales de "Prueba de Vida") se despliega inmediatamente debajo del log de ejecución en la misma pantalla.
+    *   **Control del Ciclo de Vida y Refresco Silencioso:** Se solucionó el cierre o reinicio prematuro del modal mediante `prevIsOpen` en `EvaluarScreeningModal.tsx` y llamadas silenciosas `fetchBackendData(true)` en `P-DIS-02`, manteniendo la pantalla fija hasta que el usuario decida cerrar haciendo clic en `"Ver Expediente Actualizado"`.
+
+*   **29/07/2026:** Identificación Oficial (`ID: M-SCR-01`) y Contexto de Búsqueda/Criterios en Modal:
+    *   **Etiqueta de Identificación Oficial (`ID: M-SCR-01`):** Incorporada la insignia `ID: M-SCR-01` en el encabezado del modal de inferencia.
+    *   **Nombre de Búsqueda Asociada:** Desplegada la línea informativa con el nombre del perfil y cliente de la búsqueda vinculada al pipeline debajo del candidato.
+    *   **Detalle de Criterios Configurados:** Incorporado el desglose interactivo con la lista de criterios de la búsqueda (preguntas, insignias de `KNOCKOUT` en rojo vs `PESO: X pts` en amarillo/azul) dentro del cuerpo del modal.
+    *   **Pre-flight Checks & Feedback:** Verificación de requisitos pre-ejecución (alerta si la búsqueda carece de criterios o si el candidato no tiene CV adjunto) deshabilitando el botón de inicio con feedback explicativo.
+
+*   **29/07/2026:** Reubicación de "Screening Inteligente IA" a `ID: P-DIS-02` y Fix de Re-render Infinito:
+    *   **Migración a F1 Descubrimiento (`ID: P-DIS-02`):** Se reubicó la sección de Screening Inteligente (`ScreeningPanel` y `EvaluarScreeningModal`) a la vista detallada de candidatos en Fase 1 Descubrimiento (`/descubrimiento/[id]`).
+    *   **Depuración de `ID: P-TAL-02` (`/talento/[id]`):** Se eliminó la sección de Screening Inteligente de la ficha general de talento, desvinculando estados y peticiones API redundantes.
+    *   **Fix de Re-render Infinito (`Maximum update depth exceeded`):** Se resolvió el error en `ScreeningPanel.tsx` reemplazando el `useEffect` incondicional por una comparación por contenido serializado mediante `useRef(JSON.stringify(resultadoScreening))`.
+
+*   **29/07/2026:** Integración de Autenticación con Firebase Token Real en Backend Local y Refactorización de Server Actions:
+    *   **Autenticación con Token Real de Firebase:** Se eliminaron los bypasses de usuarios y tokens mock temporales en `src/actions/busquedas.ts` y `src/context/AuthContext.tsx`. El frontend extrae el Firebase ID Token de la sesión activa del usuario autenticado (`azul_ats_token`) y lo transmite en la cabecera `Authorization: Bearer <token>` en las peticiones REST al servidor backend local Express conectado a Firestore.
+    *   **Refactorización de Helper de Endpoints (`src/utils/api.ts`):** Se creó la utilidad independiente `src/utils/api.ts` para albergar la función síncrona `getApiEndpoint`, solucionando la restricción de Next.js App Router que exige que todas las funciones exportadas desde archivos con la directiva `'use server'` sean asíncronas (`async`).
+    *   **Re-importación en Server Actions:** Se actualizaron los imports de `getApiEndpoint` en `src/actions/busquedas.ts`, `src/actions/candidatos.ts` y `src/actions/pipeline.ts`.
+
+*   **28/07/2026:** Configuración de Entorno a Backend 100% Local (`http://localhost:8080/api/v1`):
+    *   **Variables de Entorno (`.env.local`):** Actualizada `NEXT_PUBLIC_API_URL="http://localhost:8080/api/v1"` para redirigir todas las peticiones REST al servidor backend local en el puerto 8080.
+    *   **Constructor de Endpoints Dinámico (`getApiEndpoint`):** Implementado `getApiEndpoint` en Server Actions (`busquedas.ts`, `candidatos.ts`, `pipeline.ts`) para eliminar URLs absolutas hardcodeadas y garantizar compatibilidad entre `/api/v1` y rutas relativas.
+    *   **Headers & CORS:** Verificado el envío estricto de `Content-Type: application/json` y `Authorization: Bearer <token>` en todas las peticiones.
+
+*   **28/07/2026:** Ampliación del Esquema de Edición en `ID: P-BUS-02` (`PATCH /api/v1/busquedas/:id`):
+    *   **Edición Ampliada de Campos Descriptivos:** Habilitada la edición de campos de Identificación, Perfil Técnico, Condiciones y SLA (`responsable_operativo`, `skills_excluyentes`, `skills_deseables`, `nivel_ingles_req`, `modalidad`, `presupuesto_max`, `link_job_description`) en `SearchForm.tsx`.
+    *   **Payload Multinivel Adaptado:** Actualizado `actualizarBusquedaAPI` en `src/actions/busquedas.ts` para enviar la estructura JSON jerárquica aceptada por el nuevo esquema expandido del backend Cloud Run.
+
+*   **28/07/2026:** Creación de la Pantalla Completa de Edición de Búsquedas (`ID: P-BUS-02` - `/busquedas/[id]`):
+    *   **Navegación Standalone:** Reemplazado el modal lateral (Slide-over) de edición en `/busquedas` (`P-BUS-01`) por una navegación directa a la nueva vista a pantalla completa `/busquedas/[id]` (`P-BUS-02`).
+    *   **Maquetación y UI Shell (`ID: P-BUS-02`):** Diseño a pantalla completa con navegación Breadcrumb (`Búsquedas / Editar Búsqueda`), insignias de estado/prioridad y la etiqueta identificadora oficial `ID: P-BUS-02`.
+    *   **Integración de Formulario Completo (`SearchForm.tsx`):** Despliegue de las 5 secciones de la posición (Cédula de Identidad, Descripción & Objetivos, Requisitos Exigidos, Beneficios/Modalidad y Criterios de Screening con inmutabilidad de UUIDs v4).
+    *   **Botones de Acción & Feedback:** Incorporación de botones de acción "Guardar Cambios de la Búsqueda" y "Cancelar", con feedback de guardado asíncrono y redirección limpia al Maestro de Búsquedas.
+
+*   **28/07/2026:** Lanzamiento e Integración del Módulo de "Screening Inteligente con IA" (Criterios de Aceptación/Descarte):
+    *   **Setup de Criterios de Screening en Búsquedas (Etapa 1):** Incorporación del constructor dinámico **Criterios de Screening (Máximo 5)** en `SearchForm.tsx` con reglas excluyentes (`Knockout`, peso 0) y evaluativas (`Deseable` ponderado). Garantizada la inmutabilidad y preservación de los UUIDs v4 (`id`) de las preguntas al editar búsquedas activas para mantener la consistencia con las evaluaciones previas en los pipelines.
+    *   **Payload Estricto & Server Actions:** Actualización de `src/actions/busquedas.ts` y `src/actions/pipeline.ts` para llamadas REST seguras con JWT. La edición de búsquedas limita estrictamente el cuerpo de `PATCH /api/v1/busquedas/:id` a `estado_busqueda`, `prioridad` y `criterios_screening` para cumplir con las reglas del backend.
+    *   **Inferencia Asistida por IA (`POST /api/v1/pipeline/:id/evaluar-screening` - Etapa 2):** Desarrollo del modal interactivo `EvaluarScreeningModal.tsx` con chequeos pre-flight (alerta si la búsqueda carece de criterios o si el candidato no tiene CV adjunto), animación de progreso y botón de reintento ante fallos de red.
+    *   **Panel de Screening & Prueba de Vida (`ScreeningPanel.tsx` - Etapa 2):** Integración del semáforo tricolor (🟢 SÍ, 🟡 INFERIDO, 🔴 NO) con cajas de evidencia cita textual del CV (`evidencia_cv` en `blockquote`), Fit Score acumulado y bandera roja de alerta excluyente ante fallos *Knockout* (`tiene_knockout: true`).
+    *   **Human-in-the-Loop & UI Optimista:** Permitida la modificación manual interactiva del semáforo por parte del reclutador con estado optimista local para feedback instantáneo y recálculo automático de puntajes en el backend (`PATCH /api/v1/pipeline/:id`) con `revalidatePath` para refresco en tableros Kanban.
+    *   **Certificación y Pruebas:** Ejecución limpia del compilador TypeScript `./node_modules/.bin/tsc --noEmit` (**0 errores**) y actualización completa de la documentación técnica y funcional del proyecto.
+
+*   **28/07/2026:** Estandarización y Ajustes de Regla en Botón "Avanzar estado" (P-PRE-01, P-CIE-01, P-DIS-01 y P-DIS-02):
+    *   **Ajuste de Estado Final en P-DIS-01 y P-DIS-02:** Se eliminó la visibilidad del botón **`Avanzar estado`** para los postulantes en estado `04_rechazado` ("04 - RECHAZADO EN FASE INICIAL") en las vistas Kanban y Lista Detallada de **P-DIS-01** y en la ficha de detalle **P-DIS-02**, debido a que corresponde al estado final de la Fase 1 Descubrimiento.
+    *   **Corrección en P-DIS-01 (Descubrimiento - Vista Kanban):** Se integró el botón **`Avanzar estado`** en las tarjetas Kanban para postulantes en estado `03_bloqueado` ("03 - EN DUDA A CONFIRMAR") con tooltip `title="A 04 - Rechazado en Fase Inicial"` y función de transición a `04_rechazado`.
+    *   **Botón "Avanzar estado" Estandarizado:** Incorporación del botón estandarizado **`Avanzar estado`** con ícono `>>` (`ChevronsRight`), etiqueta visible y tooltip emergente (`title`) al pasar el cursor (mouse hover) indicando el estado destino en las vistas Kanban y Lista Detallada (columna ACCIONES).
+    *   **Pantalla P-PRE-01 (Presentación al Cliente):** Avance de postulantes en Kanban y Lista Detallada entre `09_shortlist`, `10_entrevista_cliente` y `11_standby` con tooltips emergentes (`A 10 - Entrevista con Cliente`, `A 11 - Stand-by / Back-up`).
+    *   **Pantalla P-CIE-01 (Cierre del Proceso):** Avance de postulantes en Kanban y Lista Detallada entre `12_oferta_extendida`, `13_contratado` e inactivos (`14_rechazado_cliente` / `15_candidato_se_baja`) con tooltips emergentes (`A 13 - Contratado (Won)`, `A 14 - Rechazado por Cliente (Lost)`, `A 12 - Oferta Extendida / Negociación`).
+    *   **Pruebas Automatizadas & Compilación Limpia:** Actualización de pruebas unitarias en `tests/descubrimiento_etapa3.test.js`, `tests/presentacion.test.js` y `tests/cierre.test.js` (100% de éxito en 37/37 pruebas totales) y compilación limpia con `npm run build`.
+
+*   **28/07/2026:** Rediseño Visual y Homologación de Distribución de Secciones en `ID: P-CIE-02` (`/cierre/[id]`):
+    *   **Estructura y Layout Inspirados en P-EVA-02:** Reorganización completa de la vista de expediente de cierre y negociación para coincidir milimétricamente con el diseño y distribución de la pantalla `ID: P-EVA-02` (`/evaluacion/[id]`).
+    *   **Distribución en 3 Columnas (`grid-cols-1 lg:grid-cols-3`):**
+        - *Área Principal (`lg:col-span-2`)*: Ficha Hero del candidato (con badge de fase, Fit Score, puesto, cliente, ubicación, canal de ingreso editable y metadatos de contacto/actividad), Sección de Agendamiento Dinámico de Reuniones (ordenadas descendentemente por fecha/hora con creación/edición/eliminación en modal), Trazabilidad Vertical de Notas del Pipeline (con orden invertido de 5 etapas F4 -> F3 -> F2 -> F1 -> Origen y edición global), y Consola de Facilidades de Cierre e IA — F4 organizadas en tabs navegables (Motor Predictivo, Simulador Salarial, Generador Contratos, Feedback Empatía, Pre-Onboarding).
+        - *Barra Lateral (`lg:col-span-1`)*: Panel de Acciones del Pipeline F4 (transiciones de estado interno, botón de retroceso a Fase Cliente y botón de graduación/confirmación de contratación Won), Trazabilidad de Datos del Pipeline (ID Pipeline, ID Búsqueda, Estado y línea de tiempo SLA), y Score Visual circular de Fit Score con estrellas de ponderación.
+    *   **Preservación Total de Funciones F4:** Mantención íntegra de la conectividad REST backend (`getBusquedasAPI`, `getCandidatosAPI`, `getPipelineAPI`, `actualizarCandidatoAPI`, `actualizarPipelineAPI`), modals interactivas (Reuniones y Cierre Won) y simulaciones de facilidades salariales y legales.
+    *   **Validación Automática:** Suite de 37 tests unitarios aprobados al 100% y compilación de producción de Next.js (`npm run build`) limpia.
 
 *   **27/07/2026:** Integración Multietapa de "Canal de Ingreso (Sourcing)", Sección Dinámica de "Reuniones" y Mutabilidad de Puesto:
     *   **Corrección de Peticiones en Modal `M-IMP-01` / `M-IMP-02`:** Solución al bucle infinito de peticiones al endpoint `/api/v1/candidatos` ocasionado por un ciclo de re-renders al abrir el modal de ingesta de candidato por IA.
@@ -235,7 +348,7 @@ git push origin main
         - Reestructuración de la sección en `P-DIS-02` (`/descubrimiento/[id]`): cambio de título a `"Reuniones"`, ordenación automática de la lista por fecha descendente, e incorporación de la insignia/badge de la fase de creación (`fase`, ej. `F1 - Descubrimiento`).
         - Extensión de la interfaz `Reunion` (`src/actions/pipeline.ts`) con el parámetro opcional `fase?: string | null`.
         - Replicación completa de la sección `REUNIONES` en `P-EVA-02` (`/evaluacion/[id]`), `P-PRE-02` (`/presentacion/[id]`) y `P-CIE-02` (`/cierre/[id]`), incluyendo modales interactivos de creación, edición y eliminación, asignando las etiquetas origen `F2 - Evaluación`, `F3 - Presentación` y `F4 - Cierre` respectivamente y sincronizándolas en tiempo real vía `actualizarPipelineAPI`.
-    *   **Modificación del Cargo/Puesto (`puesto_postulacion`):** Remoción de `puesto` de la lista de campos inmutables en `actualizarCandidatoAPI` ([src/actions/candidatos.ts](file:///Users/dcastellano/Documents/devs/da-rh1/azulats-app1/src/actions/candidatos.ts)) y mapeo de la propiedad `puesto_postulacion` en el payload `PATCH /api/v1/candidatos/:id`, permitiendo mutar el puesto del postulante sin errores HTTP 400.
+    *   **Modificación del Cargo/Puesto (`puesto_postulacion`):** Remoción de `puesto` de la lista de campos inmutables en `actualizarCandidatoAPI` y mapeo de la propiedad `puesto_postulacion` en el payload `PATCH /api/v1/candidatos/:id`, permitiendo mutar el puesto del postulante sin errores HTTP 400.
     *   **Pruebas Automáticas:** Actualización y validación de la suite de pruebas unitarias (`tests/descubrimiento_etapa3.test.js` y `tests/candidatos_etapa2.test.js`), alcanzando un **100% de éxito en 34 pruebas pasadas** y compilación limpia de producción en Next.js (`npm run build`).
 
 *   **27/07/2026:** Estandarización del Botón "CV", Sistema de Identificadores Únicos (P-xxx/M-xxx) y Canal de Ingreso Dinámico:
@@ -244,12 +357,31 @@ git push origin main
     *   **Globalización de Motivo de Rechazo y Resolución:** Extracción de `motivo_rechazo` y objeto `resolucion` al nivel global de `PipelineItem` (`src/actions/pipeline.ts`), posibilitando la edición interactiva del motivo de descarte en el detalle de descubrimiento `/descubrimiento/[id]`.
     *   **Asignación de Identificadores Únicos (`ID: P-xxx` y `ID: M-xxx`):** Incorporación de insignias monospaciadas seleccionables en todas las cabeceras de páginas y ventanas emergentes para facilitar la indicación exacta de componentes en los prompts de desarrollo. Separación explícita de `ID: M-IMP-01` (Modal Ingesta en Talento) e `ID: M-IMP-02` (Parser Ingesta en Descubrimiento).
 
+*   **25/07/2026:** Unificación de Campo "Notas iniciales", Solución de Conexión Cloud Run y Actualización de Manual PDF:
+    *   **Unificación Global de "Notas iniciales":** Se estandarizó la denominación y etiqueta del campo `notas_iniciales` a **"Notas iniciales"** en todas las vistas de la plataforma (tablero Kanban, tabla de listado, ficha del candidato `/talento/[id]`, formulario de alta `CandidatoForm.tsx`, modal de importación IA `ImportarIaModal.tsx` y tarjetas de sourcing en Descubrimiento).
+    *   **Reordenamiento y Resaltado de Notas en Kanban y Ficha:** En las tarjetas Kanban de la Base de Postulantes (`/talento`) y en la ficha de detalle (`/talento/[id]`), el bloque de **Notas iniciales** se posicionó de manera prominente **antes** de *Rubros / Industrias*, presentado en un panel de contraste ámbar (`bg-amber-500/10 border-amber-500/30 text-amber-100 font-medium italic`).
+    *   **Corrección de Conexión a Backend Cloud Run:** Se corrigió la variable `NEXT_PUBLIC_API_URL` en `.env.local` y Server Actions (`candidatos.ts`, `busquedas.ts`, `pipeline.ts`) apuntando al endpoint activo en Google Cloud Run (`https://azulats-service1-795205053212.us-east1.run.app`). Asimismo, se amplió el dataset de respaldo local a **24 postulantes completos** distribuidos en todas las fases.
+    *   **Actualización del Manual Funcional y PDF:** Se actualizaron las capturas de pantalla reales y se regeneró el PDF ([manual_funcional.pdf](file:///Users/dcastellano/Documents/devs/da-rh1/azulats-app1/docs/manual/manual_funcional.pdf) - 3.29 MB) sin errores de renderizado.
+
 *   **25/07/2026:** Creación de la Página Dedicada de Detalle de Candidato `/presentacion/[id]`:
     *   **Navegación Standalone:** Se eliminó el contenedor deslizable lateral (slide-over) de `/presentacion` en favor de una página dedicada independiente `/presentacion/[id]` con arquitectura y maquetación homologadas a la página de Evaluación (`/evaluacion/[id]`).
     *   **Historial y Línea de Tiempo SLA:** Integración de la trazabilidad de metadatos de pipeline, estados del backend e historial de cambios con indicador de horas de espera.
     *   **Edición Multietapa de Notas:** Módulo de anotaciones para notas de Origen, F1 Descubrimiento, F2 Evaluación y F3 Presentación con guardado asíncrono en backend (`actualizarCandidatoAPI` y `actualizarPipelineAPI`).
     *   **Suite Completa de Herramientas F3:** Adaptación a sistema de pestañas de todas las herramientascliente (Analítica Telemétrica Zoom, Traductor y Estandarizador ATS, Candidate Briefing Ejecutivo por IA, Orquestador de Agendas Condicional y Bot Rastreador de SLA).
     *   **Graduación a Fase 4 Cierre:** Incorporación del modal interactivo de confirmación para graduar al candidato a Fase 4 Cierre (`11_oferta_extendida`) y redirección automatizada a `/cierre`.
+
+*   **25/07/2026:** Nuevo Estado F2 `07 - En Duda Evaluación`, Renumeración Global de Pipeline y Renombrado en Talento:
+    *   **Nuevo Estado Intermedio en F2 Evaluación:** Incorporación del estado `07_en_duda_evaluacion` ("07 - EN DUDA EVALUACIÓN") entre Assessment y Descartado en el pipeline de Evaluación. Columna Kanban propia con color ámbar y botón "En Duda" disponible en tarjetas Kanban y vista Lista Detallada. El estado permite señalar candidatos que requieren revisión adicional sin descartarlos definitivamente.
+    *   **Renumeración Completa del Pipeline:** Para acomodar el nuevo estado, todos los estados subsiguientes fueron renumerados en cascada:
+        - F2 Evaluación: `07_descartado_interno` → `08_descartado_interno`
+        - F3 Presentación: `08_shortlist` → `09_shortlist` · `09_entrevista_cliente` → `10_entrevista_cliente` · `10_standby` → `11_standby`
+        - F4 Cierre: `11_oferta_extendida` → `12_oferta_extendida` · `12_contratado` → `13_contratado` · `13_rechazado_cliente` → `14_rechazado_cliente` · `14_candidato_se_baja` → `15_candidato_se_baja`
+        - Avance F2→F3: `08_presentado_cliente` → `09_presentado_cliente`
+        - Avance F3→F4: `11_oferta_extendida` → `12_oferta_extendida`
+        - Retroceso F4→F3 ("Volver a Fase Cliente"): `08_shortlist` → `09_shortlist`
+    *   **Grid Kanban F2 a 4 Columnas:** Actualización del layout Kanban de F2 Evaluación de `md:grid-cols-3` a `md:grid-cols-2 xl:grid-cols-4` para mostrar correctamente las 4 columnas (Screening, Assessment, En Duda, Descartado) sin ocultar ninguna.
+    *   **Renombrado en Talento:** La columna `DESCARTADO` en el Talent Mixer (`/talento`) fue renombrada a `DESCARTADO (NO SELECCIONAR)` para clarificar la intención de no reutilización del candidato en procesos activos.
+    *   **Consistencia Total y Tests:** Actualización de `src/lib/evaluacion.ts`, `src/lib/presentacion.ts`, `src/lib/cierre.ts`, todos los archivos de página y las suites de pruebas unitarias. Compilación TypeScript limpia y **33/33 tests aprobados**.
 
 *   **25/07/2026:** Integración Backend en el Módulo "F4 Cierre del Proceso" (Cierre):
     *   **Conexión a Servicios REST Backend:** Se eliminó el mockeo primario en `/cierre`, conectando la vista directamente a las Server Actions (`getBusquedasAPI`, `getCandidatosAPI`, `getPipelineAPI` y `actualizarPipelineAPI`).
@@ -379,25 +511,6 @@ git push origin main
     *   **Indicadores KPI de Negocio:** Cálculos automáticos de WIP Cycle Time, cNPS promedio e índice Pass-through Rate, con alertas visuales de sobrecarga (límite de 10 candidatos activos en cola).
     *   **Herramientas Operativas Avanzadas de IA:** Slide-over contextual con tabulación interactiva que alberga simuladores visuales para el Sintetizador de llamadas (Pros/Cons/Riesgos), Detector Cronológico (Gaps/Overlaps), Preguntas STAR con copiado rápido, Validador de Identidad/Entorno (IP/Geofencing/Cámara) y AI Co-Pilot (Entorno de Live Coding con sandbox en Rust y TSX).
     *   **Suite de Pruebas Unitarias:** Creación de `tests/evaluacion.test.js` bajo el framework nativo `node:test` para certificar la precisión del dataset inicial y el correcto cómputo de desviaciones en KPIs.
-*   **25/07/2026:** Nuevo Estado F2 `07 - En Duda Evaluación`, Renumeración Global de Pipeline y Renombrado en Talento:
-    *   **Nuevo Estado Intermedio en F2 Evaluación:** Incorporación del estado `07_en_duda_evaluacion` ("07 - EN DUDA EVALUACIÓN") entre Assessment y Descartado en el pipeline de Evaluación. Columna Kanban propia con color ámbar y botón "En Duda" disponible en tarjetas Kanban y vista Lista Detallada. El estado permite señalar candidatos que requieren revisión adicional sin descartarlos definitivamente.
-    *   **Renumeración Completa del Pipeline:** Para acomodar el nuevo estado, todos los estados subsiguientes fueron renumerados en cascada:
-        - F2 Evaluación: `07_descartado_interno` → `08_descartado_interno`
-        - F3 Presentación: `08_shortlist` → `09_shortlist` · `09_entrevista_cliente` → `10_entrevista_cliente` · `10_standby` → `11_standby`
-        - F4 Cierre: `11_oferta_extendida` → `12_oferta_extendida` · `12_contratado` → `13_contratado` · `13_rechazado_cliente` → `14_rechazado_cliente` · `14_candidato_se_baja` → `15_candidato_se_baja`
-        - Avance F2→F3: `08_presentado_cliente` → `09_presentado_cliente`
-        - Avance F3→F4: `11_oferta_extendida` → `12_oferta_extendida`
-        - Retroceso F4→F3 ("Volver a Fase Cliente"): `08_shortlist` → `09_shortlist`
-    *   **Grid Kanban F2 a 4 Columnas:** Actualización del layout Kanban de F2 Evaluación de `md:grid-cols-3` a `md:grid-cols-2 xl:grid-cols-4` para mostrar correctamente las 4 columnas (Screening, Assessment, En Duda, Descartado) sin ocultar ninguna.
-    *   **Renombrado en Talento:** La columna `DESCARTADO` en el Talent Mixer (`/talento`) fue renombrada a `DESCARTADO (NO SELECCIONAR)` para clarificar la intención de no reutilización del candidato en procesos activos.
-    *   **Consistencia Total y Tests:** Actualización de `src/lib/evaluacion.ts`, `src/lib/presentacion.ts`, `src/lib/cierre.ts`, todos los archivos de página y las suites de pruebas unitarias. Compilación TypeScript limpia y **33/33 tests aprobados**.
-
-*   **25/07/2026:** Integración de Servicios Backend y Navegación Dedicada en Módulos `/presentacion` y `/cierre`:
-    *   **Eliminación de Mocks y Conexión Backend:** Sustitución de datos simulados en `/presentacion` y `/cierre` por llamadas API reales (`getBusquedasAPI`, `getCandidatosAPI`, `getPipelineAPI`, `actualizarCandidatoAPI`, `actualizarPipelineAPI`).
-    *   **Páginas de Detalle Dedicadas (`/presentacion/[id]` y `/cierre/[id]`):** Creación de vistas de expedientes completos de candidatos para Fase 3 (Presentación) y Fase 4 (Cierre) con navegación mediante breadcrumbs y enlaces directos entre fases del pipeline.
-    *   **Nomenclatura y Controles:** Renombrado del botón "Pantalla Completa" a "Maximizar" en las vistas de Kanban y Lista Detallada. Reemplazo de los botones "Lanzar Herramientas Cliente" (en Presentación) y "OPERAR" (en Cierre) por botones con etiqueta "Detalles" e ícono `<Eye />` que dirigen a las rutas individuales de expediente.
-    *   **Facilidades IA de Cierre:** Integración de 5 herramientas operativas en la ficha `/cierre/[id]`: Motor Predictivo de Aceptación, Simulador Salarial Flexible, Generador de Carta Oferta / Contrato PDF, Generador de Feedback Empático de Employer Branding y Secuenciador Pre-Onboarding.
-    *   **Editor de Notas Multietapa:** Guardado asíncrono y persistencia de notas del reclutador en todas las etapas del pipeline (Inicial, F1, F2, F3, F4).
 
 *   **20/07/2026:** Integración de la Importación Asistida por IA (Módulo Postulantes):
     *   **Server Actions Ampliadas:** Incorporación de la Server Action `importarCandidatoIA_API(formData)` en `src/actions/candidatos.ts` para gestionar el enlace asíncrono y seguro con el endpoint `POST /api/v1/candidatos/importar-ia` inyectando JWT.
@@ -428,33 +541,49 @@ git push origin main
     *   **Función de Copiar al Portapapeles:** Introducción de un botón con micro-interacciones (ícono de `Copy` que cambia dinámicamente a checkmark de éxito en color verde `#4ade80` al completar la acción) al lado del botón de ver CV en el listado y detalle. Permite copiar una plantilla de texto plano y legible con toda la información clave del postulante para pegar directo en correos/mensajería.
     *   **Resolución Segura de PDF CV (Bypass 403):** Creación del endpoint `/api/v1/candidatos/:id/cv` en el backend Express y su respectiva habilitación de token por query param en el middleware `verificarToken`. En el frontend, se redireccionan los clicks a este endpoint de streaming seguro, evitando el error `Firebase Storage: User does not have permission... (storage/unauthorized)` al sortear restricciones de reglas del SDK del cliente de Firebase.
     *   **Resumen Profesional (Consola de Detalle):** Se agregó la sección superior "Resumen Profesional" (como un contenedor o tarjeta con el texto "A desarrollar" de fondo italicizado) en el panel derecho de la ficha del postulante, anticipando la futura integración con modelos de lenguaje backend para extractos de perfiles.
+
 *   **18/07/2026:** Ajustes de Nomenclatura, Usabilidad de Correo y Claridad en la vista del módulo **Postulantes**
     *   **Nomenclatura Superior:** Se renombró el botón global del menú superior de "Base de Talentos" a "Postulantes" en todas las vistas de la aplicación.
     *   **Interactividad en Emails (mailto):** Se convirtieron los campos visuales de correo electrónico (en las tarjetas individuales del listado y en la vista de configuración del perfil del usuario) en enlaces interactivos del tipo `mailto:` para facilitar el contacto directo.
     *   **Acción Limpia:** Cambiado el botón de las tarjetas individuales en `/talento` de "Fader Mixer" a "Detalles" para mayor claridad del flujo del usuario.
+
 *   **18/07/2026:** Finalización de la **Fase 3 (Gestión de Roles y Borrado Físico - Derecho al Olvido)** del módulo **Talent Mixer (Postulantes)**:
     *   **Gestión de Roles (Super Administrador):** Extensión de la lógica de roles en `AuthContext.tsx` para admitir dominios `.es` de la organización Digital Ágil en adición al dominio `.com`.
     *   **Zona de Peligro (Derecho al Olvido):** Integración de listado de candidatos en la pantalla de Ajustes y habilitación del botón "Eliminar Permanentemente" por medio del server action `eliminarCandidatoAPI(id, true)`.
     *   **Double-Step Confirmation Modal:** Desarrollo del popup de seguridad para la confirmación de la purga física definitiva de base de datos (Firestore) y archivos binarios (currículums adjuntos PDF) en Cloud Storage mediante validación de palabra clave `CONFIRMAR`.
+
 *   **18/07/2026:** Finalización de la **Fase 2 (Panel de Postulantes en Grilla y Formulario de Alta)** del módulo **Talent Mixer (Postulantes)**:
     *   **Bandeja Principal (/talento):** Construcción del panel interactivo con visualización responsive en grid, buscador reactivo y estados luminosos dinámicos según el estado del candidato.
     *   **Formulario Slide-over (Alta Manual - `CandidatoForm.tsx`):** Formulario embebido con animación de etiquetas flotantes, zona Drag and Drop con verificación restrictiva de la extensión (sólo `.pdf`) y peso (máximo 5MB), consentimiento RGPD y manejo visual de códigos de error API HTTP `400 Bad Request`.
     *   **Consola DAW (Fichas del Detalle - `/talento/[id]`):** Detalle de perfil recreando una consola ecualizadora MIDI con faders de IA analógicos (*Hard Skills*, *Soft Skills*, *Fit Cultural*, y *Seniority*) y control de Soft Delete.
+
 *   **18/07/2026:** Finalización de la **Fase 1 (Infraestructura de Datos y Seguridad)** del nuevo módulo **Talent Mixer (Postulantes)**:
     *   **Seguridad en Edge:** Configuración del proxy interceptor perimetral `src/proxy.ts` para proteger la ruta `/talento`, forzando redirección automática a `/login` para usuarios no autenticados.
     *   **Conector API REST & Mock Fallback:** Creación de Server Actions en `src/actions/candidatos.ts` para operaciones CRUD en Cloud Run con un sistema seguro de datos simulados en memoria (Mock database fallback), previniendo fallos en pruebas locales y forzando `acepta_privacidad: true` y control de inmutabilidad selectiva.
     *   **Navegación Coherente:** Integración del enlace universal y horizontal hacia `/talento` (Talent Mixer, representado con icono `Sliders`) en todas las barras superiores compartidas: Dashboard, Búsquedas, Reclutamiento y Ajustes.
+
 *   **13/07/2026:** Finalización del CRUD del Maestro de Búsquedas mediante el desarrollo de flujos interactivos de lectura y actualización (Edit Mode). Se agregaron filas clicables y botones de acción en la tabla (`src/app/busquedas/page.tsx`), soporte de datos reactivos `initialData` en `SearchForm.tsx` con selectors dinámicos de fase editables, e integración hacia el endpoint Server Action `actualizarBusquedaAPI(id, payload)` vía PATCH.
+
 *   **13/07/2026:** Migración del conector API REST a Server Actions (`src/actions/busquedas.ts`) para resolver el error de CORS del navegador (`Failed to fetch`). La obtención de tokens e invocación a los endpoints de Cloud Run ahora ocurren en el servidor usando cookies seguras.
+
 *   **13/07/2026:** Ejecución de auditoría de integración y QA Automation: se mejoró la resiliencia del listado de búsquedas implementando un estado vacío (Empty State) explícito cuando no hay registros en la base de datos de la API, y se verificaron los límites transaccionales de guardado del Slide-over.
+
 *   **13/07/2026:** Conectada la vista del Maestro de Búsquedas (`src/app/busquedas/page.tsx`) a la API de Cloud Run. Sustitución de datos de maqueta (mock data) por persistencia real a través del método `getBusquedasAPI()` con inyección de JWT, cargadores asíncronos y filtros dinámicos.
+
 *   **13/07/2026:** Conectado el formulario del Slide-over con la API REST real de Cloud Run en `src/actions/busquedas.ts`, implementando `getAuthToken()` para inyección de token Bearer y control específico para Multi-Status (207) y códigos de error.
+
 *   **13/07/2026:** Resolución de incidencias de auditoría: se implementó estado visual de carga (cargador giratorio) en botón Google Sign-In ([F2]) y protección de doble anillo del lado cliente (HOC/useEffect) en todas las páginas protegidas de la aplicación ([T3]).
+
 *   **12/07/2026:** Creación de estado global de autenticación y vinculación de datos reales al perfil de usuario.
+
 *   **12/07/2026:** Implementación funcional del Login y redirección al Dashboard.
+
 *   **12/07/2026:** Desarrollo de la vista de Configuración y finalización del UI Shell base.
+
 *   **12/07/2026:** Desarrollo de la interfaz de Recruitment Management sincronizada con Stitch.
+
 *   **12/07/2026:** Conexión de SearchForm con API externa, integración de Server Actions y manejo de estados UI.
+
 *   **12/07/2026:** Desarrollo de SearchForm.tsx integrado en Slide-over con validación de datos base.
 *   **12/07/2026:** Implementación de la vista principal de Búsquedas y componente Slide-over base.
 *   **12/07/2026:** Implementación de UI del Dashboard Gerencial (Filtros, KPIs y Recharts).

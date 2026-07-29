@@ -1457,6 +1457,19 @@ export default function DescubrimientoPage() {
             </button>
           )}
 
+          {cad.phase1State === "03_bloqueado" && (
+            <button
+              onClick={() => handleTransitionState(cad.id, "04_rechazado", {
+                rejectionReason: "Falta de información en aclaración"
+              })}
+              title="A 04 - Rechazado en Fase Inicial"
+              className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/25 text-rose-400 font-bold text-[9px] flex items-center justify-center gap-1 flex-grow cursor-pointer whitespace-nowrap"
+            >
+              <ChevronsRight className="w-3 h-3 shrink-0" />
+              <span>Avanzar estado</span>
+            </button>
+          )}
+
           {/* Action: Transfer / Move beyond phase 1 (Disponible desde cualquier estado) */}
           <button
             onClick={() => setCandidateToAdvance(cad)}
@@ -1479,17 +1492,7 @@ export default function DescubrimientoPage() {
             </button>
           )}
 
-          {/* Re-active Candidate if discarded */}
-          {cad.phase1State === "04_rechazado" && (
-            <button
-              onClick={() => handleTransitionState(cad.id, "01_nuevo")}
-              title="A 01 - Nuevo en Revisión"
-              className="px-2 py-1 rounded bg-indigo-500/15 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white font-bold text-[9px] flex items-center justify-center gap-1 flex-grow text-center transition-all cursor-pointer whitespace-nowrap"
-            >
-              <ChevronsRight className="w-3 h-3 shrink-0" />
-              <span>Avanzar estado</span>
-            </button>
-          )}
+
         </div>
       </div>
     );
@@ -2297,16 +2300,7 @@ export default function DescubrimientoPage() {
                               </button>
                             )}
 
-                            {cad.phase1State === "04_rechazado" && (
-                              <button
-                                onClick={() => handleTransitionState(cad.id, "01_nuevo")}
-                                title="A 01 - Nuevo en Revisión"
-                                className="px-2.5 py-1 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold hover:bg-indigo-500 hover:text-white transition-all text-[10px] cursor-pointer flex items-center gap-1"
-                              >
-                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
-                                <span>Avanzar estado</span>
-                              </button>
-                            )}
+
 
                             {/* Action: Transfer / Move beyond phase 1 (Disponible para todas las filas) */}
                             <button

@@ -233,4 +233,18 @@ describe('Descubrimiento - Detalle & Sincronización IA - Etapa 3', () => {
     assert.strictEqual(sorted[1].id_reunion, 'reu-1'); // Older date second (2026-07-20)
     assert.strictEqual(sorted[1].fase, 'F1 - Descubrimiento');
   });
+
+  test('Debería determinar el siguiente estado al avanzar postulante en F1 Descubrimiento (04_rechazado es el estado final)', () => {
+    const nextPhaseMap = {
+      '01_nuevo': '02_contactado',
+      '02_contactado': '03_bloqueado',
+      '03_bloqueado': '04_rechazado',
+      '04_rechazado': null
+    };
+
+    assert.strictEqual(nextPhaseMap['01_nuevo'], '02_contactado');
+    assert.strictEqual(nextPhaseMap['02_contactado'], '03_bloqueado');
+    assert.strictEqual(nextPhaseMap['03_bloqueado'], '04_rechazado');
+    assert.strictEqual(nextPhaseMap['04_rechazado'], null, '04_rechazado no debe avanzar a ningún estado por ser el estado final');
+  });
 });

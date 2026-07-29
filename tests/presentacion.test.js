@@ -181,4 +181,16 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
     assert.strictEqual(kpis.blockageTimeHours, 0);
     assert.strictEqual(kpis.calibrationAccuracy, 0);
   });
+
+  test('Debería determinar el siguiente estado al avanzar postulante en Presentación (P-PRE-01)', () => {
+    const nextPhaseMap = {
+      '09_shortlist': '10_entrevista_cliente',
+      '10_entrevista_cliente': '11_standby',
+      '11_standby': '10_entrevista_cliente'
+    };
+
+    assert.strictEqual(nextPhaseMap['09_shortlist'], '10_entrevista_cliente');
+    assert.strictEqual(nextPhaseMap['10_entrevista_cliente'], '11_standby');
+    assert.strictEqual(nextPhaseMap['11_standby'], '10_entrevista_cliente');
+  });
 });

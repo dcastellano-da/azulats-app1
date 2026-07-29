@@ -9,6 +9,7 @@ import {
   Building2, 
   MapPin, 
   ChevronRight, 
+  ChevronsRight,
   Users, 
   LayoutDashboard, 
   Briefcase,
@@ -1222,9 +1223,43 @@ export default function CierrePage() {
                       </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5 text-[10px]">
+                          {/* Avanzar estado button */}
+                          {cad.currentPhase === "12_oferta_extendida" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "13_contratado")}
+                              title="A 13 - Contratado (Won)"
+                              className="px-2.5 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                              <span>Avanzar estado</span>
+                            </button>
+                          )}
+
+                          {cad.currentPhase === "13_contratado" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "14_rechazado_cliente")}
+                              title="A 14 - Rechazado por Cliente (Lost)"
+                              className="px-2.5 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold hover:bg-rose-500 hover:text-white transition-all text-[10px] cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                              <span>Avanzar estado</span>
+                            </button>
+                          )}
+
+                          {(cad.currentPhase === "14_rechazado_cliente" || cad.currentPhase === "15_candidato_se_baja") && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "12_oferta_extendida")}
+                              title="A 12 - Oferta Extendida / Negociación"
+                              className="px-2.5 py-1 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold hover:bg-indigo-500 hover:text-white transition-all text-[10px] cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                              <span>Avanzar estado</span>
+                            </button>
+                          )}
+
                           <button
                             onClick={() => handleViewDetails(cad)}
-                            className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+                            className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0"
                             title="Ver expediente y detalles completos"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -1362,33 +1397,39 @@ function KanbanCard({ cad, onSelect, onTransition, onDragStart, onViewCv }: Kanb
         </button>
       </div>
 
-      {/* Quick fast controls */}
-      <div className="grid grid-cols-3 gap-1 pt-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200 select-none">
-        {cad.currentPhase !== "12_oferta_extendida" && (
-          <button 
-            onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "12_oferta_extendida"); }}
-            className="px-1.5 py-1 text-[8.5px] font-bold rounded bg-white/5 border border-white/5 text-[#879391] hover:text-white"
-          >
-            Nego
-          </button>
-        )}
-        {cad.currentPhase !== "13_contratado" && (
-          <button 
-            onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "13_contratado"); }}
-            className="px-1.5 py-1 text-[8.5px] font-bold rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20"
-          >
-            Habilitar
-          </button>
-        )}
-        {(cad.currentPhase !== "14_rechazado_cliente" && cad.currentPhase !== "15_candidato_se_baja") && (
-          <button 
-            onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "14_rechazado_cliente"); }}
-            className="px-1.5 py-1 text-[8.5px] font-bold rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
-          >
-            Rechazar
-          </button>
-        )}
-      </div>
+      {/* Avanzar estado button */}
+      {cad.currentPhase === "12_oferta_extendida" && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "13_contratado"); }}
+          title="A 13 - Contratado (Won)"
+          className="w-full px-2 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 hover:bg-[#6bd8cb]/35 text-[#6bd8cb] font-bold text-[9.5px] flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+        >
+          <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+          <span>Avanzar estado</span>
+        </button>
+      )}
+
+      {cad.currentPhase === "13_contratado" && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "14_rechazado_cliente"); }}
+          title="A 14 - Rechazado por Cliente (Lost)"
+          className="w-full px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/25 text-rose-400 font-bold text-[9.5px] flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+        >
+          <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+          <span>Avanzar estado</span>
+        </button>
+      )}
+
+      {(cad.currentPhase === "14_rechazado_cliente" || cad.currentPhase === "15_candidato_se_baja") && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onTransition(cad.id, "12_oferta_extendida"); }}
+          title="A 12 - Oferta Extendida / Negociación"
+          className="w-full px-2 py-1 rounded bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/25 text-indigo-400 font-bold text-[9.5px] flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+        >
+          <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+          <span>Avanzar estado</span>
+        </button>
+      )}
 
     </div>
   );

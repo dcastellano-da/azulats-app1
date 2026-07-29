@@ -40,6 +40,8 @@ export default function CandidatoDetailPage() {
   const [isPending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
 
+
+
   // Edit Mode states
   const [isEditing, setIsEditing] = useState(false);
   const [editNombre, setEditNombre] = useState("");
@@ -127,6 +129,8 @@ export default function CandidatoDetailPage() {
           setSoftSkills((multiplier * 9) % 30 + 70); // 70-100 range
           setCulturalFit((multiplier * 3) % 25 + 75); // 75-100 range
           setSeniority((multiplier * 11) % 40 + 55); // 55-95 range
+
+
         } else {
           setFeedback({
             type: "error",
@@ -708,8 +712,9 @@ Notas iniciales: ${cand.notas_iniciales || 'Ninguna'}`;
               </div>
             </div>
 
-            {/* RIGHT PANEL: DAW Console Equalizer Faders */}
+            {/* RIGHT PANEL: DAW Console */}
             <div className="lg:col-span-7 space-y-6 text-left">
+
               {/* Professional Profile Section */}
               <div className="p-6 rounded-3xl border border-white/10 bg-[#16191b] backdrop-blur-md space-y-6">
                 <div className="flex justify-between items-center text-[#6bd8cb] border-b border-white/10 pb-3">

@@ -5,13 +5,17 @@ export function setTokenCookie(token: string) {
   if (typeof window === "undefined") return;
   const d = new Date();
   d.setTime(d.getTime() + 7 * 24 * 60 * 60 * 1000);
-  document.cookie = `azul_ats_token=${token}; expires=${d.toUTCString()}; path=/; SameSite=Lax; Secure`;
+  const isSecure = window.location.protocol === "https:";
+  const secureFlag = isSecure ? "; Secure" : "";
+  document.cookie = `azul_ats_token=${token}; expires=${d.toUTCString()}; path=/; SameSite=Lax${secureFlag}`;
 }
 
 export function clearTokenCookie() {
   if (typeof window === "undefined") return;
   if (document.cookie.includes("azul_ats_token=mock_session_token_for_docs_generation")) return;
-  document.cookie = "azul_ats_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure";
+  const isSecure = window.location.protocol === "https:";
+  const secureFlag = isSecure ? "; Secure" : "";
+  document.cookie = `azul_ats_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${secureFlag}`;
 }
 
 export async function signInWithGoogle() {

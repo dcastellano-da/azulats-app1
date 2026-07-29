@@ -9,6 +9,7 @@ import {
   Building2, 
   MapPin, 
   ChevronRight, 
+  ChevronsRight,
   Ban, 
   Users, 
   LayoutDashboard, 
@@ -1114,9 +1115,43 @@ export default function PresentacionPage() {
                       </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5 text-[10px]">
+                          {/* Avanzar estado button */}
+                          {cad.currentPhase === "09_shortlist" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "10_entrevista_cliente")}
+                              title="A 10 - Entrevista con Cliente"
+                              className="px-2.5 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                              <span>Avanzar estado</span>
+                            </button>
+                          )}
+
+                          {cad.currentPhase === "10_entrevista_cliente" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "11_standby")}
+                              title="A 11 - Stand-by / Back-up"
+                              className="px-2.5 py-1 rounded bg-purple-500/10 border border-purple-500/20 text-purple-400 font-bold hover:bg-purple-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                              <span>Avanzar estado</span>
+                            </button>
+                          )}
+
+                          {cad.currentPhase === "11_standby" && (
+                            <button
+                              onClick={() => handleTransitionState(cad.id, "10_entrevista_cliente")}
+                              title="A 10 - Entrevista con Cliente"
+                              className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                              <span>Avanzar estado</span>
+                            </button>
+                          )}
+
                           <button
                             onClick={() => handleViewDetails(cad)}
-                            className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+                            className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0"
                             title="Ver expediente y detalles completos"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -1269,36 +1304,33 @@ function KanbanCard({
         {cad.currentPhase === "09_shortlist" && (
           <button
             onClick={() => onTransition(cad.id, "10_entrevista_cliente")}
-            className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/35 text-emerald-400 font-bold text-[9px] flex items-center justify-center gap-0.5 flex-grow cursor-pointer"
+            title="A 10 - Entrevista con Cliente"
+            className="px-2 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 hover:bg-[#6bd8cb]/35 text-[#6bd8cb] font-bold text-[9px] flex items-center justify-center gap-1 flex-grow cursor-pointer whitespace-nowrap"
           >
-            <span>Entrevista</span>
-            <ChevronRight className="w-3 h-3" />
+            <ChevronsRight className="w-3 h-3 shrink-0" />
+            <span>Avanzar estado</span>
           </button>
         )}
 
         {cad.currentPhase === "10_entrevista_cliente" && (
-          <div className="flex gap-1 flex-grow">
-            <button
-              onClick={() => onTransition(cad.id, "09_shortlist")}
-              className="px-2 py-1 rounded bg-[#161a1b] border border-white/10 hover:bg-white/10 text-white font-bold text-[9px] flex-grow text-center transition-all cursor-pointer"
-            >
-              Shortlist
-            </button>
-            <button
-              onClick={() => onTransition(cad.id, "11_standby")}
-              className="px-2 py-1 rounded bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/25 text-purple-400 font-bold text-[9px] flex-grow text-center transition-all cursor-pointer"
-            >
-              Stand-by
-            </button>
-          </div>
+          <button
+            onClick={() => onTransition(cad.id, "11_standby")}
+            title="A 11 - Stand-by / Back-up"
+            className="px-2 py-1 rounded bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/25 text-purple-400 font-bold text-[9px] flex items-center justify-center gap-1 flex-grow cursor-pointer whitespace-nowrap"
+          >
+            <ChevronsRight className="w-3 h-3 shrink-0" />
+            <span>Avanzar estado</span>
+          </button>
         )}
 
         {cad.currentPhase === "11_standby" && (
           <button
             onClick={() => onTransition(cad.id, "10_entrevista_cliente")}
-            className="px-2 py-1 rounded bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-stone-900 font-bold text-[9px] flex-grow text-center transition-all cursor-pointer"
+            title="A 10 - Entrevista con Cliente"
+            className="px-2 py-1 rounded bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-stone-900 font-bold text-[9px] flex items-center justify-center gap-1 flex-grow text-center transition-all cursor-pointer whitespace-nowrap"
           >
-            Volver a Entrevista
+            <ChevronsRight className="w-3 h-3 shrink-0" />
+            <span>Avanzar estado</span>
           </button>
         )}
       </div>

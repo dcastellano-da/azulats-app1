@@ -45,7 +45,8 @@ import {
   Plus,
   Trash2,
   Video,
-  ExternalLink
+  ExternalLink,
+  HelpCircle
 } from "lucide-react";
 
 // Backend API Actions
@@ -175,13 +176,13 @@ export default function CierreDetallePage() {
 
         const stateStr = (targetPipe?.flujo?.estado_actual || "").toLowerCase();
         let currentPhase: CierreCandidate["currentPhase"] = "12_oferta_extendida";
-        if (stateStr.includes("11") || stateStr.includes("oferta") || stateStr.includes("negociacion")) {
+        if (stateStr.includes("12") || stateStr.includes("oferta") || stateStr.includes("negociacion")) {
           currentPhase = "12_oferta_extendida";
-        } else if (stateStr.includes("12") || stateStr.includes("contratado") || stateStr.includes("won")) {
+        } else if (stateStr.includes("13") || stateStr.includes("contratado") || stateStr.includes("won")) {
           currentPhase = "13_contratado";
-        } else if (stateStr.includes("13") || stateStr.includes("rechazado") || stateStr.includes("lost")) {
+        } else if (stateStr.includes("14") || stateStr.includes("rechazado") || stateStr.includes("lost")) {
           currentPhase = "14_rechazado_cliente";
-        } else if (stateStr.includes("14") || stateStr.includes("baja") || stateStr.includes("drop")) {
+        } else if (stateStr.includes("15") || stateStr.includes("baja") || stateStr.includes("drop")) {
           currentPhase = "15_candidato_se_baja";
         }
 
@@ -249,15 +250,11 @@ export default function CierreDetallePage() {
         setEditF4Notes(f4Notes);
         setEditCanalIngreso(cObj?.canal_ingreso || "");
         setIsCustomChannel(false);
-
-        setSimBaseSalary(item.salaryDetails.baseSalary);
-        setSimBonusAnnual(item.salaryDetails.bonusAnnual);
-        setSimBenefitsValue(item.salaryDetails.benefitsValue);
       } else {
         setError("No se encontró el expediente del candidato en el pipeline de cierre.");
       }
     } catch (err: any) {
-      console.error("Error al obtener detalle del candidato en cierre:", err);
+      console.error("Error al obtener detalle del candidato:", err);
       setError(err.message || "Error al conectar con los servicios backend del pipeline.");
     } finally {
       setLoading(false);
@@ -290,7 +287,6 @@ export default function CierreDetallePage() {
           evaluacion: { notas_reclutador: editF2Notes.trim() },
           f3_presentacion: { notas_reclutador: editF3Notes.trim() },
           presentacion: { notas_reclutador: editF3Notes.trim() },
-          f3_cliente: { notas_reclutador: editF3Notes.trim() },
           f4_cierre: { notas_reclutador: editF4Notes.trim() },
           cierre: { notas_reclutador: editF4Notes.trim() }
         } as any);
@@ -306,9 +302,10 @@ export default function CierreDetallePage() {
         canal_ingreso: editCanalIngreso.trim() || null
       } : null);
       setIsEditingNotes(false);
-      triggerToast("Historial de notas de cierre guardado correctamente.");
+      triggerToast("Historial de notas guardado correctamente.");
     } catch (err) {
-      console.error("Error al guardar historial de notas de cierre:", err);
+      console.error("Error al guardar historial de notas:", err);
+      triggerToast("Error al guardar notas en el servidor.");
     } finally {
       setIsSavingNotes(false);
     }
@@ -493,9 +490,8 @@ export default function CierreDetallePage() {
     if (cand.pipeId) {
       try {
         await actualizarPipelineAPI(cand.pipeId, {
-          flujo: { estado_actual: targetPhase, fecha_ultimo_cambio: now },
-          cierre: { fecha_cierre: (targetPhase === "13_contratado" || targetPhase === "14_rechazado_cliente" || targetPhase === "15_candidato_se_baja") ? now : undefined }
-        } as any);
+          flujo: { estado_actual: targetPhase, fecha_ultimo_cambio: now }
+        });
         triggerToast(`Estado cambiado a ${label}`);
       } catch (err) {
         console.error("Error al actualizar estado:", err);
@@ -678,10 +674,10 @@ export default function CierreDetallePage() {
 
   const getPhaseLabel = (phase: CierreCandidate["currentPhase"]) => {
     switch (phase) {
-      case "12_oferta_extendida": return "12 - Oferta Extendida / Negociación";
+      case "12_oferta_extendida": return "12 - Oferta / Negociación";
       case "13_contratado": return "13 - Contratado (Won)";
-      case "14_rechazado_cliente": return "14 - Rechazado por Cliente (Lost)";
-      case "15_candidato_se_baja": return "15 - Candidato se Baja (Drop-out)";
+      case "14_rechazado_cliente": return "14 - Rechazado Cliente (Lost)";
+      case "15_candidato_se_baja": return "15 - Candidato se Baja (Drop)";
     }
   };
 
@@ -732,7 +728,7 @@ export default function CierreDetallePage() {
   const totalComp = cand.salaryDetails.baseSalary + cand.salaryDetails.bonusAnnual + cand.salaryDetails.benefitsValue;
 
   return (
-    <div className="relative min-h-screen bg-[#101415] text-white p-6 md:p-8 space-y-8 overflow-x-hidden text-left">
+    <main className="min-h-screen bg-[#101415] text-[#e0e3e5] px-4 md:px-8 py-6 selection:bg-[#c4c1fb] selection:text-stone-900">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#161a1b] border border-emerald-500/30 text-emerald-300 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs animate-fadeIn">
@@ -741,46 +737,27 @@ export default function CierreDetallePage() {
         </div>
       )}
 
-      {/* Radial Background Glows */}
-      <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-emerald-500/5 blur-[90px] pointer-events-none" />
-      <div className="absolute bottom-20 right-10 w-80 h-80 rounded-full bg-[#6bd8cb]/5 blur-[90px] pointer-events-none" />
+      <div className="max-w-6xl mx-auto space-y-6">
 
-      <div className="relative z-10 max-w-7xl mx-auto space-y-6">
+        {/* ── Breadcrumb Navigation ── */}
+        <div className="flex justify-between items-center pb-2 border-b border-white/5">
+          <Link
+            href="/cierre"
+            className="flex items-center gap-2 text-xs font-bold text-[#879391] hover:text-[#c4c1fb] transition-colors group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>Volver a F4 Cierre</span>
+          </Link>
 
-        {/* ── Top Header Navigation Bar ── */}
-        <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 pb-6 border-b border-white/10">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/cierre"
-              className="p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
-              title="Volver a la vista general de Cierre"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Fase 4: Cierre del Proceso
-                </span>
-                <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
-                  ID: P-CIE-02
-                </span>
-                <span className="text-xs text-[#879391]">/</span>
-                <span className="text-xs text-[#879391] font-mono">{cand.pipeId || cand.id}</span>
-              </div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
-                {cand.name}
-              </h1>
-            </div>
-          </div>
-
-          {/* Contextual Action Pipeline Header Links */}
           <div className="flex items-center gap-2">
+            <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+              ID: P-CIE-02
+            </span>
             {/* PDF CV Direct View button */}
             <button
               onClick={() => cand && handleViewCv(cand.id, cand.url_cv)}
               title={cand?.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
-              className={`px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs ${
+              className={`px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs ${
                 cand?.url_cv
                   ? "text-[#6bd8cb] bg-white/5 border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
                   : "text-[#879391]/40 bg-white/5 border-white/5 hover:bg-white/10"
@@ -789,786 +766,994 @@ export default function CierreDetallePage() {
               <FileText className="w-3.5 h-3.5" />
               <span>CV</span>
             </button>
-            <Link
-              href="/descubrimiento"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#c4c1fb] hover:bg-white/5 transition-all"
-            >
-              F1 Descubrimiento
-            </Link>
-            <Link
-              href="/evaluacion"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#9b5de5] hover:bg-white/5 transition-all"
-            >
-              F2 Evaluación
-            </Link>
-            <Link
-              href="/presentacion"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-amber-400 hover:bg-white/5 transition-all"
-            >
-              F3 Cliente
-            </Link>
-            <div className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/25">
-              F4 Cierre (Actual)
-            </div>
+
+            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full uppercase tracking-wider border border-emerald-500/20">
+              Fase 4: Cierre del Proceso
+            </span>
           </div>
-        </header>
+        </div>
 
-        {/* ── Candidate Profile Summary Header Card ── */}
-        <section className="glass-panel p-6 rounded-3xl border border-white/10 relative overflow-hidden space-y-6">
-          <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-2xl font-black text-white">{cand.name}</h2>
-                <span className={`text-xs px-3 py-1 rounded-full font-bold border ${phaseColors[cand.currentPhase]}`}>
-                  {getPhaseLabel(cand.currentPhase)}
-                </span>
-                <span className="text-xs px-2.5 py-0.5 rounded-md font-mono bg-white/5 text-[#c4c1fb] border border-white/10">
-                  Fit Score: {cand.score}%
-                </span>
-                <span className="text-xs px-2.5 py-0.5 rounded-md font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Probabilidad Aceptación: {cand.toolsDetails.predictiveMotor.adjustedProbability}%
-                </span>
+        {/* ── Main Grid Layout ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* ══════════════════════════════════
+              MAIN AREA (col-span-2)
+          ══════════════════════════════════ */}
+          <div className="lg:col-span-2 space-y-6">
+
+            {/* ── Hero Card ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 relative overflow-hidden space-y-6">
+              {/* Decorative gradient blob */}
+              <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-emerald-500/5 blur-3xl pointer-events-none" />
+
+              {/* Header: name + badge */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-5">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-mono text-[#879391] uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                    {cand.id} • F4 Cierre del Proceso
+                  </span>
+                  <h1 className="text-xl font-bold text-white tracking-tight">{cand.name}</h1>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`px-3 py-1 rounded-full border text-xs font-bold ${phaseColors[cand.currentPhase]}`}>
+                    {getPhaseLabel(cand.currentPhase)}
+                  </span>
+                  <div className="px-3 py-1 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] text-xs font-bold font-mono">
+                    Fit: {cand.score}%
+                  </div>
+                </div>
               </div>
-              
-              <div className="flex items-center gap-4 text-xs text-[#879391] flex-wrap">
-                <span className="flex items-center gap-1.5 text-white font-medium">
-                  <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-                  {cand.client} — {cand.role}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                  {cand.location}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-[#879391]" />
-                  {cand.contactNumber}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-[#879391]" />
-                  {cand.email}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Share2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                  {isEditingNotes ? (
-                    <span className="inline-flex items-center gap-1">
-                      <select
-                        value={isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "") ? "OTHER_CUSTOM" : editCanalIngreso}
-                        onChange={(e) => {
-                          if (e.target.value === "OTHER_CUSTOM") {
-                            setIsCustomChannel(true);
-                            setEditCanalIngreso("");
-                          } else {
-                            setIsCustomChannel(false);
-                            setEditCanalIngreso(e.target.value);
-                          }
-                        }}
-                        className="bg-[#101415] border border-white/10 px-2.5 py-1 text-xs rounded-lg text-white focus:border-[#6bd8cb] focus:outline-none cursor-pointer font-medium"
-                      >
-                        <option value="" className="bg-[#15181a]">-- Sin especificar (opcional) --</option>
-                        <optgroup label="Canales detectados en la Base de Datos">
-                          {existingChannels.map((ch) => (
-                            <option key={ch} value={ch} className="bg-[#15181a] text-white">
-                              {ch}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <option value="OTHER_CUSTOM" className="bg-[#15181a] text-[#6bd8cb] font-semibold">
-                          + Escribir nuevo canal personalizado...
-                        </option>
-                      </select>
 
-                      {(isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "")) && (
-                        <input
-                          type="text"
-                          value={editCanalIngreso}
-                          onChange={(e) => setEditCanalIngreso(e.target.value)}
-                          placeholder="Escribe el canal..."
-                          className="bg-[#101415] border border-[#6bd8cb]/40 px-2 py-1 text-xs rounded-lg text-white focus:border-[#6bd8cb] focus:outline-none"
-                        />
-                      )}
-                    </span>
-                  ) : cand.canal_ingreso ? (
-                    <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
-                      {cand.canal_ingreso}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-medium text-white/40 italic">
-                      No especificado
-                    </span>
-                  )}
-                </span>
-              </div>
-            </div>
-
-            {/* Header Action Buttons */}
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Revert to Client Phase Button */}
-              <button
-                onClick={handleRevertToClientPhase}
-                disabled={isRevertingPhase}
-                className="px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 text-amber-400 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                title="Cambia el estado del expediente al primer estado de la Fase 3 Cliente (09_shortlist)"
-              >
-                {isRevertingPhase ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <ChevronsLeft className="w-3.5 h-3.5" />
-                )}
-                <span>Volver a Fase Cliente</span>
-              </button>
-
-              {/* Hire Button */}
-              {cand.currentPhase !== "13_contratado" && (
-                <button
-                  onClick={() => setIsCloseModalOpen(true)}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-[#6bd8cb] text-[#101415] font-black text-xs hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/10 cursor-pointer"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>Cerrar Contratación (Won)</span>
-                </button>
-              )}
-
-              {/* State Dropdown Transitions */}
-              <select
-                value={cand.currentPhase}
-                onChange={(e) => handleTransitionState(e.target.value as CierreCandidate["currentPhase"])}
-                className="bg-[#101415] border border-white/20 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-emerald-400 cursor-pointer"
-              >
-                <option value="12_oferta_extendida" className="bg-[#15181a]">12 - Oferta / Negociación</option>
-                <option value="13_contratado" className="bg-[#15181a]">13 - Contratado (Won)</option>
-                <option value="14_rechazado_cliente" className="bg-[#15181a]">14 - Rechazado por Cliente (Lost)</option>
-                <option value="15_candidato_se_baja" className="bg-[#15181a]">15 - Candidato se Baja (Drop-out)</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        {/* Sección de Agendamiento Dinámico de Reuniones */}
-        <section className="glass-panel p-6 rounded-3xl border border-white/10 text-left space-y-5">
-          {(() => {
-            const rawMeetings: Reunion[] = (activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones) || [];
-            const sortedMeetings = [...rawMeetings].sort((a, b) => {
-              const timeA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0;
-              const timeB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0;
-              return timeB - timeA;
-            });
-
-            return (
-              <>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-white/5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
-                      <Calendar className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                        <span>Reuniones</span>
-                        <span className="text-[10px] bg-white/10 text-[#6bd8cb] px-2 py-0.5 rounded-full font-mono font-bold">
-                          {sortedMeetings.length}
-                        </span>
-                      </h3>
-                      <p className="text-[10px] text-[#879391] mt-0.5">
-                        Agendamiento e historial de entrevistas del expediente
-                      </p>
+              {/* Metadata grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Puesto Vacante</span>
+                    <div className="flex items-center gap-2 text-xs text-white font-semibold">
+                      {cand.role}
                     </div>
                   </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Cliente</span>
+                    <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold">
+                      <Building2 className="w-4 h-4 text-emerald-400/70" />
+                      <span>{cand.client}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Ubicación</span>
+                    <div className="flex items-center gap-2 text-xs text-[#879391]">
+                      <MapPin className="w-4 h-4 text-[#6bd8cb]/70" />
+                      <span>{cand.location}</span>
+                    </div>
+                  </div>
+
+                  {/* Canal de Ingreso (Sourcing) */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block flex items-center gap-1">
+                      <Share2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                      Canal de Ingreso (Sourcing)
+                    </span>
+                    {isEditingNotes ? (
+                      <div className="space-y-1.5">
+                        <select
+                          value={isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "") ? "OTHER_CUSTOM" : editCanalIngreso}
+                          onChange={(e) => {
+                            if (e.target.value === "OTHER_CUSTOM") {
+                              setIsCustomChannel(true);
+                              setEditCanalIngreso("");
+                            } else {
+                              setIsCustomChannel(false);
+                              setEditCanalIngreso(e.target.value);
+                            }
+                          }}
+                          className="bg-white/5 border border-white/10 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none cursor-pointer font-medium"
+                        >
+                          <option value="" className="bg-[#15181a]">-- Sin especificar (opcional) --</option>
+                          <optgroup label="Canales detectados en la Base de Datos">
+                            {existingChannels.map((ch) => (
+                              <option key={ch} value={ch} className="bg-[#15181a] text-white">
+                                {ch}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <option value="OTHER_CUSTOM" className="bg-[#15181a] text-[#6bd8cb] font-semibold">
+                            + Escribir nuevo canal personalizado...
+                          </option>
+                        </select>
+
+                        {(isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "")) && (
+                          <input
+                            type="text"
+                            value={editCanalIngreso}
+                            onChange={(e) => setEditCanalIngreso(e.target.value)}
+                            placeholder="Escribe la vía de sourcing (ej: Headhunting, LinkedIn...)..."
+                            className="bg-[#101415] border border-[#6bd8cb]/40 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none mt-1"
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs">
+                        {cand.canal_ingreso ? (
+                          <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
+                            {cand.canal_ingreso}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-white/40 italic">
+                            No especificado
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Contacto</span>
+                    <div className="flex items-center gap-2 text-xs text-[#879391]">
+                      <Phone className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                      <span>{cand.contactNumber}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-[#879391] mt-1.5">
+                      <Mail className="w-3.5 h-3.5 text-[#c4c1fb]" />
+                      <span className="truncate">{cand.email}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Última actividad</span>
+                    <div className="flex items-center gap-1.5 text-xs text-[#879391]">
+                      <Clock className="w-3.5 h-3.5 text-[#6bd8cb]/70" />
+                      <span>{cand.lastActivity}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Entrada al WIP Cierre</span>
+                    <p className="text-xs text-[#879391]">{new Date(cand.offerDate).toLocaleString("es-ES")}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sección de Agendamiento Dinámico de Reuniones */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 text-left space-y-5">
+              {(() => {
+                const rawMeetings: Reunion[] = (activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones) || [];
+                const sortedMeetings = [...rawMeetings].sort((a, b) => {
+                  const timeA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0;
+                  const timeB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0;
+                  return timeB - timeA;
+                });
+
+                return (
+                  <>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-white/5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
+                          <Calendar className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                            <span>Reuniones</span>
+                            <span className="text-[10px] bg-white/10 text-[#6bd8cb] px-2 py-0.5 rounded-full font-mono font-bold">
+                              {sortedMeetings.length}
+                            </span>
+                          </h3>
+                          <p className="text-[10px] text-[#879391] mt-0.5">
+                            Agendamiento e historial de entrevistas del expediente
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleOpenCreateMeeting}
+                        className="px-3.5 py-2 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer self-start sm:self-auto"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Nueva Reunión</span>
+                      </button>
+                    </div>
+
+                    {/* Lista de Reuniones ordenadas por fecha descendente */}
+                    {sortedMeetings.length === 0 ? (
+                      <div className="p-6 text-center border border-dashed border-white/10 rounded-2xl space-y-2">
+                        <Calendar className="w-8 h-8 text-[#879391]/50 mx-auto" />
+                        <p className="text-xs text-[#879391]">No hay reuniones agendadas.</p>
+                        <button
+                          onClick={handleOpenCreateMeeting}
+                          className="text-xs font-bold text-[#6bd8cb] hover:underline inline-flex items-center gap-1 mt-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Agendar la primera reunión
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {sortedMeetings.map((meeting) => (
+                          <div 
+                            key={meeting.id_reunion}
+                            className="p-4 rounded-2xl bg-stone-950/45 border border-white/10 hover:border-[#6bd8cb]/30 transition-all space-y-3"
+                          >
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-white/5 pb-2.5">
+                              <div className="space-y-0.5">
+                                <h4 className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
+                                  <span className="inline-block text-[9.5px] font-bold font-mono px-2 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] uppercase tracking-wider">
+                                    {meeting.fase || "F4 - Cierre"}
+                                  </span>
+                                  <span>{meeting.objetivo || "Reunión de Cierre"}</span>
+                                </h4>
+                                <div className="flex items-center gap-2 text-[11px] text-[#6bd8cb] font-mono">
+                                  <Clock className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                                  <span>
+                                    {meeting.fecha_hora 
+                                      ? new Date(meeting.fecha_hora).toLocaleString("es-ES", {
+                                          dateStyle: "full",
+                                          timeStyle: "short"
+                                        })
+                                      : "Sin fecha definida"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <button
+                                  onClick={() => handleOpenEditMeeting(meeting)}
+                                  className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-[#6bd8cb]/40 bg-white/5 hover:bg-[#6bd8cb]/10 text-white/80 hover:text-[#6bd8cb] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Modificar datos de la reunión"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                                  <span>Modificar</span>
+                                </button>
+                                <button
+                                  onClick={() => setDeletingMeetingId(meeting.id_reunion)}
+                                  className="p-1.5 rounded-lg border border-white/10 hover:border-rose-500/40 bg-white/5 hover:bg-rose-500/10 text-white/70 hover:text-rose-400 transition-all cursor-pointer"
+                                  title="Eliminar reunión"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {meeting.link_reunion && (
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={meeting.link_reunion.startsWith("http") ? meeting.link_reunion : `https://${meeting.link_reunion}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-300 text-xs font-bold transition-all inline-flex items-center gap-1.5"
+                                >
+                                  <Video className="w-3.5 h-3.5 text-indigo-400" />
+                                  <span className="truncate max-w-xs">{meeting.link_reunion}</span>
+                                  <ExternalLink className="w-3 h-3 ml-0.5 shrink-0" />
+                                </a>
+                              </div>
+                            )}
+
+                            {meeting.notas && (
+                              <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs text-[#879391] leading-relaxed">
+                                <span className="text-[10px] uppercase font-bold text-white/40 block mb-0.5">Notas de la sesión:</span>
+                                <p className="whitespace-pre-wrap">{meeting.notas}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* ── Trazabilidad de Notas del Pipeline (Invertido: F4 arriba -> F3 -> F2 -> F1 -> Origen abajo) ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-6 text-left relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 gap-3">
+                <div>
+                  <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20 uppercase font-bold tracking-widest inline-block mb-1">
+                    TRAZABILIDAD DE RECLUTAMIENTO
+                  </span>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <span>Historial y Trazabilidad de Notas del Candidato</span>
+                  </h3>
+                </div>
+
+                {/* Global Edit Button covering all notes */}
+                <div>
+                  {!isEditingNotes ? (
+                    <button
+                      onClick={() => setIsEditingNotes(true)}
+                      className="px-4 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500 hover:text-[#101415] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-emerald-500/10"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Editar Historial de Notas</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveNotes}
+                        disabled={isSavingNotes}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-[#6bd8cb] text-[#101415] hover:opacity-90 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20 disabled:opacity-50"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>{isSavingNotes ? "Guardando..." : "Guardar Todos los Cambios"}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditInitialNotes(cand.initialNotes || "");
+                          setEditF1Notes(cand.f1Notes || "");
+                          setEditF2Notes(cand.f2Notes || "");
+                          setEditF3Notes(cand.f3Notes || "");
+                          setEditF4Notes(cand.f4Notes || "");
+                          setIsEditingNotes(false);
+                        }}
+                        className="px-3.5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Cancelar</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="relative pl-6 md:pl-8 space-y-6 border-l-2 border-white/10 ml-2 md:ml-3 pt-1 pb-1">
+
+                {/* ── 01 (ARRIBA). FASE 4: CIERRE DEL PROCESO (MÓDULO ACTUAL) ── */}
+                <div className="relative space-y-2">
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-emerald-400 text-emerald-400 flex items-center justify-center text-[10px] font-mono font-bold shadow-md shadow-emerald-500/20">
+                    01
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/15 pb-2">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                          Fase 4: Cierre del Proceso (Módulo Actual)
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        campo: f4_cierre.notas_reclutador
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editF4Notes}
+                        onChange={e => setEditF4Notes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de negociación de oferta y condiciones de incorporación..."
+                        className="w-full bg-[#101415]/90 border border-emerald-500/50 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-emerald-500 focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-emerald-500/20 rounded-xl text-xs text-white leading-relaxed font-medium">
+                        {cand.f4Notes ? (
+                          cand.f4Notes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin notas de negociación o cierre asignadas. Usa "Editar Historial de Notas" para agregar observaciones de cierre.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 02 (CENTRO). FASE 3: PRESENTACIÓN AL CLIENTE ── */}
+                <div className="relative space-y-2">
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-amber-500/40 text-amber-400 flex items-center justify-center text-[10px] font-mono font-bold shadow-md">
+                    02
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-amber-500/25 bg-amber-500/5 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                          Fase 3: Presentación al Cliente
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-amber-400/70 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        campo: f3_presentacion.notas_reclutador
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editF3Notes}
+                        onChange={e => setEditF3Notes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de F3..."
+                        className="w-full bg-[#101415]/90 border border-amber-500/40 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-amber-400 focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-amber-500/15 rounded-xl text-xs text-white leading-relaxed">
+                        {cand.f3Notes ? (
+                          cand.f3Notes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin notas de presentación registradas.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 03 (CENTRO). FASE 2: EVALUACIÓN INTERNA ── */}
+                <div className="relative space-y-2">
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-[#6bd8cb]/40 text-[#6bd8cb] flex items-center justify-center text-[10px] font-mono font-bold shadow-md">
+                    03
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-[#6bd8cb]/25 bg-[#6bd8cb]/5 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#6bd8cb]/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Cpu className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                        <span className="text-xs font-bold text-[#6bd8cb] uppercase tracking-wider">
+                          Fase 2: Evaluación Interna
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-[#6bd8cb]/70 bg-[#6bd8cb]/10 px-2 py-0.5 rounded border border-[#6bd8cb]/20">
+                        campo: f2_evaluacion.notas_reclutador
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editF2Notes}
+                        onChange={e => setEditF2Notes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de evaluación técnica..."
+                        className="w-full bg-[#101415]/90 border border-[#6bd8cb]/40 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-[#6bd8cb] focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-[#6bd8cb]/15 rounded-xl text-xs text-white leading-relaxed">
+                        {cand.f2Notes ? (
+                          cand.f2Notes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin notas de evaluación registradas.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 04 (CENTRO). FASE 1: DESCUBRIMIENTO & SOURCING ── */}
+                <div className="relative space-y-2">
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-[#c4c1fb]/40 text-[#c4c1fb] flex items-center justify-center text-[10px] font-mono font-bold shadow-md">
+                    04
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-[#c4c1fb]/25 bg-[#c4c1fb]/5 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#c4c1fb]/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Compass className="w-3.5 h-3.5 text-[#c4c1fb]" />
+                        <span className="text-xs font-bold text-[#c4c1fb] uppercase tracking-wider">
+                          Fase 1: Descubrimiento & Sourcing
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-[#c4c1fb]/70 bg-[#c4c1fb]/10 px-2 py-0.5 rounded border border-[#c4c1fb]/20">
+                        campo: f1_descubrimiento.notas_reclutador
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editF1Notes}
+                        onChange={e => setEditF1Notes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de sourcing..."
+                        className="w-full bg-[#101415]/90 border border-[#c4c1fb]/40 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-[#c4c1fb] focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-[#c4c1fb]/15 rounded-xl text-xs text-white leading-relaxed">
+                        {cand.f1Notes ? (
+                          cand.f1Notes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin notas de descubrimiento registradas.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 05 (ABAJO). NOTAS INICIALES DE ORIGEN ── */}
+                <div className="relative space-y-2">
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-white/20 text-white/60 flex items-center justify-center text-[10px] font-mono font-bold shadow-md">
+                    05
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-white/10 bg-white/5 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-white/60" />
+                        <span className="text-xs font-bold text-white/80 uppercase tracking-wider">
+                          Notas iniciales (Origen)
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-white/50 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                        campo: candidatos.notas_iniciales
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editInitialNotes}
+                        onChange={e => setEditInitialNotes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de origen del candidato..."
+                        className="w-full bg-[#101415]/90 border border-white/20 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-white/50 focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white/70 leading-relaxed font-sans">
+                        {cand.initialNotes ? (
+                          cand.initialNotes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin anotaciones iniciales registradas.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* ── Diagnostic Tools Tabs ── */}
+            <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden">
+              {/* Tab header */}
+              <div className="px-6 py-3 border-b border-white/10 bg-[#101415]/60">
+                <div className="flex items-center gap-2 mb-3">
+                  <Cpu className="w-4 h-4 text-emerald-400 animate-pulse" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">Facilidades de Cierre e IA — F4</span>
+                </div>
+                <nav className="flex items-center overflow-x-auto gap-1 select-none">
+                  {([
+                    { key: "motor", icon: <TrendingUp className="w-3.5 h-3.5" />, label: "1. Motor Predictivo" },
+                    { key: "simulador", icon: <DollarSign className="w-3.5 h-3.5" />, label: "2. Simulador Salarial" },
+                    { key: "contratos", icon: <FileCheck className="w-3.5 h-3.5" />, label: "3. Generador Contratos" },
+                    { key: "feedback", icon: <HeartHandshake className="w-3.5 h-3.5" />, label: "4. Feedback Empatía" },
+                    { key: "onboarding", icon: <Sparkles className="w-3.5 h-3.5" />, label: "5. Pre-Onboarding" }
+                  ] as { key: DiagTab; icon: React.ReactNode; label: string }[]).map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                        activeTab === tab.key
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          : "text-[#879391] hover:text-white"
+                      }`}
+                    >
+                      {tab.icon}
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Tab body */}
+              <div className="p-6 space-y-5">
+
+                {/* 1. Motor Predictivo */}
+                {activeTab === "motor" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Motor Predictivo de Aceptación de Ofertas</h4>
+                        <p className="text-[10px] text-[#879391]">Inferencia por machine learning sobre probabilidad de firma de propuesta económica</p>
+                      </div>
+                      <button
+                        onClick={runPredictiveEngine}
+                        disabled={isSimulatingMotor}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
+                      >
+                        {isSimulatingMotor ? (
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <TrendingUp className="w-3.5 h-3.5" />
+                        )}
+                        <span>Recalcular Motor Predictivo</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Probabilidad Ajustada de Aceptación</span>
+                        <span className="text-3xl font-black text-emerald-400">{cand.toolsDetails.predictiveMotor.adjustedProbability}%</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-bold block w-fit">
+                          Alta certidumbre de cierre
+                        </span>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Factores de Riesgo / Oportunidad</span>
+                        <ul className="space-y-1">
+                          {cand.toolsDetails.predictiveMotor.riskFactors.map((r, idx) => (
+                            <li key={idx} className="flex items-center gap-1.5 text-[#e0e3e5]">
+                              <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                              <span>{r}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Simulador Salarial */}
+                {activeTab === "simulador" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Simulador Salarial & Paquete de Compensación</h4>
+                        <p className="text-[10px] text-[#879391]">Modelado interactivo de salario fijo, variable y beneficios monetizados</p>
+                      </div>
+                      <button
+                        onClick={recalculateOfferSimulator}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
+                      >
+                        <DollarSign className="w-3.5 h-3.5" />
+                        <span>Aplicar Cambios en Oferta</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Salario Fijo Bruto Anual (€)</span>
+                        <input
+                          type="number"
+                          value={simBaseSalary}
+                          onChange={(e) => setSimBaseSalary(Number(e.target.value))}
+                          className="w-full bg-[#101415] border border-white/15 rounded-xl p-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Bonus Variable Anual (€)</span>
+                        <input
+                          type="number"
+                          value={simBonusAnnual}
+                          onChange={(e) => setSimBonusAnnual(Number(e.target.value))}
+                          className="w-full bg-[#101415] border border-white/15 rounded-xl p-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Beneficios Monetizados (€)</span>
+                        <input
+                          type="number"
+                          value={simBenefitsValue}
+                          onChange={(e) => setSimBenefitsValue(Number(e.target.value))}
+                          className="w-full bg-[#101415] border border-white/15 rounded-xl p-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 flex justify-between items-center">
+                      <span>Compensación Total Estimada (OTE):</span>
+                      <span className="text-xl font-black font-mono">{totalComp.toLocaleString("es-ES")} € / año</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Generador Contratos */}
+                {activeTab === "contratos" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Generador de Cartas Oferta y Contratos por IA</h4>
+                        <p className="text-[10px] text-[#879391]">Generación automática de propuesta legal estructurada</p>
+                      </div>
+                      <button
+                        onClick={generateDraftContract}
+                        disabled={isSimulatingContractGen}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
+                      >
+                        {isSimulatingContractGen ? (
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <FileCheck className="w-3.5 h-3.5" />
+                        )}
+                        <span>Generar Carta Oferta IA</span>
+                      </button>
+                    </div>
+
+                    {cand.toolsDetails.contractGenerator.generated ? (
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Documento Listo</span>
+                          <a
+                            href={cand.toolsDetails.contractGenerator.documentUrl || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[10px] flex items-center gap-1"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>Descargar Borrador PDF</span>
+                          </a>
+                        </div>
+                        <p className="text-[#e0e3e5] leading-relaxed font-mono">
+                          {`CARTA OFERTA DE EMPLEO DE ${cand.client.toUpperCase()}\nPosición: ${cand.role}\nCompensación Total: ${totalComp.toLocaleString("es-ES")} € / año\nTipo Contrato: ${cand.toolsDetails.contractGenerator.contractType}\nFecha Incorporación: ${cand.toolsDetails.contractGenerator.startDate}`}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-[#879391]">
+                        Aún no se ha redactado la carta oferta. Haz clic en el botón superior para generarla.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. Feedback Empatía */}
+                {activeTab === "feedback" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Generador de Feedback Empático por IA</h4>
+                        <p className="text-[10px] text-[#879391]">Comunicaciones empáticas para candidatos no seleccionados o bajas</p>
+                      </div>
+                      <button
+                        onClick={generateEmpathyFeedback}
+                        disabled={isSimulatingFeedbackGen}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
+                      >
+                        {isSimulatingFeedbackGen ? (
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <HeartHandshake className="w-3.5 h-3.5" />
+                        )}
+                        <span>Redactar Feedback Empático</span>
+                      </button>
+                    </div>
+
+                    {cand.toolsDetails.feedbackWriter.generatedFeedback ? (
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Mensaje Preparado</span>
+                          <button
+                            onClick={() => handleCopyText(cand.toolsDetails.feedbackWriter.generatedFeedback, "feedback")}
+                            className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-white text-[10px] flex items-center gap-1 cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3 text-emerald-400" />
+                            <span>{copiedTextType === "feedback" ? "¡Copiado!" : "Copiar Feedback"}</span>
+                          </button>
+                        </div>
+                        <p className="text-[#e0e3e5] leading-relaxed whitespace-pre-line">
+                          {cand.toolsDetails.feedbackWriter.generatedFeedback}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-[#879391]">
+                        Sin mensaje redactado aún. Haz clic en el botón superior para compilar el texto de devolución empática.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 5. Pre-Onboarding */}
+                {activeTab === "onboarding" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Cadencias de Pre-Onboarding Automatizadas</h4>
+                        <p className="text-[10px] text-[#879391]">Mantén el enganche del candidato contratado entre la firma y el primer día laboral</p>
+                      </div>
+                      <button
+                        onClick={triggerPreOnboardingCadence}
+                        disabled={isSimulatingPreOnboarding}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
+                      >
+                        {isSimulatingPreOnboarding ? (
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                        <span>Iniciar Cadencia Pre-Onboarding</span>
+                      </button>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Riesgo de Ghosting / Deserción:</span>
+                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          Riesgo {cand.toolsDetails.preOnboard.ghostingRisk}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 pt-1">
+                        {cand.toolsDetails.preOnboard.cadenceSteps.map((step, idx) => (
+                          <div key={idx} className="p-3 rounded-xl bg-black/40 border border-white/5 flex justify-between items-center text-xs">
+                            <div>
+                              <span className="text-emerald-400 font-bold font-mono text-[10px] block">{step.day}</span>
+                              <span className="text-[#e0e3e5] font-bold">{step.title}</span>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                              step.status === "sent" ? "bg-emerald-500/10 text-emerald-400" : "bg-white/5 text-[#879391]"
+                            }`}>
+                              {step.status === "sent" ? "Enviado" : "Programado"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+
+          {/* ══════════════════════════════════
+              SIDEBAR (col-span-1)
+          ══════════════════════════════════ */}
+          <div className="space-y-6">
+
+            {/* ── Acciones F4 ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-5 text-left">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider pb-2 border-b border-white/5">
+                Acciones del Pipeline F4
+              </h3>
+
+              {/* Cambio de Estado */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold text-[#879391] block">Cambio de Estado Interno</span>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => handleTransitionState("12_oferta_extendida")}
+                    disabled={cand.currentPhase === "12_oferta_extendida"}
+                    className="w-full py-2.5 rounded-xl border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 hover:bg-[#6bd8cb]/15 hover:text-white transition-all text-xs font-bold text-[#6bd8cb] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    <span>12 - Oferta / Negociación</span>
+                  </button>
+                  <button
+                    onClick={() => handleTransitionState("13_contratado")}
+                    disabled={cand.currentPhase === "13_contratado"}
+                    className="w-full py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 hover:text-white transition-all text-xs font-bold text-emerald-400 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>13 - Contratado (Won)</span>
+                  </button>
+                  <button
+                    onClick={() => handleTransitionState("14_rechazado_cliente")}
+                    disabled={cand.currentPhase === "14_rechazado_cliente"}
+                    className="w-full py-2.5 rounded-xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/15 hover:text-white transition-all text-xs font-bold text-rose-400 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Ban className="w-4 h-4" />
+                    <span>14 - Rechazado Cliente</span>
+                  </button>
+                  <button
+                    onClick={() => handleTransitionState("15_candidato_se_baja")}
+                    disabled={cand.currentPhase === "15_candidato_se_baja"}
+                    className="w-full py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/15 hover:text-white transition-all text-xs font-bold text-amber-400 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>15 - Candidato se Baja</span>
+                  </button>
 
                   <button
-                    onClick={handleOpenCreateMeeting}
-                    className="px-3.5 py-2 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer self-start sm:self-auto"
+                    onClick={handleRevertToClientPhase}
+                    disabled={isRevertingPhase}
+                    className="w-full py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/15 text-amber-400 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+                    title="Cambia el estado del expediente al primer estado de la Fase 3 Cliente (09_shortlist)"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Nueva Reunión</span>
+                    {isRevertingPhase ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ChevronsLeft className="w-3.5 h-3.5" />
+                    )}
+                    <span>Volver a Fase Cliente</span>
                   </button>
                 </div>
+              </div>
 
-                {/* Lista de Reuniones ordenadas por fecha descendente */}
-                {sortedMeetings.length === 0 ? (
-                  <div className="p-6 text-center border border-dashed border-white/10 rounded-2xl space-y-2">
-                    <Calendar className="w-8 h-8 text-[#879391]/50 mx-auto" />
-                    <p className="text-xs text-[#879391]">No hay reuniones agendadas.</p>
-                    <button
-                      onClick={handleOpenCreateMeeting}
-                      className="text-xs font-bold text-[#6bd8cb] hover:underline inline-flex items-center gap-1 mt-1 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Agendar la primera reunión
-                    </button>
+              {/* Finalización */}
+              {cand.currentPhase !== "13_contratado" && (
+                <div className="space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-[#879391] block">Finalización de Proceso</span>
+                  <button
+                    onClick={() => setIsCloseModalOpen(true)}
+                    className="w-full py-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500 hover:text-stone-950 transition-all text-xs font-black text-emerald-400 flex items-center justify-center gap-2 cursor-pointer shadow shadow-emerald-500/5"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>Cerrar Contratación (Won)</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Datos del Pipeline ── */}
+            {activePipelineItem && (
+              <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-4 text-left">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider pb-2 border-b border-white/5">
+                  Trazabilidad del Pipeline
+                </h3>
+
+                <div className="space-y-2 text-xs">
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">ID Pipeline</span>
+                    <span className="font-mono text-white/80 select-all text-[10px]">{activePipelineItem.id}</span>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {sortedMeetings.map((meeting) => (
-                      <div 
-                        key={meeting.id_reunion}
-                        className="p-4 rounded-2xl bg-stone-950/45 border border-white/10 hover:border-[#6bd8cb]/30 transition-all space-y-3"
-                      >
-                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-white/5 pb-2.5">
-                          <div className="space-y-0.5">
-                            <h4 className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
-                              <span className="inline-block text-[9.5px] font-bold font-mono px-2 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] uppercase tracking-wider">
-                                {meeting.fase || "F4 - Cierre"}
-                              </span>
-                              <span>{meeting.objetivo || "Reunión de Cierre"}</span>
-                            </h4>
-                            <div className="flex items-center gap-2 text-[11px] text-[#6bd8cb] font-mono">
-                              <Clock className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                              <span>
-                                {meeting.fecha_hora 
-                                  ? new Date(meeting.fecha_hora).toLocaleString("es-ES", {
-                                      dateStyle: "full",
-                                      timeStyle: "short"
-                                    })
-                                  : "Sin fecha definida"}
-                              </span>
-                            </div>
-                          </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">ID Búsqueda</span>
+                    <span className="font-mono text-white/80 select-all text-[10px]">{activePipelineItem.claves_conexion.id_busqueda}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">Estado en Pipeline</span>
+                    <span className="text-[#6bd8cb] font-bold block mt-0.5">{activePipelineItem.flujo.estado_actual}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">Fecha de Cierre / Modificación</span>
+                    <span className="text-emerald-400 font-bold block mt-0.5 text-[10px]">
+                      {cand.closedDate ? new Date(cand.closedDate).toLocaleString() : "En Negociación Activa"}
+                    </span>
+                  </div>
+                </div>
 
-                          <div className="flex items-center gap-2 self-end sm:self-auto">
-                            <button
-                              onClick={() => handleOpenEditMeeting(meeting)}
-                              className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-[#6bd8cb]/40 bg-white/5 hover:bg-[#6bd8cb]/10 text-white/80 hover:text-[#6bd8cb] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                              title="Modificar datos de la reunión"
-                            >
-                              <Edit2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                              <span>Modificar</span>
-                            </button>
-                            <button
-                              onClick={() => setDeletingMeetingId(meeting.id_reunion)}
-                              className="p-1.5 rounded-lg border border-white/10 hover:border-rose-500/40 bg-white/5 hover:bg-rose-500/10 text-white/70 hover:text-rose-400 transition-all cursor-pointer"
-                              title="Eliminar reunión"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                {/* Historial SLA */}
+                {activePipelineItem.flujo.historial_estados && activePipelineItem.flujo.historial_estados.length > 0 ? (
+                  <div className="pt-4 border-t border-white/5 space-y-4">
+                    <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider block">
+                      Historial y Trazabilidad de Estados (SLA)
+                    </span>
+                    <div className="relative pl-6 border-l border-white/10 space-y-5 ml-2 pt-1 pb-1">
+                      {activePipelineItem.flujo.historial_estados.map((entry, idx) => (
+                        <div key={idx} className="relative space-y-1">
+                          <div className={`absolute -left-[29.5px] top-1 w-2.5 h-2.5 rounded-full border border-[#101415] shadow-sm ${
+                            idx === 0 ? "bg-emerald-400 ring-4 ring-emerald-400/20" : "bg-[#879391]"
+                          }`} />
+                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1">
+                            <span className={`text-xs font-bold ${idx === 0 ? "text-white" : "text-white/60"}`}>
+                              {entry.estado}
+                            </span>
+                            <span className="text-[10px] text-[#879391] font-mono">
+                              {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "N/A"}
+                            </span>
                           </div>
                         </div>
-
-                        {meeting.link_reunion && (
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={meeting.link_reunion.startsWith("http") ? meeting.link_reunion : `https://${meeting.link_reunion}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-300 text-xs font-bold transition-all inline-flex items-center gap-1.5"
-                            >
-                              <Video className="w-3.5 h-3.5 text-indigo-400" />
-                              <span className="truncate max-w-xs">{meeting.link_reunion}</span>
-                              <ExternalLink className="w-3 h-3 ml-0.5 shrink-0" />
-                            </a>
-                          </div>
-                        )}
-
-                        {meeting.notas && (
-                          <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs text-[#879391] leading-relaxed">
-                            <span className="text-[10px] uppercase font-bold text-white/40 block mb-0.5">Notas de la sesión:</span>
-                            <p className="whitespace-pre-wrap">{meeting.notas}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-4 border-t border-white/5">
+                    <p className="text-[11px] text-[#879391] italic">
+                      No se registra historial previo de transiciones para esta postulación.
+                    </p>
                   </div>
                 )}
-              </>
-            );
-          })()}
-        </section>
-
-        {/* ── Metadata & SLA Timeline Section ── */}
-        {activePipelineItem && (
-          <section className="glass-panel p-5 rounded-2xl border border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" />
-                Línea de Tiempo & Metadatos del Pipeline de Cierre
-              </span>
-              <span className="text-[10px] text-[#879391] font-mono">
-                Actualizado: {new Date(activePipelineItem.updatedAt || Date.now()).toLocaleString("es-ES")}
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                <span className="text-[9px] text-[#879391] font-bold uppercase block">ID Búsqueda Asignada</span>
-                <span className="font-mono text-white font-bold">{activePipelineItem.claves_conexion?.id_busqueda}</span>
-              </div>
-
-              <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                <span className="text-[9px] text-[#879391] font-bold uppercase block">ID Registro Pipeline</span>
-                <span className="font-mono text-[#6bd8cb] font-bold">{activePipelineItem.id}</span>
-              </div>
-
-              <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                <span className="text-[9px] text-[#879391] font-bold uppercase block">Fecha de Cierre / Modificación</span>
-                <span className="font-mono text-emerald-400 font-bold">
-                  {cand.closedDate ? new Date(cand.closedDate).toLocaleDateString("es-ES") : "En Negociación Activa"}
-                </span>
-              </div>
-            </div>
-
-            {/* SLA History Steps */}
-            {activePipelineItem.flujo?.historial_estados && activePipelineItem.flujo.historial_estados.length > 0 && (
-              <div className="pt-2">
-                <span className="text-[9px] text-[#879391] font-bold uppercase block mb-2">Historial de Transiciones</span>
-                <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                  {activePipelineItem.flujo.historial_estados.map((h, i) => (
-                    <div key={i} className="flex items-center gap-2 shrink-0">
-                      <span className="px-2 py-0.5 rounded bg-white/5 text-[9.5px] font-mono text-[#c4c1fb] border border-white/10">
-                        {h.estado} ({new Date(h.timestamp).toLocaleDateString("es-ES")})
-                      </span>
-                      {i < (activePipelineItem.flujo.historial_estados?.length || 0) - 1 && (
-                        <ChevronRight className="w-3 h-3 text-white/20 shrink-0" />
-                      )}
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
-          </section>
-        )}
 
-        {/* ── Recruiter Notes Section across Pipeline Stages ── */}
-        <section className="glass-panel p-6 rounded-3xl border border-white/10 space-y-4">
-          <div className="flex justify-between items-center pb-3 border-b border-white/10">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <FileText className="w-4 h-4 text-emerald-400" />
-              Historial de Anotaciones del Expediente Completo
-            </h3>
-            
-            {isEditingNotes ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsEditingNotes(false)}
-                  className="px-3 py-1.5 rounded-xl border border-white/10 text-xs text-[#879391] hover:text-white hover:bg-white/5 transition-all cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSaveNotes}
-                  disabled={isSavingNotes}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
-                >
-                  {isSavingNotes ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Save className="w-3.5 h-3.5" />
-                  )}
-                  <span>Guardar Historial</span>
-                </button>
+            {/* ── Score visual ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 text-center space-y-3">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-white/30 block">Fit Score F4</span>
+              <div className="relative inline-flex items-center justify-center w-24 h-24 mx-auto">
+                <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+                  <circle
+                    cx="48" cy="48" r="40"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 40}`}
+                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - cand.score / 100)}`}
+                    className="transition-all duration-700"
+                  />
+                </svg>
+                <span className="absolute text-xl font-black text-emerald-400 font-mono">{cand.score}%</span>
               </div>
-            ) : (
-              <button
-                onClick={() => setIsEditingNotes(true)}
-                className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Edit2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Editar Anotaciones</span>
-              </button>
-            )}
+              <div className="flex items-center justify-center gap-1.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`w-3.5 h-3.5 ${i < Math.round(cand.score / 20) ? "text-amber-400 fill-amber-400" : "text-white/10"}`}
+                  />
+                ))}
+              </div>
+              <p className="text-[10px] text-[#879391]">
+                {cand.score >= 85 ? "Candidato de alta prioridad de contratación" : cand.score >= 70 ? "Candidato apto — negociación final" : "Candidato en fase de cierre"}
+              </p>
+            </div>
+
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs">
-            {/* Notes 1: Initial */}
-            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-              <span className="text-[9.5px] font-bold text-[#879391] uppercase tracking-wider block">Notas Origen</span>
-              {isEditingNotes ? (
-                <textarea
-                  value={editInitialNotes}
-                  onChange={(e) => setEditInitialNotes(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#101415] border border-white/15 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-emerald-400 font-sans resize-none"
-                  placeholder="Sin notas..."
-                />
-              ) : (
-                <p className="text-[#e0e3e5] leading-relaxed italic text-[11px]">
-                  {cand.initialNotes || editInitialNotes || "Sin anotaciones."}
-                </p>
-              )}
-            </div>
-
-            {/* Notes 2: F1 Sourcing */}
-            <div className="p-3.5 rounded-2xl bg-cyan-500/5 border border-cyan-500/15 space-y-2">
-              <span className="text-[9.5px] font-bold text-cyan-400 uppercase tracking-wider block">Notas F1</span>
-              {isEditingNotes ? (
-                <textarea
-                  value={editF1Notes}
-                  onChange={(e) => setEditF1Notes(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#101415] border border-cyan-500/30 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-cyan-400 font-sans resize-none"
-                  placeholder="Sin notas de F1..."
-                />
-              ) : (
-                <p className="text-cyan-100 leading-relaxed italic text-[11px]">
-                  {cand.f1Notes || editF1Notes || "Sin anotaciones en F1."}
-                </p>
-              )}
-            </div>
-
-            {/* Notes 3: F2 Evaluación */}
-            <div className="p-3.5 rounded-2xl bg-purple-500/5 border border-purple-500/15 space-y-2">
-              <span className="text-[9.5px] font-bold text-purple-400 uppercase tracking-wider block">Notas F2</span>
-              {isEditingNotes ? (
-                <textarea
-                  value={editF2Notes}
-                  onChange={(e) => setEditF2Notes(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#101415] border border-purple-500/30 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-400 font-sans resize-none"
-                  placeholder="Sin notas de F2..."
-                />
-              ) : (
-                <p className="text-purple-100 leading-relaxed italic text-[11px]">
-                  {cand.f2Notes || editF2Notes || "Sin anotaciones en F2."}
-                </p>
-              )}
-            </div>
-
-            {/* Notes 4: F3 Presentación Cliente */}
-            <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/15 space-y-2">
-              <span className="text-[9.5px] font-bold text-amber-400 uppercase tracking-wider block">Notas F3</span>
-              {isEditingNotes ? (
-                <textarea
-                  value={editF3Notes}
-                  onChange={(e) => setEditF3Notes(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#101415] border border-amber-500/30 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-amber-400 font-sans resize-none"
-                  placeholder="Notas F3..."
-                />
-              ) : (
-                <p className="text-amber-100 leading-relaxed italic text-[11px]">
-                  {cand.f3Notes || editF3Notes || "Sin anotaciones en F3."}
-                </p>
-              )}
-            </div>
-
-            {/* Notes 5: F4 Cierre */}
-            <div className="p-3.5 rounded-2xl bg-emerald-500/5 border border-emerald-500/15 space-y-2">
-              <span className="text-[9.5px] font-bold text-emerald-400 uppercase tracking-wider block">Notas F4 Cierre</span>
-              {isEditingNotes ? (
-                <textarea
-                  value={editF4Notes}
-                  onChange={(e) => setEditF4Notes(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#101415] border border-emerald-500/30 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-emerald-400 font-sans resize-none"
-                  placeholder="Notas de negociación de oferta..."
-                />
-              ) : (
-                <p className="text-emerald-100 leading-relaxed italic text-[11px]">
-                  {cand.f4Notes || editF4Notes || "Sin observaciones registradas en negociación de cierre."}
-                </p>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Closure Facilities & Operational AI Tools Tabbed Navigation ── */}
-        <section className="glass-panel p-6 rounded-3xl border border-white/10 space-y-6">
-          
-          {/* Tab Selector Buttons */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/10">
-            <button
-              onClick={() => setActiveTab("motor")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "motor"
-                  ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>Motor Predictivo</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("simulador")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "simulador"
-                  ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <DollarSign className="w-3.5 h-3.5" />
-              <span>Simulador Salarial</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("contratos")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "contratos"
-                  ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <FileCheck className="w-3.5 h-3.5" />
-              <span>Generador Contratos</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("feedback")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "feedback"
-                  ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <HeartHandshake className="w-3.5 h-3.5" />
-              <span>Feedback Empatía</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("onboarding")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "onboarding"
-                  ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Pre-Onboarding</span>
-            </button>
-          </div>
-
-          {/* TAB 1: Motor Predictivo */}
-          {activeTab === "motor" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Motor Predictivo de Aceptación de Ofertas</h4>
-                  <p className="text-[10px] text-[#879391]">Inferencia por machine learning sobre probabilidad de firma de propuesta económica</p>
-                </div>
-                <button
-                  onClick={runPredictiveEngine}
-                  disabled={isSimulatingMotor}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
-                >
-                  {isSimulatingMotor ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <TrendingUp className="w-3.5 h-3.5" />
-                  )}
-                  <span>Recalcular Motor Predictivo</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Probabilidad Ajustada de Aceptación</span>
-                  <span className="text-3xl font-black text-emerald-400">{cand.toolsDetails.predictiveMotor.adjustedProbability}%</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-bold block w-fit">
-                    Alta certidumbre de cierre
-                  </span>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Factores de Riesgo / Oportunidad</span>
-                  <ul className="space-y-1">
-                    {cand.toolsDetails.predictiveMotor.riskFactors.map((r, idx) => (
-                      <li key={idx} className="flex items-center gap-1.5 text-[#e0e3e5]">
-                        <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                        <span>{r}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: Simulador Salarial */}
-          {activeTab === "simulador" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Simulador Salarial & Paquete de Compensación</h4>
-                  <p className="text-[10px] text-[#879391]">Modelado interactivo de salario fijo, variable y beneficios monetizados</p>
-                </div>
-                <button
-                  onClick={recalculateOfferSimulator}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
-                >
-                  <DollarSign className="w-3.5 h-3.5" />
-                  <span>Aplicar Cambios en Oferta</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Salario Fijo Bruto Anual (€)</span>
-                  <input
-                    type="number"
-                    value={simBaseSalary}
-                    onChange={(e) => setSimBaseSalary(Number(e.target.value))}
-                    className="w-full bg-[#101415] border border-white/15 rounded-xl p-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Bonus Variable Anual (€)</span>
-                  <input
-                    type="number"
-                    value={simBonusAnnual}
-                    onChange={(e) => setSimBonusAnnual(Number(e.target.value))}
-                    className="w-full bg-[#101415] border border-white/15 rounded-xl p-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Beneficios Monetizados (€)</span>
-                  <input
-                    type="number"
-                    value={simBenefitsValue}
-                    onChange={(e) => setSimBenefitsValue(Number(e.target.value))}
-                    className="w-full bg-[#101415] border border-white/15 rounded-xl p-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 flex justify-between items-center">
-                <span>Compensación Total Estimada (OTE):</span>
-                <span className="text-xl font-black font-mono">{totalComp.toLocaleString("es-ES")} € / año</span>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: Generador de Contratos */}
-          {activeTab === "contratos" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Generador de Cartas Oferta y Contratos por IA</h4>
-                  <p className="text-[10px] text-[#879391]">Generación automática de propuesta legal estructurada</p>
-                </div>
-                <button
-                  onClick={generateDraftContract}
-                  disabled={isSimulatingContractGen}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
-                >
-                  {isSimulatingContractGen ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <FileCheck className="w-3.5 h-3.5" />
-                  )}
-                  <span>Generar Carta Oferta IA</span>
-                </button>
-              </div>
-
-              {cand.toolsDetails.contractGenerator.generated ? (
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Documento Listo</span>
-                    <a
-                      href={cand.toolsDetails.contractGenerator.documentUrl || "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[10px] flex items-center gap-1"
-                    >
-                      <Copy className="w-3 h-3" />
-                      <span>Descargar Borrador PDF</span>
-                    </a>
-                  </div>
-                  <p className="text-[#e0e3e5] leading-relaxed font-mono">
-                    {`CARTA OFERTA DE EMPLEO DE ${cand.client.toUpperCase()}\nPosición: ${cand.role}\nCompensación Total: ${totalComp.toLocaleString("es-ES")} € / año\nTipo Contrato: ${cand.toolsDetails.contractGenerator.contractType}\nFecha Incorporación: ${cand.toolsDetails.contractGenerator.startDate}`}
-                  </p>
-                </div>
-              ) : (
-                <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-[#879391]">
-                  Aún no se ha redactado la carta oferta. Haz clic en el botón superior para generarla.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 4: Feedback Empatía */}
-          {activeTab === "feedback" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Generador de Feedback Empático por IA</h4>
-                  <p className="text-[10px] text-[#879391]">Comunicaciones empáticas para candidatos no seleccionados o bajas</p>
-                </div>
-                <button
-                  onClick={generateEmpathyFeedback}
-                  disabled={isSimulatingFeedbackGen}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
-                >
-                  {isSimulatingFeedbackGen ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <HeartHandshake className="w-3.5 h-3.5" />
-                  )}
-                  <span>Redactar Feedback Empático</span>
-                </button>
-              </div>
-
-              {cand.toolsDetails.feedbackWriter.generatedFeedback ? (
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Mensaje Preparado</span>
-                    <button
-                      onClick={() => handleCopyText(cand.toolsDetails.feedbackWriter.generatedFeedback, "feedback")}
-                      className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-white text-[10px] flex items-center gap-1 cursor-pointer"
-                    >
-                      <Copy className="w-3 h-3 text-emerald-400" />
-                      <span>{copiedTextType === "feedback" ? "¡Copiado!" : "Copiar Feedback"}</span>
-                    </button>
-                  </div>
-                  <p className="text-[#e0e3e5] leading-relaxed whitespace-pre-line">
-                    {cand.toolsDetails.feedbackWriter.generatedFeedback}
-                  </p>
-                </div>
-              ) : (
-                <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-[#879391]">
-                  Sin mensaje redactado aún. Haz clic en el botón superior para compilar el texto de devolución empática.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 5: Pre-Onboarding */}
-          {activeTab === "onboarding" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Cadencias de Pre-Onboarding Automatizadas</h4>
-                  <p className="text-[10px] text-[#879391]">Mantén el enganche del candidato contratado entre la firma y el primer día laboral</p>
-                </div>
-                <button
-                  onClick={triggerPreOnboardingCadence}
-                  disabled={isSimulatingPreOnboarding}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-500/20"
-                >
-                  {isSimulatingPreOnboarding ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5" />
-                  )}
-                  <span>Iniciar Cadencia Pre-Onboarding</span>
-                </button>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Riesgo de Ghosting / Deserción:</span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Riesgo {cand.toolsDetails.preOnboard.ghostingRisk}
-                  </span>
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  {cand.toolsDetails.preOnboard.cadenceSteps.map((step, idx) => (
-                    <div key={idx} className="p-3 rounded-xl bg-black/40 border border-white/5 flex justify-between items-center text-xs">
-                      <div>
-                        <span className="text-emerald-400 font-bold font-mono text-[10px] block">{step.day}</span>
-                        <span className="text-[#e0e3e5] font-bold">{step.title}</span>
-                      </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                        step.status === "sent" ? "bg-emerald-500/10 text-emerald-400" : "bg-white/5 text-[#879391]"
-                      }`}>
-                        {step.status === "sent" ? "Enviado" : "Programado"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-        </section>
+        </div>
 
       </div>
 
@@ -1621,6 +1806,7 @@ export default function CierreDetallePage() {
           </div>
         </div>
       )}
+
       {/* --- MODAL CREAR / EDITAR REUNIÓN --- */}
       {isMeetingModalOpen && (
         <div className="fixed inset-0 bg-[#101415]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1757,6 +1943,6 @@ export default function CierreDetallePage() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

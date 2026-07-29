@@ -1,17 +1,30 @@
 'use client';
 
 import React, { useState, useTransition, useEffect } from "react";
-import { Info, CheckCircle2, AlertCircle } from "lucide-react";
+import { Info, CheckCircle2, AlertCircle, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { crearBusquedaAPI, actualizarBusquedaAPI, Busqueda } from "@/actions/busquedas";
+import { CriterioScreening } from "@/types/screening";
 
 interface SearchFormProps {
   onSuccess: (data: any) => void;
   onClose: () => void;
   onSubmittingChange: (isSubmitting: boolean) => void;
   initialData?: Busqueda;
+  showSubmitButton?: boolean;
+  submitButtonText?: string;
+  layoutTwoColumns?: boolean;
 }
 
-export default function SearchForm({ onSuccess, onClose, onSubmittingChange, initialData }: SearchFormProps) {
+export default function SearchForm({ 
+  onSuccess, 
+  onClose, 
+  onSubmittingChange, 
+  initialData,
+  showSubmitButton = false,
+  submitButtonText = "Guardar Búsqueda",
+  layoutTwoColumns
+}: SearchFormProps) {
+  const isTwoColumns = layoutTwoColumns ?? showSubmitButton;
   // 6 Identity fields state + estadoFase
   const [cliente, setCliente] = useState("");
   const [perfilBusqueda, setPerfilBusqueda] = useState("");
@@ -30,6 +43,7 @@ export default function SearchForm({ onSuccess, onClose, onSubmittingChange, ini
   const [presupuestoMax, setPresupuestoMax] = useState("");
   const [prioridad, setPrioridad] = useState("Normal");
   const [linkJobDescription, setLinkJobDescription] = useState("");
+  const [criteriosScreening, setCriteriosScreening] = useState<CriterioScreening[]>([]);
 
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: "success" | "warning" | "error"; message: string } | null>(null);
@@ -60,6 +74,12 @@ export default function SearchForm({ onSuccess, onClose, onSubmittingChange, ini
       setPresupuestoMax(initialData.presupuesto_max || "");
       setPrioridad(initialData.prioridad || "Normal");
       setLinkJobDescription(initialData.link_job_description || "");
+      
+      const incomingCriterios = (Array.isArray(initialData.criterios_screening) && initialData.criterios_screening.length > 0)
+        ? initialData.criterios_screening
+        : (Array.isArray((initialData as any).criterios) ? (initialData as any).criterios : (Array.isArray(initialData.criterios_screening) ? initialData.criterios_screening : []));
+
+      setCriteriosScreening(incomingCriterios);
     } else {
       setCliente("");
       setPerfilBusqueda("");
@@ -77,6 +97,7 @@ export default function SearchForm({ onSuccess, onClose, onSubmittingChange, ini
       setPresupuestoMax("");
       setPrioridad("Normal");
       setLinkJobDescription("");
+      setCriteriosScreening([]);
     }
     setFeedback(null);
   }, [initialData]);
@@ -85,6 +106,38 @@ export default function SearchForm({ onSuccess, onClose, onSubmittingChange, ini
   useEffect(() => {
     onSubmittingChange(isPending);
   }, [isPending, onSubmittingChange]);
+
+  const handleAddCriterio = () => {
+    if (criteriosScreening.length >= 5) return;
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `crit_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    setCriteriosScreening(prev => [
+      ...prev,
+      { id: newId, pregunta: "", tipo: "deseable", peso: 20 }
+    ]);
+  };
+
+  const handleUpdateCriterio = (index: number, updatedField: Partial<CriterioScreening>) => {
+    setCriteriosScreening(prev => {
+      const copy = [...prev];
+      const current = copy[index];
+      if (!current) return prev;
+      const nuevoTipo = updatedField.tipo !== undefined ? updatedField.tipo : current.tipo;
+      const nuevoPeso = nuevoTipo === "knockout" ? 0 : (updatedField.peso !== undefined ? updatedField.peso : (current.tipo === "knockout" ? 20 : current.peso));
+      
+      copy[index] = {
+        ...current,
+        ...updatedField,
+        id: current.id, // Preservar UUID original
+        tipo: nuevoTipo,
+        peso: nuevoPeso
+      };
+      return copy;
+    });
+  };
+
+  const handleRemoveCriterio = (index: number) => {
+    setCriteriosScreening(prev => prev.filter((_, idx) => idx !== index));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,7 +169,11 @@ export default function SearchForm({ onSuccess, onClose, onSubmittingChange, ini
       modalidad,
       presupuesto_max: presupuestoMax.trim(),
       prioridad,
-      link_job_description: linkJobDescription.trim()
+      link_job_description: linkJobDescription.trim(),
+      criterios_screening: criteriosScreening.map(c => ({
+        ...c,
+        peso: c.tipo === "knockout" ? 0 : Number(c.peso || 0)
+      }))
     };
 
     startTransition(async () => {
@@ -169,280 +226,385 @@ export default function SearchForm({ onSuccess, onClose, onSubmittingChange, ini
       onSubmit={handleSubmit}
       className="space-y-6"
     >
-      {/* Informative helper banner */}
-      <div className="flex gap-2.5 p-3 rounded-xl border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 text-xs text-[#6bd8cb]">
-        <Info className="w-5 h-5 shrink-0" />
-        <p className="leading-relaxed">
-          {initialData 
-            ? "Modo de edición activado. Solo se permite actualizar el Estado de Fase y la Prioridad debido a políticas analíticas del backend."
-            : "Estructure la ficha técnica del proceso. Al guardar, se creará el registro jerárquico correspondiente."
-          }
-        </p>
-      </div>
-
-      {/* BLOQUE 1: IDENTIFICACIÓN */}
-      <div className="space-y-4 pt-2 border-t border-white/10">
-        <h3 className="text-[11px] font-bold text-[#6bd8cb] tracking-wider uppercase">
-          1. Identificación
-        </h3>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Código Búsqueda
-            </label>
-            <input
-              type="text"
-              value={idBusqueda}
-              onChange={(e) => setIdBusqueda(e.target.value)}
-              placeholder="Ej. REQ-MOCK-001"
-              disabled={isPending || !!initialData}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-            />
+      <div className={isTwoColumns ? "grid grid-cols-1 lg:grid-cols-12 gap-8 items-start" : "space-y-6"}>
+        {/* LEFT COLUMN: Wider (col-span-7) - Sections 1 to 4 */}
+        <div className={isTwoColumns ? "lg:col-span-7 space-y-6" : "space-y-6"}>
+          {/* Informative helper banner */}
+          <div className="flex gap-2.5 p-3 rounded-xl border border-[#6bd8cb]/20 bg-[#6bd8cb]/5 text-xs text-[#6bd8cb]">
+            <Info className="w-5 h-5 shrink-0" />
+            <p className="leading-relaxed">
+              {initialData 
+                ? "Modo de edición activado. Puede actualizar el Estado de Fase, Prioridad, Responsables, Skills, Nivel de Inglés, Modalidad, Presupuesto y Criterios de Screening."
+                : "Estructure la ficha técnica del proceso. Al guardar, se creará el registro jerárquico correspondiente."
+              }
+            </p>
           </div>
 
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              CLIENTE <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={cliente}
-              onChange={(e) => setCliente(e.target.value)}
-              placeholder="Nombre del cliente"
-              disabled={isPending || !!initialData}
-              required
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-            />
+          {/* BLOQUE 1: IDENTIFICACIÓN */}
+          <div className="space-y-4 pt-2 border-t border-white/10">
+            <h3 className="text-[11px] font-bold text-[#6bd8cb] tracking-wider uppercase">
+              1. Identificación
+            </h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Código Búsqueda
+                </label>
+                <input
+                  type="text"
+                  value={idBusqueda}
+                  onChange={(e) => setIdBusqueda(e.target.value)}
+                  placeholder="Ej. REQ-MOCK-001"
+                  disabled={isPending || !!initialData}
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  CLIENTE <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={cliente}
+                  onChange={(e) => setCliente(e.target.value)}
+                  placeholder="Nombre del cliente"
+                  disabled={isPending || !!initialData}
+                  required
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Responsable Operativo <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={responsableOperativo}
+                  onChange={(e) => setResponsableOperativo(e.target.value)}
+                  placeholder="Ej. Edith Medina"
+                  disabled={isPending}
+                  required
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Fecha Apertura <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={fechaInicioObjetivo}
+                  onChange={(e) => setFechaInicioObjetivo(e.target.value)}
+                  disabled={isPending || !!initialData}
+                  required
+                  style={{ colorScheme: "dark" }}
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all cursor-pointer font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* BLOQUE 2: PERFIL TÉCNICO */}
+          <div className="space-y-4 pt-4 border-t border-white/10">
+            <h3 className="text-[11px] font-bold text-[#6bd8cb] tracking-wider uppercase">
+              2. Perfil Técnico
+            </h3>
+
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                Rol/Puesto Solicitado <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={perfilBusqueda}
+                onChange={(e) => setPerfilBusqueda(e.target.value)}
+                placeholder="Ej. Cloud Security Expert"
+                disabled={isPending || !!initialData}
+                required
+                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Seniority
+                </label>
+                <input
+                  type="text"
+                  value={seniority}
+                  onChange={(e) => setSeniority(e.target.value)}
+                  placeholder="Ej. Senior, Lead"
+                  disabled={isPending || !!initialData}
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Nivel Inglés Req.
+                </label>
+                <input
+                  type="text"
+                  value={nivelInglesReq}
+                  onChange={(e) => setNivelInglesReq(e.target.value)}
+                  placeholder="Ej. B2 Conversacional"
+                  disabled={isPending}
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                Skills Excluyentes (separadas por comas)
+              </label>
+              <input
+                type="text"
+                value={skillsExcluyentes}
+                onChange={(e) => setSkillsExcluyentes(e.target.value)}
+                placeholder="Ej. Node.js, Jest, GCP"
+                disabled={isPending}
+                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+              />
+            </div>
+
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                Skills Deseables (separadas por comas)
+              </label>
+              <input
+                type="text"
+                value={skillsDeseables}
+                onChange={(e) => setSkillsDeseables(e.target.value)}
+                placeholder="Ej. AWS, Docker, Kubernetes"
+                disabled={isPending}
+                className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+              />
+            </div>
+          </div>
+
+          {/* BLOQUE 3: CONDICIONES */}
+          <div className="space-y-4 pt-4 border-t border-white/10">
+            <h3 className="text-[11px] font-bold text-[#6bd8cb] tracking-wider uppercase">
+              3. Condiciones de Contratación
+            </h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Modalidad
+                </label>
+                <select
+                  value={modalidad}
+                  onChange={(e) => setModalidad(e.target.value)}
+                  disabled={isPending}
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all cursor-pointer font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+                >
+                  <option value="Remoto" className="bg-[#15181a] text-white">Remoto</option>
+                  <option value="Híbrido" className="bg-[#15181a] text-white">Híbrido</option>
+                  <option value="Presencial" className="bg-[#15181a] text-white">Presencial</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Responsable Validación <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={responsableValidacion}
+                  onChange={(e) => setResponsableValidacion(e.target.value)}
+                  placeholder="Ej. Celeste"
+                  disabled={isPending || !!initialData}
+                  required
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* BLOQUE 4: ESTADO Y SLA */}
+          <div className="space-y-4 pt-4 border-t border-white/10 pb-2">
+            <h3 className="text-[11px] font-bold text-[#6bd8cb] tracking-wider uppercase">
+              4. Estado y SLA
+            </h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Estado de Fase
+                </label>
+                <select
+                  value={estadoFase}
+                  onChange={(e) => setEstadoFase(e.target.value)}
+                  disabled={isPending}
+                  required
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all cursor-pointer font-medium disabled:opacity-50"
+                >
+                  <option value="Abierta" className="bg-[#15181a] text-white">Abierta</option>
+                  <option value="Pausada" className="bg-[#15181a] text-white">Pausada</option>
+                  <option value="Cerrada" className="bg-[#15181a] text-white">Cerrada</option>
+                  <option value="preparacion_previa" className="bg-[#15181a] text-white">Preparación Previa</option>
+                  <option value="evaluacion_tecnica" className="bg-[#15181a] text-white">Evaluación Técnica</option>
+                  <option value="revision_cliente" className="bg-[#15181a] text-white">Revisión de Cliente</option>
+                  <option value="oferta_cierre" className="bg-[#15181a] text-white">Oferta & Cierre</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Prioridad <span className="text-[#6bd8cb]">*</span>
+                </label>
+                <select
+                  value={prioridad}
+                  onChange={(e) => setPrioridad(e.target.value)}
+                  disabled={isPending}
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all cursor-pointer font-medium disabled:opacity-50"
+                >
+                  <option value="Baja" className="bg-[#15181a] text-white">Baja</option>
+                  <option value="Normal" className="bg-[#15181a] text-white">Normal</option>
+                  <option value="Alta" className="bg-[#15181a] text-white">Alta</option>
+                  <option value="Crítica" className="bg-[#15181a] text-white">Crítica</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Presupuesto Máx.
+                </label>
+                <input
+                  type="text"
+                  value={presupuestoMax}
+                  onChange={(e) => setPresupuestoMax(e.target.value)}
+                  placeholder="Ej. 60K EUR"
+                  disabled={isPending}
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
+                  Link Job Description
+                </label>
+                <input
+                  type="url"
+                  value={linkJobDescription}
+                  onChange={(e) => setLinkJobDescription(e.target.value)}
+                  placeholder="Ej. https://docs.google.com/..."
+                  disabled={isPending}
+                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Responsable Operativo <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={responsableOperativo}
-              onChange={(e) => setResponsableOperativo(e.target.value)}
-              placeholder="Ej. Edith Medina"
-              disabled={isPending || !!initialData}
-              required
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-            />
-          </div>
+        {/* RIGHT COLUMN: Narrower (col-span-5) - Section 5 (Criterios de Screening) */}
+        <div className={isTwoColumns ? "lg:col-span-5 space-y-6" : "space-y-6"}>
+          {/* BLOQUE 5: CRITERIOS DE SCREENING (IA CHECKLIST - MÁX 5) */}
+          <div className="space-y-4 pt-2 border-t lg:border-t-0 border-white/10 pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-[11px] font-bold text-[#6bd8cb] tracking-wider uppercase">
+                  5. Criterios de Screening (Máximo 5)
+                </h3>
+                <p className="text-[10px] text-[#879391] mt-0.5">
+                  Defina las preguntas de descarte o evaluación ponderada para la IA (Gemini 2.5 Flash).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddCriterio}
+                disabled={isPending || criteriosScreening.length >= 5}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-[#6bd8cb]/10 text-[#6bd8cb] border border-[#6bd8cb]/20 hover:bg-[#6bd8cb]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Agregar ({criteriosScreening.length}/5)</span>
+              </button>
+            </div>
 
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Fecha Apertura <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="date"
-              value={fechaInicioObjetivo}
-              onChange={(e) => setFechaInicioObjetivo(e.target.value)}
-              disabled={isPending || !!initialData}
-              required
-              style={{ colorScheme: "dark" }}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all cursor-pointer font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-            />
-          </div>
-        </div>
-      </div>
+            {initialData && (
+              <div className="flex gap-2.5 p-3 rounded-xl border border-amber-500/20 bg-amber-500/10 text-xs text-amber-300">
+                <AlertTriangle className="w-5 h-5 shrink-0 text-amber-400" />
+                <p className="leading-relaxed">
+                  <strong>Atención:</strong> Al modificar los criterios de screening en esta búsqueda activa, los candidatos en el pipeline podrían requerir ser re-evaluados con IA para actualizar su semáforo.
+                </p>
+              </div>
+            )}
 
-      {/* BLOQUE 2: PERFIL TÉCNICO */}
-      <div className="space-y-4 pt-4 border-t border-white/10">
-        <h3 className="text-[11px] font-bold text-[#6bd8cb] tracking-wider uppercase">
-          2. Perfil Técnico
-        </h3>
+            {criteriosScreening.length === 0 ? (
+              <div className="p-4 rounded-xl border border-dashed border-white/10 text-center text-xs text-[#879391]">
+                No hay criterios de screening configurados. Haz clic en "Agregar" para agregar hasta 5 reglas.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {criteriosScreening.map((crit, idx) => (
+                  <div key={crit.id || idx} className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold text-[#c4c1fb]">Criterio #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCriterio(idx)}
+                        disabled={isPending}
+                        className="text-red-400 hover:text-red-300 text-xs p-1 rounded hover:bg-red-500/10 transition-all"
+                        title="Eliminar criterio"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
 
-        <div className="flex flex-col">
-          <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-            Rol/Puesto Solicitado <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="text"
-            value={perfilBusqueda}
-            onChange={(e) => setPerfilBusqueda(e.target.value)}
-            placeholder="Ej. Cloud Security Expert"
-            disabled={isPending || !!initialData}
-            required
-            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-          />
-        </div>
+                    <div className="flex flex-col">
+                      <label className="text-[10px] text-[#879391] mb-1">Pregunta / Condición a evaluar</label>
+                      <input
+                        type="text"
+                        value={crit.pregunta}
+                        onChange={(e) => handleUpdateCriterio(idx, { pregunta: e.target.value })}
+                        placeholder="Ej. ¿Tiene al menos 5 años de experiencia en logística?"
+                        disabled={isPending}
+                        className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391]"
+                      />
+                    </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Seniority
-            </label>
-            <input
-              type="text"
-              value={seniority}
-              onChange={(e) => setSeniority(e.target.value)}
-              placeholder="Ej. Senior, Lead"
-              disabled={isPending || !!initialData}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-            />
-          </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col">
+                        <label className="text-[10px] text-[#879391] mb-1">Tipo de Regla</label>
+                        <select
+                          value={crit.tipo}
+                          onChange={(e) => handleUpdateCriterio(idx, { tipo: e.target.value as "knockout" | "deseable" })}
+                          disabled={isPending}
+                          className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all cursor-pointer"
+                        >
+                          <option value="deseable" className="bg-[#15181a]">Deseable (Ponderado)</option>
+                          <option value="knockout" className="bg-[#15181a]">Knockout (Excluyente)</option>
+                        </select>
+                      </div>
 
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Nivel Inglés Req.
-            </label>
-            <input
-              type="text"
-              value={nivelInglesReq}
-              onChange={(e) => setNivelInglesReq(e.target.value)}
-              placeholder="Ej. B2 Conversacional"
-              disabled={isPending || !!initialData}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col">
-          <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-            Skills Excluyentes (separadas por comas)
-          </label>
-          <input
-            type="text"
-            value={skillsExcluyentes}
-            onChange={(e) => setSkillsExcluyentes(e.target.value)}
-            placeholder="Ej. Node.js, Jest, GCP"
-            disabled={isPending || !!initialData}
-            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-          />
-        </div>
-
-        <div className="flex flex-col">
-          <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-            Skills Deseables (separadas por comas)
-          </label>
-          <input
-            type="text"
-            value={skillsDeseables}
-            onChange={(e) => setSkillsDeseables(e.target.value)}
-            placeholder="Ej. AWS, Docker, Kubernetes"
-            disabled={isPending || !!initialData}
-            className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-          />
-        </div>
-      </div>
-
-      {/* BLOQUE 3: CONDICIONES */}
-      <div className="space-y-4 pt-4 border-t border-white/10">
-        <h3 className="text-[11px] font-bold text-[#6bd8cb] tracking-wider uppercase">
-          3. Condiciones de Contratación
-        </h3>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Modalidad
-            </label>
-            <select
-              value={modalidad}
-              onChange={(e) => setModalidad(e.target.value)}
-              disabled={isPending || !!initialData}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all cursor-pointer font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-            >
-              <option value="Remoto" className="bg-[#15181a] text-white">Remoto</option>
-              <option value="Híbrido" className="bg-[#15181a] text-white">Híbrido</option>
-              <option value="Presencial" className="bg-[#15181a] text-white">Presencial</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Responsable Validación <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={responsableValidacion}
-              onChange={(e) => setResponsableValidacion(e.target.value)}
-              placeholder="Ej. Celeste"
-              disabled={isPending || !!initialData}
-              required
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* BLOQUE 4: ESTADO Y SLA */}
-      <div className="space-y-4 pt-4 border-t border-white/10 pb-2">
-        <h3 className="text-[11px] font-bold text-[#6bd8cb] tracking-wider uppercase">
-          4. Estado y SLA
-        </h3>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Estado de Fase
-            </label>
-            <select
-              value={estadoFase}
-              onChange={(e) => setEstadoFase(e.target.value)}
-              disabled={isPending}
-              required
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all cursor-pointer font-medium disabled:opacity-50"
-            >
-              <option value="Abierta" className="bg-[#15181a] text-white">Abierta</option>
-              <option value="Pausada" className="bg-[#15181a] text-white">Pausada</option>
-              <option value="Cerrada" className="bg-[#15181a] text-white">Cerrada</option>
-              <option value="preparacion_previa" className="bg-[#15181a] text-white">Preparación Previa</option>
-              <option value="evaluacion_tecnica" className="bg-[#15181a] text-white">Evaluación Técnica</option>
-              <option value="revision_cliente" className="bg-[#15181a] text-white">Revisión de Cliente</option>
-              <option value="oferta_cierre" className="bg-[#15181a] text-white">Oferta & Cierre</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Prioridad <span className="text-[#6bd8cb]">*</span>
-            </label>
-            <select
-              value={prioridad}
-              onChange={(e) => setPrioridad(e.target.value)}
-              disabled={isPending}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all cursor-pointer font-medium disabled:opacity-50"
-            >
-              <option value="Baja" className="bg-[#15181a] text-white">Baja</option>
-              <option value="Normal" className="bg-[#15181a] text-white">Normal</option>
-              <option value="Alta" className="bg-[#15181a] text-white">Alta</option>
-              <option value="Crítica" className="bg-[#15181a] text-white">Crítica</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Presupuesto Máx.
-            </label>
-            <input
-              type="text"
-              value={presupuestoMax}
-              onChange={(e) => setPresupuestoMax(e.target.value)}
-              placeholder="Ej. 60K EUR"
-              disabled={isPending || !!initialData}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-[10px] font-bold text-[#c4c1fb] tracking-wider uppercase mb-1.5">
-              Link Job Description
-            </label>
-            <input
-              type="url"
-              value={linkJobDescription}
-              onChange={(e) => setLinkJobDescription(e.target.value)}
-              placeholder="Ej. https://docs.google.com/..."
-              disabled={isPending || !!initialData}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
-            />
+                      <div className="flex flex-col">
+                        <label className="text-[10px] text-[#879391] mb-1">Peso / Puntaje</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={crit.tipo === "knockout" ? 0 : crit.peso}
+                          onChange={(e) => handleUpdateCriterio(idx, { peso: parseInt(e.target.value) || 0 })}
+                          disabled={isPending || crit.tipo === "knockout"}
+                          className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all disabled:opacity-40"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -464,6 +626,34 @@ export default function SearchForm({ onSuccess, onClose, onSubmittingChange, ini
             <AlertCircle className="w-5 h-5 shrink-0" />
           )}
           <span>{feedback.message}</span>
+        </div>
+      )}
+
+      {/* Action buttons (when rendered in full page mode) */}
+      {showSubmitButton && (
+        <div className="flex items-center justify-end gap-3 pt-6 border-t border-white/10">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isPending}
+            className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-xs font-bold text-[#c4c1fb] hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer disabled:opacity-40"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={isPending}
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#0d9488] to-[#6bd8cb] text-[#101415] font-extrabold text-xs shadow-lg shadow-[#0d9488]/20 hover:brightness-110 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-40"
+          >
+            {isPending ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-[#101415] border-t-transparent rounded-full animate-spin"></div>
+                <span>Guardando...</span>
+              </>
+            ) : (
+              <span>{submitButtonText}</span>
+            )}
+          </button>
         </div>
       )}
 

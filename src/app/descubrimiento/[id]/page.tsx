@@ -41,8 +41,11 @@ import { getBusquedasAPI } from "@/actions/busquedas";
 import type { Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, actualizarCandidatoAPI } from "@/actions/candidatos";
 import type { Candidato } from "@/actions/candidatos";
-import { getPipelineAPI, actualizarPipelineAPI } from "@/actions/pipeline";
+import { getPipelineAPI, getPipelineItemAPI, actualizarPipelineAPI } from "@/actions/pipeline";
 import type { PipelineItem, Reunion } from "@/actions/pipeline";
+import ScreeningPanel from "@/app/components/ScreeningPanel";
+import EvaluarScreeningModal from "@/app/components/EvaluarScreeningModal";
+import type { CriterioScreening } from "@/types/screening";
 
 interface SourcedCandidate {
   id: string;
@@ -271,6 +274,9 @@ export default function SourcedCandidateDetailPage() {
   const [candidates, setCandidates] = useState<SourcedCandidate[]>([]);
   const [cand, setCand] = useState<SourcedCandidate | null>(null);
   const [activePipelineItem, setActivePipelineItem] = useState<PipelineItem | null>(null);
+  const [activeBusquedaObj, setActiveBusquedaObj] = useState<Busqueda | null>(null);
+  const [criteriosBusqueda, setCriteriosBusqueda] = useState<CriterioScreening[]>([]);
+  const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -573,28 +579,54 @@ export default function SourcedCandidateDetailPage() {
   }, [user, authLoading, router]);
 
   // Fetch real data from backend
-  const fetchBackendData = async () => {
+  const fetchBackendData = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       setError(null);
 
       // 1. Get active searches
       const searchRes = await getBusquedasAPI();
       let searchesList: Busqueda[] = Array.isArray(searchRes) ? searchRes : [];
 
-      // 2. Find this candidate's pipeline item in any of these searches using either pipeline ID or candidate ID
+      const activeBusqueda = searchesList.find(b => Array.isArray(b.criterios_screening) && b.criterios_screening.length > 0) || searchesList[0];
+      if (activeBusqueda) {
+        if (activeBusqueda.criterios_screening) {
+          setCriteriosBusqueda(activeBusqueda.criterios_screening);
+        }
+        setActiveBusquedaObj(activeBusqueda);
+      }
+
+      // 2. Direct pipeline item lookup by ID (e.g. /descubrimiento/6EDjceRl0vxbPbOvfRNH)
       let foundPipeItem: PipelineItem | undefined;
       let foundSearch: Busqueda | undefined;
 
-      if (searchesList.length > 0) {
-        const promises = searchesList.map(s => getPipelineAPI(s.id));
+      console.log(`🔍 [DIAGNÓSTICO SCREENING P-DIS-02] Consultando ID de URL: "${id}"`);
+      try {
+        const directRes = await getPipelineItemAPI(id);
+        if (directRes.success && directRes.data) {
+          const rawItem = Array.isArray(directRes.data) ? directRes.data[0] : directRes.data;
+          if (rawItem && (rawItem.id || rawItem.claves_conexion)) {
+            foundPipeItem = rawItem;
+            console.log(`🔍 [DIAGNÓSTICO SCREENING P-DIS-02] Pipeline encontrado por ID directo /pipeline/${id}:`, foundPipeItem);
+          }
+        }
+      } catch (err) {
+        console.warn("Direct pipeline lookup skipped:", err);
+      }
+
+      // Search loop fallback across searches
+      if (!foundPipeItem && searchesList.length > 0) {
+        const promises = searchesList.map(s => getPipelineAPI(s.id || (s as any).id_busqueda));
         const results = await Promise.all(promises);
         
-        // Search by pipeline ID first (url param id matches pipe item uuid)
         for (let i = 0; i < results.length; i++) {
           const res = results[i];
           if (res.success && Array.isArray(res.data)) {
-            const item = res.data.find(p => p.id === id);
+            const item = res.data.find(p => 
+              p.id === id || 
+              p.claves_conexion?.id_candidato === id ||
+              (p as any).id_candidato === id
+            );
             if (item) {
               foundPipeItem = item;
               foundSearch = searchesList[i];
@@ -602,20 +634,32 @@ export default function SourcedCandidateDetailPage() {
             }
           }
         }
+      }
 
-        // Fallback: search by candidate ID
-        if (!foundPipeItem) {
-          for (let i = 0; i < results.length; i++) {
-            const res = results[i];
-            if (res.success && Array.isArray(res.data)) {
-              const item = res.data.find(p => p.claves_conexion.id_candidato === id);
-              if (item) {
-                foundPipeItem = item;
-                foundSearch = searchesList[i];
-                break;
-              }
-            }
-          }
+      console.log(`🔍 [DIAGNÓSTICO SCREENING P-DIS-02] Pipeline Item Encontrado:`, foundPipeItem ? {
+        id: foundPipeItem.id,
+        id_busqueda: foundPipeItem.claves_conexion?.id_busqueda,
+        id_candidato: foundPipeItem.claves_conexion?.id_candidato,
+        fit_score_screening: foundPipeItem.fit_score_screening,
+        tiene_knockout: foundPipeItem.tiene_knockout,
+        fecha_modificacion_screening: foundPipeItem.fecha_modificacion_screening,
+        resultado_screening_count: foundPipeItem.resultado_screening?.length || 0,
+        resultado_screening_raw: foundPipeItem.resultado_screening
+      } : "NINGUNO (null/undefined)");
+
+      // Resolve specific search & criteria for this pipeline item
+      let resolvedSearch = foundSearch;
+      if (!resolvedSearch && foundPipeItem?.claves_conexion?.id_busqueda) {
+        resolvedSearch = searchesList.find(s => s.id === foundPipeItem?.claves_conexion?.id_busqueda);
+      }
+      if (!resolvedSearch) {
+        resolvedSearch = activeBusqueda;
+      }
+
+      if (resolvedSearch) {
+        setActiveBusquedaObj(resolvedSearch);
+        if (Array.isArray(resolvedSearch.criterios_screening) && resolvedSearch.criterios_screening.length > 0) {
+          setCriteriosBusqueda(resolvedSearch.criterios_screening);
         }
       }
 
@@ -632,8 +676,8 @@ export default function SourcedCandidateDetailPage() {
       const defaults = ["Headhunting", "LinkedIn", "Referido", "InfoJob", "Otros"];
       setExistingChannels(Array.from(new Set([...defaults, ...dbChannels])));
       
-      const candidateId = foundPipeItem ? foundPipeItem.claves_conexion.id_candidato : id;
-      const foundCandidate = candidatesList.find(c => c.id === candidateId);
+      const candidateId = foundPipeItem?.claves_conexion?.id_candidato || (foundPipeItem as any)?.id_candidato || id;
+      const foundCandidate = candidatesList.find(c => c.id === candidateId || c.id === id);
       
       if (!foundCandidate) {
         setCand(null);
@@ -643,7 +687,7 @@ export default function SourcedCandidateDetailPage() {
       }
 
       // Map to SourcedCandidate
-      const sourced = mapSinglePipelineToSourcedCandidate(foundPipeItem || null, foundCandidate, foundSearch);
+      const sourced = mapSinglePipelineToSourcedCandidate(foundPipeItem || null, foundCandidate, resolvedSearch);
       setCand(sourced);
       setActivePipelineItem(foundPipeItem || null);
       syncEditForm(sourced);
@@ -1964,6 +2008,50 @@ export default function SourcedCandidateDetailPage() {
 
           {/* Right Area: Interactive Actions Sidebar */}
           <div className="space-y-6">
+
+            {/* Screening Inteligente Panel (IA) */}
+            {(() => {
+              const resList = activePipelineItem?.resultado_screening || 
+                (activePipelineItem as any)?.resultadoScreening || 
+                (activePipelineItem as any)?.f1_descubrimiento?.resultado_screening || 
+                (cand as any)?.resultado_screening ||
+                [];
+
+              const effectiveCriterios = (criteriosBusqueda && criteriosBusqueda.length > 0)
+                ? criteriosBusqueda
+                : resList.map((r: any, idx: number) => ({
+                    id: r.id_criterio || `crit-${idx}`,
+                    pregunta: r.pregunta || `Criterio de Evaluación ${idx + 1}`,
+                    tipo: r.es_knockout ? "knockout" : "deseable",
+                    peso: r.puntaje_obtenido || 20
+                  }));
+
+              return (
+                <ScreeningPanel
+                  pipelineId={activePipelineItem?.id || cand?.pipeId || id}
+                  criteriosBusqueda={effectiveCriterios}
+                  resultadoScreening={resList}
+                  fitScore={
+                    activePipelineItem?.fit_score_screening ?? 
+                    (activePipelineItem as any)?.fit_score ??
+                    (activePipelineItem as any)?.f1_descubrimiento?.fit_score_screening ??
+                    0
+                  }
+                  tieneKnockout={
+                    activePipelineItem?.tiene_knockout ?? 
+                    (activePipelineItem as any)?.tieneKnockout ??
+                    (activePipelineItem as any)?.f1_descubrimiento?.tiene_knockout ??
+                    false
+                  }
+                  fechaModificacion={
+                    activePipelineItem?.fecha_modificacion_screening || 
+                    (activePipelineItem as any)?.fecha_modificacion ||
+                    (activePipelineItem as any)?.f1_descubrimiento?.fecha_modificacion_screening
+                  }
+                  onEvaluarClick={() => setIsEvalModalOpen(true)}
+                />
+              );
+            })()}
             
             {/* Semantic diagnostics and quick actions container */}
             <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-5 text-left">
@@ -2026,16 +2114,7 @@ export default function SourcedCandidateDetailPage() {
                     </button>
                   )}
 
-                  {cand.phase1State === "04_rechazado" && (
-                    <button
-                      onClick={() => handleTransitionState("01_nuevo")}
-                      title="A 01 - Nuevo en Revisión"
-                      className="px-3.5 py-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <ChevronsRight className="w-4 h-4 shrink-0" />
-                      <span>Avanzar estado</span>
-                    </button>
-                  )}
+
 
                   {/* Action: Transfer / Move beyond phase 1 (Disponible desde cualquier estado) */}
                   <button
@@ -2508,6 +2587,18 @@ export default function SourcedCandidateDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Inferencia IA de Screening */}
+      <EvaluarScreeningModal
+        isOpen={isEvalModalOpen}
+        onClose={() => setIsEvalModalOpen(false)}
+        pipelineId={activePipelineItem?.id || cand?.pipeId || id}
+        candidateName={cand?.name || ""}
+        busquedaName={activeBusquedaObj?.perfil_busqueda ? `${activeBusquedaObj.perfil_busqueda} (${activeBusquedaObj.cliente})` : (cand?.role || "Búsqueda activa")}
+        criteriosBusqueda={criteriosBusqueda}
+        hasCv={Boolean(cand?.url_cv)}
+        onSuccess={() => fetchBackendData(true)}
+      />
 
     </main>
   );

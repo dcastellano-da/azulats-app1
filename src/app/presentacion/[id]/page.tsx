@@ -40,11 +40,12 @@ import {
   Plus,
   Trash2,
   Video,
-  ExternalLink
+  ExternalLink,
+  HelpCircle
 } from "lucide-react";
 
 // Backend API Actions
-import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
+import { getBusquedasAPI } from "@/actions/busquedas";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, actualizarPipelineAPI, Reunion } from "@/actions/pipeline";
 import { 
@@ -651,9 +652,9 @@ export default function PresentacionDetallePage() {
 
   const getPhaseLabel = (phase: PresentacionCandidate["currentPhase"]) => {
     switch (phase) {
-      case "09_shortlist": return "09 - Shortlist / Enviado a Cliente";
-      case "10_entrevista_cliente": return "10 - Entrevista con Cliente";
-      case "11_standby": return "11 - Stand-by / Back-up";
+      case "09_shortlist": return "09 - Shortlist";
+      case "10_entrevista_cliente": return "10 - Entrevista Cliente";
+      case "11_standby": return "11 - Stand-by";
     }
   };
 
@@ -701,7 +702,7 @@ export default function PresentacionDetallePage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#101415] text-white p-6 md:p-8 space-y-8 overflow-x-hidden text-left">
+    <main className="min-h-screen bg-[#101415] text-[#e0e3e5] px-4 md:px-8 py-6 selection:bg-[#c4c1fb] selection:text-stone-900">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#161a1b] border border-amber-500/30 text-amber-300 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs animate-fadeIn">
@@ -710,46 +711,27 @@ export default function PresentacionDetallePage() {
         </div>
       )}
 
-      {/* Radial Background Glows */}
-      <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-amber-500/5 blur-[90px] pointer-events-none" />
-      <div className="absolute bottom-20 right-10 w-80 h-80 rounded-full bg-[#6bd8cb]/5 blur-[90px] pointer-events-none" />
+      <div className="max-w-6xl mx-auto space-y-6">
 
-      <div className="relative z-10 max-w-7xl mx-auto space-y-6">
+        {/* ── Breadcrumb Navigation ── */}
+        <div className="flex justify-between items-center pb-2 border-b border-white/5">
+          <Link
+            href="/presentacion"
+            className="flex items-center gap-2 text-xs font-bold text-[#879391] hover:text-[#c4c1fb] transition-colors group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span>Volver a F3 Presentación</span>
+          </Link>
 
-        {/* ── Top Header Navigation Bar ── */}
-        <header className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 pb-6 border-b border-white/10">
-          <div className="flex items-center gap-4">
-            <Link
-              href="/presentacion"
-              className="p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
-              title="Volver a la vista general de Presentación"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Fase 3: Calibración final
-                </span>
-                <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
-                  ID: P-PRE-02
-                </span>
-                <span className="text-xs text-[#879391]">/</span>
-                <span className="text-xs text-[#879391] font-mono">{cand.pipeId || cand.id}</span>
-              </div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white mt-0.5">
-                {cand.name}
-              </h1>
-            </div>
-          </div>
-
-          {/* Contextual Action Pipeline Header Links */}
           <div className="flex items-center gap-2">
+            <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+              ID: P-PRE-02
+            </span>
             {/* PDF CV Direct View button */}
             <button
               onClick={() => cand && handleViewCv(cand.id, cand.url_cv)}
               title={cand?.url_cv ? "Ver Documento CV PDF" : "Sin CV adjunto"}
-              className={`px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs ${
+              className={`px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs ${
                 cand?.url_cv
                   ? "text-[#6bd8cb] bg-white/5 border-white/10 hover:bg-[#6bd8cb]/10 hover:border-[#6bd8cb]/30"
                   : "text-[#879391]/40 bg-white/5 border-white/5 hover:bg-white/10"
@@ -758,780 +740,958 @@ export default function PresentacionDetallePage() {
               <FileText className="w-3.5 h-3.5" />
               <span>CV</span>
             </button>
-            <Link
-              href="/descubrimiento"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#c4c1fb] hover:bg-white/5 transition-all"
-            >
-              F1 Descubrimiento
-            </Link>
-            <Link
-              href="/evaluacion"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-[#9b5de5] hover:bg-white/5 transition-all"
-            >
-              F2 Evaluación
-            </Link>
-            <div className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/25">
-              F3 Cliente (Actual)
-            </div>
-            <Link
-              href="/cierre"
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#879391] hover:text-emerald-400 hover:bg-white/5 transition-all"
-            >
-              F4 Cierre
-            </Link>
+
+            <span className="text-[10px] font-bold text-[#c4c1fb] bg-[#c4c1fb]/10 px-3 py-1 rounded-full uppercase tracking-wider border border-[#c4c1fb]/20">
+              Fase 3: Calibración Final
+            </span>
           </div>
-        </header>
+        </div>
 
-        {/* ── Candidate Profile Summary Header Card ── */}
-        <section className="glass-panel p-6 rounded-3xl border border-white/10 relative overflow-hidden space-y-6">
-          <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-2xl font-black text-white">{cand.name}</h2>
-                <span className={`text-xs px-3 py-1 rounded-full font-bold border ${phaseColors[cand.currentPhase]}`}>
-                  {getPhaseLabel(cand.currentPhase)}
-                </span>
-                <span className="text-xs px-2.5 py-0.5 rounded-md font-mono bg-white/5 text-[#c4c1fb] border border-white/10">
-                  Fit Score: {cand.score}%
-                </span>
-                <span className="text-xs px-2.5 py-0.5 rounded-md font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  cNPS: {cand.cNPS || 9} / 10
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-4 text-xs text-[#879391] flex-wrap">
-                <span className="flex items-center gap-1.5 text-white font-medium">
-                  <Building2 className="w-3.5 h-3.5 text-amber-500" />
-                  {cand.client} — {cand.role}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                  {cand.location}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-[#879391]" />
-                  {cand.contactNumber}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-[#879391]" />
-                  {cand.email}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Share2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                  {isEditingNotes ? (
-                    <span className="inline-flex items-center gap-1">
-                      <select
-                        value={isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "") ? "OTHER_CUSTOM" : editCanalIngreso}
-                        onChange={(e) => {
-                          if (e.target.value === "OTHER_CUSTOM") {
-                            setIsCustomChannel(true);
-                            setEditCanalIngreso("");
-                          } else {
-                            setIsCustomChannel(false);
-                            setEditCanalIngreso(e.target.value);
-                          }
-                        }}
-                        className="bg-[#101415] border border-white/10 px-2.5 py-1 text-xs rounded-lg text-white focus:border-[#6bd8cb] focus:outline-none cursor-pointer font-medium"
-                      >
-                        <option value="" className="bg-[#15181a]">-- Sin especificar (opcional) --</option>
-                        <optgroup label="Canales detectados en la Base de Datos">
-                          {existingChannels.map((ch) => (
-                            <option key={ch} value={ch} className="bg-[#15181a] text-white">
-                              {ch}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <option value="OTHER_CUSTOM" className="bg-[#15181a] text-[#6bd8cb] font-semibold">
-                          + Escribir nuevo canal personalizado...
-                        </option>
-                      </select>
+        {/* ── Main Grid Layout ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                      {(isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "")) && (
-                        <input
-                          type="text"
-                          value={editCanalIngreso}
-                          onChange={(e) => setEditCanalIngreso(e.target.value)}
-                          placeholder="Escribe el canal..."
-                          className="bg-[#101415] border border-[#6bd8cb]/40 px-2 py-1 text-xs rounded-lg text-white focus:border-[#6bd8cb] focus:outline-none"
-                        />
-                      )}
-                    </span>
-                  ) : cand.canal_ingreso ? (
-                    <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
-                      {cand.canal_ingreso}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-medium text-white/40 italic">
-                      No especificado
-                    </span>
-                  )}
-                </span>
-              </div>
-            </div>
+          {/* ══════════════════════════════════
+              MAIN AREA (col-span-2)
+          ══════════════════════════════════ */}
+          <div className="lg:col-span-2 space-y-6">
 
-            {/* Header Action Buttons */}
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Revert to Evaluation Phase Button */}
-              <button
-                onClick={handleRevertToEvalPhase}
-                disabled={isRevertingPhase}
-                className="px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 text-amber-400 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                title="Cambia el estado del expediente al primer estado de la Fase 2 Evaluación (05_screening)"
-              >
-                {isRevertingPhase ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <ChevronsLeft className="w-3.5 h-3.5" />
-                )}
-                <span>Volver a Fase Evaluación</span>
-              </button>
+            {/* ── Hero Card ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 relative overflow-hidden space-y-6">
+              {/* Decorative gradient blob */}
+              <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-[#c4c1fb]/5 blur-3xl pointer-events-none" />
 
-              {/* Advance Phase Button */}
-              <button
-                onClick={() => setIsAdvanceModalOpen(true)}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-[#6bd8cb] text-[#101415] font-black text-xs hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/10 cursor-pointer"
-              >
-                <UserCheck className="w-4 h-4" />
-                <span>Avanzar a Fase 4 Cierre</span>
-              </button>
-
-              {/* State Dropdown Transitions */}
-              <select
-                value={cand.currentPhase}
-                onChange={(e) => handleTransitionState(e.target.value as PresentacionCandidate["currentPhase"])}
-                className="bg-[#101415] border border-white/20 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-500 cursor-pointer"
-              >
-                <option value="09_shortlist" className="bg-[#15181a]">09 - Shortlist / Enviado</option>
-                <option value="10_entrevista_cliente" className="bg-[#15181a]">10 - Entrevista con Cliente</option>
-                <option value="11_standby" className="bg-[#15181a]">11 - Stand-by / Back-up</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        {/* Sección de Agendamiento Dinámico de Reuniones */}
-        <section className="glass-panel p-6 rounded-3xl border border-white/10 text-left space-y-5">
-          {(() => {
-            const rawMeetings: Reunion[] = (activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones) || [];
-            const sortedMeetings = [...rawMeetings].sort((a, b) => {
-              const timeA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0;
-              const timeB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0;
-              return timeB - timeA;
-            });
-
-            return (
-              <>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-white/5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
-                      <Calendar className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                        <span>Reuniones</span>
-                        <span className="text-[10px] bg-white/10 text-[#6bd8cb] px-2 py-0.5 rounded-full font-mono font-bold">
-                          {sortedMeetings.length}
-                        </span>
-                      </h3>
-                      <p className="text-[10px] text-[#879391] mt-0.5">
-                        Agendamiento e historial de entrevistas del expediente
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleOpenCreateMeeting}
-                    className="px-3.5 py-2 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer self-start sm:self-auto"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Nueva Reunión</span>
-                  </button>
+              {/* Header: name + badge */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-5">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-mono text-[#879391] uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                    {cand.id} • F3 Presentación al Cliente
+                  </span>
+                  <h1 className="text-xl font-bold text-white tracking-tight">{cand.name}</h1>
                 </div>
-
-                {/* Lista de Reuniones ordenadas por fecha descendente */}
-                {sortedMeetings.length === 0 ? (
-                  <div className="p-6 text-center border border-dashed border-white/10 rounded-2xl space-y-2">
-                    <Calendar className="w-8 h-8 text-[#879391]/50 mx-auto" />
-                    <p className="text-xs text-[#879391]">No hay reuniones agendadas.</p>
-                    <button
-                      onClick={handleOpenCreateMeeting}
-                      className="text-xs font-bold text-[#6bd8cb] hover:underline inline-flex items-center gap-1 mt-1 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Agendar la primera reunión
-                    </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`px-3 py-1 rounded-full border text-xs font-bold ${phaseColors[cand.currentPhase]}`}>
+                    {getPhaseLabel(cand.currentPhase)}
+                  </span>
+                  <div className="px-3 py-1 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] text-xs font-bold font-mono">
+                    Fit: {cand.score}%
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {sortedMeetings.map((meeting) => (
-                      <div 
-                        key={meeting.id_reunion}
-                        className="p-4 rounded-2xl bg-stone-950/45 border border-white/10 hover:border-[#6bd8cb]/30 transition-all space-y-3"
-                      >
-                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-white/5 pb-2.5">
-                          <div className="space-y-0.5">
-                            <h4 className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
-                              <span className="inline-block text-[9.5px] font-bold font-mono px-2 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] uppercase tracking-wider">
-                                {meeting.fase || "F3 - Presentación"}
-                              </span>
-                              <span>{meeting.objetivo || "Reunión de Presentación"}</span>
-                            </h4>
-                            <div className="flex items-center gap-2 text-[11px] text-[#6bd8cb] font-mono">
-                              <Clock className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                              <span>
-                                {meeting.fecha_hora 
-                                  ? new Date(meeting.fecha_hora).toLocaleString("es-ES", {
-                                      dateStyle: "full",
-                                      timeStyle: "short"
-                                    })
-                                  : "Sin fecha definida"}
-                              </span>
-                            </div>
-                          </div>
+                </div>
+              </div>
 
-                          <div className="flex items-center gap-2 self-end sm:self-auto">
-                            <button
-                              onClick={() => handleOpenEditMeeting(meeting)}
-                              className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-[#6bd8cb]/40 bg-white/5 hover:bg-[#6bd8cb]/10 text-white/80 hover:text-[#6bd8cb] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-                              title="Modificar datos de la reunión"
-                            >
-                              <Edit2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                              <span>Modificar</span>
-                            </button>
-                            <button
-                              onClick={() => setDeletingMeetingId(meeting.id_reunion)}
-                              className="p-1.5 rounded-lg border border-white/10 hover:border-rose-500/40 bg-white/5 hover:bg-rose-500/10 text-white/70 hover:text-rose-400 transition-all cursor-pointer"
-                              title="Eliminar reunión"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
+              {/* Metadata grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Puesto Vacante</span>
+                    <div className="flex items-center gap-2 text-xs text-white font-semibold">
+                      {cand.role}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Cliente</span>
+                    <div className="flex items-center gap-2 text-xs text-[#c4c1fb]">
+                      <Building2 className="w-4 h-4 text-[#c4c1fb]/70" />
+                      <span>{cand.client}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Ubicación</span>
+                    <div className="flex items-center gap-2 text-xs text-[#879391]">
+                      <MapPin className="w-4 h-4 text-[#6bd8cb]/70" />
+                      <span>{cand.location}</span>
+                    </div>
+                  </div>
 
-                        {meeting.link_reunion && (
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={meeting.link_reunion.startsWith("http") ? meeting.link_reunion : `https://${meeting.link_reunion}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-300 text-xs font-bold transition-all inline-flex items-center gap-1.5"
-                            >
-                              <Video className="w-3.5 h-3.5 text-indigo-400" />
-                              <span className="truncate max-w-xs">{meeting.link_reunion}</span>
-                              <ExternalLink className="w-3 h-3 ml-0.5 shrink-0" />
-                            </a>
-                          </div>
-                        )}
+                  {/* Canal de Ingreso (Sourcing) */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block flex items-center gap-1">
+                      <Share2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                      Canal de Ingreso (Sourcing)
+                    </span>
+                    {isEditingNotes ? (
+                      <div className="space-y-1.5">
+                        <select
+                          value={isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "") ? "OTHER_CUSTOM" : editCanalIngreso}
+                          onChange={(e) => {
+                            if (e.target.value === "OTHER_CUSTOM") {
+                              setIsCustomChannel(true);
+                              setEditCanalIngreso("");
+                            } else {
+                              setIsCustomChannel(false);
+                              setEditCanalIngreso(e.target.value);
+                            }
+                          }}
+                          className="bg-white/5 border border-white/10 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none cursor-pointer font-medium"
+                        >
+                          <option value="" className="bg-[#15181a]">-- Sin especificar (opcional) --</option>
+                          <optgroup label="Canales detectados en la Base de Datos">
+                            {existingChannels.map((ch) => (
+                              <option key={ch} value={ch} className="bg-[#15181a] text-white">
+                                {ch}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <option value="OTHER_CUSTOM" className="bg-[#15181a] text-[#6bd8cb] font-semibold">
+                            + Escribir nuevo canal personalizado...
+                          </option>
+                        </select>
 
-                        {meeting.notas && (
-                          <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs text-[#879391] leading-relaxed">
-                            <span className="text-[10px] uppercase font-bold text-white/40 block mb-0.5">Notas de la sesión:</span>
-                            <p className="whitespace-pre-wrap">{meeting.notas}</p>
-                          </div>
+                        {(isCustomChannel || (!existingChannels.includes(editCanalIngreso) && editCanalIngreso !== "")) && (
+                          <input
+                            type="text"
+                            value={editCanalIngreso}
+                            onChange={(e) => setEditCanalIngreso(e.target.value)}
+                            placeholder="Escribe la vía de sourcing (ej: Headhunting, LinkedIn...)..."
+                            className="bg-[#101415] border border-[#6bd8cb]/40 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none mt-1"
+                          />
                         )}
                       </div>
-                    ))}
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs">
+                        {cand.canal_ingreso ? (
+                          <span className="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
+                            {cand.canal_ingreso}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-white/40 italic">
+                            No especificado
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Contacto</span>
+                    <div className="flex items-center gap-2 text-xs text-[#879391]">
+                      <Phone className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                      <span>{cand.contactNumber}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-[#879391] mt-1.5">
+                      <Mail className="w-3.5 h-3.5 text-[#c4c1fb]" />
+                      <span className="truncate">{cand.email}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Última actividad</span>
+                    <div className="flex items-center gap-1.5 text-xs text-[#879391]">
+                      <Clock className="w-3.5 h-3.5 text-amber-400/70" />
+                      <span>{cand.lastActivity}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/30 font-bold block">Entrada al WIP</span>
+                    <p className="text-xs text-[#879391]">{new Date(cand.entryDate).toLocaleString("es-ES")}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sección de Agendamiento Dinámico de Reuniones */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 text-left space-y-5">
+              {(() => {
+                const rawMeetings: Reunion[] = (activePipelineItem?.f1_descubrimiento?.reuniones || cand?.reuniones) || [];
+                const sortedMeetings = [...rawMeetings].sort((a, b) => {
+                  const timeA = a.fecha_hora ? new Date(a.fecha_hora).getTime() : 0;
+                  const timeB = b.fecha_hora ? new Date(b.fecha_hora).getTime() : 0;
+                  return timeB - timeA;
+                });
+
+                return (
+                  <>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-white/5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb]">
+                          <Calendar className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                            <span>Reuniones</span>
+                            <span className="text-[10px] bg-white/10 text-[#6bd8cb] px-2 py-0.5 rounded-full font-mono font-bold">
+                              {sortedMeetings.length}
+                            </span>
+                          </h3>
+                          <p className="text-[10px] text-[#879391] mt-0.5">
+                            Agendamiento e historial de entrevistas del expediente
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleOpenCreateMeeting}
+                        className="px-3.5 py-2 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer self-start sm:self-auto"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Nueva Reunión</span>
+                      </button>
+                    </div>
+
+                    {/* Lista de Reuniones ordenadas por fecha descendente */}
+                    {sortedMeetings.length === 0 ? (
+                      <div className="p-6 text-center border border-dashed border-white/10 rounded-2xl space-y-2">
+                        <Calendar className="w-8 h-8 text-[#879391]/50 mx-auto" />
+                        <p className="text-xs text-[#879391]">No hay reuniones agendadas.</p>
+                        <button
+                          onClick={handleOpenCreateMeeting}
+                          className="text-xs font-bold text-[#6bd8cb] hover:underline inline-flex items-center gap-1 mt-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Agendar la primera reunión
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {sortedMeetings.map((meeting) => (
+                          <div 
+                            key={meeting.id_reunion}
+                            className="p-4 rounded-2xl bg-stone-950/45 border border-white/10 hover:border-[#6bd8cb]/30 transition-all space-y-3"
+                          >
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-white/5 pb-2.5">
+                              <div className="space-y-0.5">
+                                <h4 className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
+                                  <span className="inline-block text-[9.5px] font-bold font-mono px-2 py-0.5 rounded-md bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] uppercase tracking-wider">
+                                    {meeting.fase || "F3 - Presentación"}
+                                  </span>
+                                  <span>{meeting.objetivo || "Reunión de Presentación"}</span>
+                                </h4>
+                                <div className="flex items-center gap-2 text-[11px] text-[#6bd8cb] font-mono">
+                                  <Clock className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                                  <span>
+                                    {meeting.fecha_hora 
+                                      ? new Date(meeting.fecha_hora).toLocaleString("es-ES", {
+                                          dateStyle: "full",
+                                          timeStyle: "short"
+                                        })
+                                      : "Sin fecha definida"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <button
+                                  onClick={() => handleOpenEditMeeting(meeting)}
+                                  className="px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-[#6bd8cb]/40 bg-white/5 hover:bg-[#6bd8cb]/10 text-white/80 hover:text-[#6bd8cb] text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Modificar datos de la reunión"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                                  <span>Modificar</span>
+                                </button>
+                                <button
+                                  onClick={() => setDeletingMeetingId(meeting.id_reunion)}
+                                  className="p-1.5 rounded-lg border border-white/10 hover:border-rose-500/40 bg-white/5 hover:bg-rose-500/10 text-white/70 hover:text-rose-400 transition-all cursor-pointer"
+                                  title="Eliminar reunión"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {meeting.link_reunion && (
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={meeting.link_reunion.startsWith("http") ? meeting.link_reunion : `https://${meeting.link_reunion}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-300 text-xs font-bold transition-all inline-flex items-center gap-1.5"
+                                >
+                                  <Video className="w-3.5 h-3.5 text-indigo-400" />
+                                  <span className="truncate max-w-xs">{meeting.link_reunion}</span>
+                                  <ExternalLink className="w-3 h-3 ml-0.5 shrink-0" />
+                                </a>
+                              </div>
+                            )}
+
+                            {meeting.notas && (
+                              <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs text-[#879391] leading-relaxed">
+                                <span className="text-[10px] uppercase font-bold text-white/40 block mb-0.5">Notas de la sesión:</span>
+                                <p className="whitespace-pre-wrap">{meeting.notas}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* ── Trazabilidad de Notas del Pipeline (Invertido: F3 arriba -> F2 -> F1 -> Origen abajo) ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-6 text-left relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 gap-3">
+                <div>
+                  <span className="text-[9px] font-mono text-[#6bd8cb] bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded border border-[#6bd8cb]/20 uppercase font-bold tracking-widest inline-block mb-1">
+                    TRAZABILIDAD DE RECLUTAMIENTO
+                  </span>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-[#6bd8cb]" />
+                    <span>Historial y Trazabilidad de Notas del Candidato</span>
+                  </h3>
+                </div>
+
+                {/* Global Edit Button covering all notes */}
+                <div>
+                  {!isEditingNotes ? (
+                    <button
+                      onClick={() => setIsEditingNotes(true)}
+                      className="px-4 py-2 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/15 text-[#6bd8cb] hover:bg-[#6bd8cb] hover:text-[#101415] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-[#6bd8cb]/10"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Editar Historial de Notas</span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveNotes}
+                        disabled={isSavingNotes}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#6bd8cb] to-[#0d9488] text-[#101415] hover:opacity-90 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20 disabled:opacity-50"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>{isSavingNotes ? "Guardando..." : "Guardar Todos los Cambios"}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditInitialNotes(cand.initialNotes || "");
+                          setEditF1Notes(cand.f1Notes || "");
+                          setEditF2Notes(cand.f2Notes || "");
+                          setEditF3Notes(cand.f3Notes || "");
+                          setIsEditingNotes(false);
+                        }}
+                        className="px-3.5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Cancelar</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="relative pl-6 md:pl-8 space-y-6 border-l-2 border-white/10 ml-2 md:ml-3 pt-1 pb-1">
+
+                {/* ── 01 (ARRIBA). FASE 3: PRESENTACIÓN AL CLIENTE (MÓDULO ACTUAL) ── */}
+                <div className="relative space-y-2">
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-amber-500 text-amber-400 flex items-center justify-center text-[10px] font-mono font-bold shadow-md shadow-amber-500/20">
+                    01
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/15 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                          Fase 3: Presentación al Cliente (Módulo Actual)
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        campo: f3_presentacion.notas_reclutador
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editF3Notes}
+                        onChange={e => setEditF3Notes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de calibración e interacción con el cliente en esta fase..."
+                        className="w-full bg-[#101415]/90 border border-amber-500/50 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-amber-500 focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-amber-500/20 rounded-xl text-xs text-white leading-relaxed font-medium">
+                        {cand.f3Notes ? (
+                          cand.f3Notes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin notas de presentación asignadas para esta fase. Usa "Editar Historial de Notas" para agregar anotaciones.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 02 (CENTRO). FASE 2: EVALUACIÓN INTERNA ── */}
+                <div className="relative space-y-2">
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-[#6bd8cb]/40 text-[#6bd8cb] flex items-center justify-center text-[10px] font-mono font-bold shadow-md">
+                    02
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-[#6bd8cb]/25 bg-[#6bd8cb]/5 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#6bd8cb]/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Cpu className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                        <span className="text-xs font-bold text-[#6bd8cb] uppercase tracking-wider">
+                          Fase 2: Evaluación Interna
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-[#6bd8cb]/70 bg-[#6bd8cb]/10 px-2 py-0.5 rounded border border-[#6bd8cb]/20">
+                        campo: f2_evaluacion.notas_reclutador
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editF2Notes}
+                        onChange={e => setEditF2Notes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de evaluación técnica..."
+                        className="w-full bg-[#101415]/90 border border-[#6bd8cb]/40 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-[#6bd8cb] focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-[#6bd8cb]/15 rounded-xl text-xs text-white leading-relaxed">
+                        {cand.f2Notes ? (
+                          cand.f2Notes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin notas de evaluación registradas.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 03 (CENTRO). FASE 1: DESCUBRIMIENTO & SOURCING ── */}
+                <div className="relative space-y-2">
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-[#c4c1fb]/40 text-[#c4c1fb] flex items-center justify-center text-[10px] font-mono font-bold shadow-md">
+                    03
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-[#c4c1fb]/25 bg-[#c4c1fb]/5 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#c4c1fb]/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Compass className="w-3.5 h-3.5 text-[#c4c1fb]" />
+                        <span className="text-xs font-bold text-[#c4c1fb] uppercase tracking-wider">
+                          Fase 1: Descubrimiento & Sourcing
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-[#c4c1fb]/70 bg-[#c4c1fb]/10 px-2 py-0.5 rounded border border-[#c4c1fb]/20">
+                        campo: f1_descubrimiento.notas_reclutador
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editF1Notes}
+                        onChange={e => setEditF1Notes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de sourcing..."
+                        className="w-full bg-[#101415]/90 border border-[#c4c1fb]/40 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-[#c4c1fb] focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-[#c4c1fb]/15 rounded-xl text-xs text-white leading-relaxed">
+                        {cand.f1Notes ? (
+                          cand.f1Notes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin notas de descubrimiento registradas.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── 04 (ABAJO). NOTAS INICIALES DE ORIGEN ── */}
+                <div className="relative space-y-2">
+                  <div className="absolute -left-[31px] md:-left-[39px] top-0 w-7 h-7 rounded-full bg-[#15181a] border-2 border-white/20 text-white/60 flex items-center justify-center text-[10px] font-mono font-bold shadow-md">
+                    04
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-white/10 bg-white/5 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-white/60" />
+                        <span className="text-xs font-bold text-white/80 uppercase tracking-wider">
+                          Notas iniciales (Origen)
+                        </span>
+                      </div>
+                      <span className="text-[9.5px] font-mono text-white/50 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                        campo: candidatos.notas_iniciales
+                      </span>
+                    </div>
+
+                    {isEditingNotes ? (
+                      <textarea
+                        value={editInitialNotes}
+                        onChange={e => setEditInitialNotes(e.target.value)}
+                        rows={3}
+                        placeholder="Escribe las notas de origen del candidato..."
+                        className="w-full bg-[#101415]/90 border border-white/20 p-3.5 text-xs rounded-xl text-white placeholder-[#879391] focus:border-white/50 focus:outline-none resize-none leading-relaxed"
+                      />
+                    ) : (
+                      <div className="p-3.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white/70 leading-relaxed font-sans">
+                        {cand.initialNotes ? (
+                          cand.initialNotes
+                        ) : (
+                          <span className="italic text-[#879391]">Sin anotaciones iniciales registradas.</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* ── Diagnostic Tools Tabs ── */}
+            <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden">
+              {/* Tab header */}
+              <div className="px-6 py-3 border-b border-white/10 bg-[#101415]/60">
+                <div className="flex items-center gap-2 mb-3">
+                  <Cpu className="w-4 h-4 text-[#c4c1fb] animate-pulse" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">Herramientas de Cliente e IA — F3</span>
+                </div>
+                <nav className="flex items-center overflow-x-auto gap-1 select-none">
+                  {([
+                    { key: "general", icon: <FileText className="w-3.5 h-3.5" />, label: "1. General" },
+                    { key: "analitica", icon: <Zap className="w-3.5 h-3.5" />, label: "2. Analítica Zoom" },
+                    { key: "traductor", icon: <Languages className="w-3.5 h-3.5" />, label: "3. Traductor ATS" },
+                    { key: "briefing", icon: <Sparkles className="w-3.5 h-3.5" />, label: "4. Briefing IA" },
+                    { key: "agenda", icon: <Calendar className="w-3.5 h-3.5" />, label: "5. Orquestador Agendas" },
+                    { key: "tracker", icon: <Bell className="w-3.5 h-3.5" />, label: "6. Bot SLA Tracker" }
+                  ] as { key: DiagTab; icon: React.ReactNode; label: string }[]).map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                        activeTab === tab.key
+                          ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30"
+                          : "text-[#879391] hover:text-white"
+                      }`}
+                    >
+                      {tab.icon}
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Tab body */}
+              <div className="p-6 space-y-5">
+
+                {/* 1. General & Briefing */}
+                {activeTab === "general" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
+                      <span className="font-bold text-[#6bd8cb]">Resumen Ejecutivo de Calibración</span>
+                      <p className="mt-0.5 text-[#879391] leading-relaxed">
+                        {`El expediente de ${cand.name} para la vacante de ${cand.role} en ${cand.client} se encuentra presentado activamente.`}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
+                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Años Experiencia</span>
+                        <span className="text-base font-bold text-white block mt-1">{cand.experienceYears} años</span>
+                      </div>
+                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
+                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">cNPS Evaluador</span>
+                        <span className="text-base font-bold text-amber-400 block mt-1">{cand.cNPS || 9} / 10</span>
+                      </div>
+                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
+                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Fit Score</span>
+                        <span className="text-base font-bold text-[#6bd8cb] block mt-1">{cand.score}%</span>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </>
-            );
-          })()}
-        </section>
 
-        {/* ── Metadata & SLA Timeline Section ── */}
-        {activePipelineItem && (
-          <section className="glass-panel p-5 rounded-2xl border border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" />
-                Línea de Tiempo SLA & Metadatos del Pipeline
-              </span>
-              <span className="text-[10px] text-[#879391] font-mono">
-                Actualizado: {new Date(activePipelineItem.updatedAt || Date.now()).toLocaleString("es-ES")}
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                <span className="text-[9px] text-[#879391] font-bold uppercase block">ID Búsqueda Asignada</span>
-                <span className="font-mono text-white font-bold">{activePipelineItem.claves_conexion?.id_busqueda}</span>
-              </div>
+                {/* 2. Analítica Zoom */}
+                {activeTab === "analitica" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Analítica Telemétrica Zoom / Meet</h4>
+                        <p className="text-[10px] text-[#879391]">Transcripciones e inferencias de sentimiento del postulante</p>
+                      </div>
+                      <button
+                        onClick={runZoomAnalysis}
+                        disabled={isSimulatingAnalysis}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20"
+                      >
+                        {isSimulatingAnalysis ? (
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Zap className="w-3.5 h-3.5" />
+                        )}
+                        <span>Ejecutar Análisis Telemétrico</span>
+                      </button>
+                    </div>
 
-              <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                <span className="text-[9px] text-[#879391] font-bold uppercase block">ID Registro Pipeline</span>
-                <span className="font-mono text-[#6bd8cb] font-bold">{activePipelineItem.id}</span>
-              </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Sentiment Score General</span>
+                        <span className="text-2xl font-black text-amber-400">{cand.toolsDetails.analitica.sentimentScore} / 100</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold block w-fit">
+                          {cand.toolsDetails.analitica.globalSentiment}
+                        </span>
+                      </div>
 
-              <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                <span className="text-[9px] text-[#879391] font-bold uppercase block">Última Modificación de Estado</span>
-                <span className="font-mono text-amber-400 font-bold">
-                  {new Date(activePipelineItem.flujo?.fecha_ultimo_cambio || Date.now()).toLocaleDateString("es-ES")}
-                </span>
-              </div>
-            </div>
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Microexpresiones Detectadas</span>
+                        <ul className="space-y-1">
+                          {cand.toolsDetails.analitica.microExpressionsDetected.map((m, idx) => (
+                            <li key={idx} className="flex items-center gap-1.5 text-[#e0e3e5]">
+                              <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                              <span>{m}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
 
-            {/* SLA History Steps */}
-            {activePipelineItem.flujo?.historial_estados && activePipelineItem.flujo.historial_estados.length > 0 && (
-              <div className="pt-2">
-                <span className="text-[9px] text-[#879391] font-bold uppercase block mb-2">Historial de Transiciones</span>
-                <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                  {activePipelineItem.flujo.historial_estados.map((h, i) => (
-                    <div key={i} className="flex items-center gap-2 shrink-0">
-                      <span className="px-2 py-0.5 rounded bg-white/5 text-[9.5px] font-mono text-[#c4c1fb] border border-white/10">
-                        {h.estado} ({new Date(h.timestamp).toLocaleDateString("es-ES")})
-                      </span>
-                      {i < (activePipelineItem.flujo.historial_estados?.length || 0) - 1 && (
-                        <ChevronRight className="w-3 h-3 text-white/20 shrink-0" />
+                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                      <span className="text-[10px] font-bold text-white/40 uppercase block">Snippets de Transcripción Registrados</span>
+                      <div className="space-y-2">
+                        {cand.toolsDetails.analitica.transcriptSnippets.map((t, idx) => (
+                          <div key={idx} className="p-2.5 rounded-xl bg-black/40 border border-white/5 text-[11px]">
+                            <span className="font-bold text-[#6bd8cb] block">{t.speaker}:</span>
+                            <p className="text-[#879391] italic">"{t.text}"</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Traductor ATS */}
+                {activeTab === "traductor" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Traductor & Estandarizador ATS</h4>
+                        <p className="text-[10px] text-[#879391]">Formateo unificado de currículums en inglés para clientes corporativos</p>
+                      </div>
+                      <button
+                        onClick={runTranslationAndStadardizer}
+                        disabled={isSimulatingTranslation}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20"
+                      >
+                        {isSimulatingTranslation ? (
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Languages className="w-3.5 h-3.5" />
+                        )}
+                        <span>Traducir CV al Inglés</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">CV Original</span>
+                        <p className="text-[#879391] leading-relaxed italic">{cand.toolsDetails.traductor.originalCVText}</p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
+                        <span className="text-[10px] font-bold text-[#6bd8cb] uppercase block">Resumen Traducido ATS</span>
+                        <p className="text-[#e0e3e5] leading-relaxed font-mono">
+                          {cand.toolsDetails.traductor.translatedCVText}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Briefing IA */}
+                {activeTab === "briefing" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Candidate Briefing Ejecutivo por IA</h4>
+                        <p className="text-[10px] text-[#879391]">Documento estructurado de presentación para el Hiring Manager</p>
+                      </div>
+                      <button
+                        onClick={runBriefingGenerator}
+                        disabled={isSimulatingBriefingGen}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20"
+                      >
+                        {isSimulatingBriefingGen ? (
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                        <span>Generar Briefing IA</span>
+                      </button>
+                    </div>
+
+                    {cand.toolsDetails.briefing.generated ? (
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Briefing Listo</span>
+                          <button
+                            onClick={() => handleCopyText(cand.toolsDetails.briefing.content, "briefing")}
+                            className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-white text-[10px] flex items-center gap-1 cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3 text-amber-500" />
+                            <span>{copiedTextType === "briefing" ? "¡Copiado!" : "Copiar Briefing"}</span>
+                          </button>
+                        </div>
+                        <p className="text-[#e0e3e5] leading-relaxed whitespace-pre-line">
+                          {cand.toolsDetails.briefing.content}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-[#879391]">
+                        Aún no se ha generado el briefing ejecutivo. Haz clic en el botón superior para generarlo.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 5. Orquestador Agendas */}
+                {activeTab === "agenda" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Orquestador de Agendas Condicional</h4>
+                        <p className="text-[10px] text-[#879391]">Mapeo de slots óptimos para entrevista con el Hiring Manager</p>
+                      </div>
+                      <button
+                        onClick={suggestOptimalSlot}
+                        disabled={isSimulatingAgendasSlot}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20"
+                      >
+                        {isSimulatingAgendasSlot ? (
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Calendar className="w-3.5 h-3.5" />
+                        )}
+                        <span>Reservar Slot Óptimo</span>
+                      </button>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                      <span className="text-[10px] font-bold text-white/40 uppercase block">Slots Sugeridos Disponibles</span>
+                      <div className="space-y-2">
+                        {cand.toolsDetails.agenda.suggestedSlots.map((slot, idx) => (
+                          <div key={idx} className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between text-xs">
+                            <span className="text-[#e0e3e5]">{slot}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold">Disponible</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {cand.toolsDetails.agenda.recruiterSlotSelected && (
+                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 space-y-1">
+                          <span className="text-[10px] font-bold uppercase block">Slot Seleccionado</span>
+                          <span className="font-bold">{cand.toolsDetails.agenda.recruiterSlotSelected}</span>
+                        </div>
                       )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* ── Recruiter Notes Section across Pipeline Stages ── */}
-        <section className="glass-panel p-6 rounded-3xl border border-white/10 space-y-4">
-          <div className="flex justify-between items-center pb-3 border-b border-white/10">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <FileText className="w-4 h-4 text-amber-500" />
-              Historial de Anotaciones del Expediente
-            </h3>
-            
-            {isEditingNotes ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsEditingNotes(false)}
-                  className="px-3 py-1.5 rounded-xl border border-white/10 text-xs text-[#879391] hover:text-white hover:bg-white/5 transition-all cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSaveNotes}
-                  disabled={isSavingNotes}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/20"
-                >
-                  {isSavingNotes ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Save className="w-3.5 h-3.5" />
-                  )}
-                  <span>Guardar Historial</span>
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setIsEditingNotes(true)}
-                className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Edit2 className="w-3.5 h-3.5 text-amber-500" />
-                <span>Editar Anotaciones</span>
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-            {/* Notes 1: Initial */}
-            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-              <span className="text-[10px] font-bold text-[#879391] uppercase tracking-wider block">Notas Iniciales (Sourcing)</span>
-              {isEditingNotes ? (
-                <textarea
-                  value={editInitialNotes}
-                  onChange={(e) => setEditInitialNotes(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#101415] border border-white/15 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-sans resize-none"
-                  placeholder="Sin notas de origen..."
-                />
-              ) : (
-                <p className="text-[#e0e3e5] leading-relaxed italic">
-                  {cand.initialNotes || editInitialNotes || "Sin anotaciones iniciales registradas."}
-                </p>
-              )}
-            </div>
-
-            {/* Notes 2: F1 Sourcing */}
-            <div className="p-4 rounded-2xl bg-cyan-500/5 border border-cyan-500/15 space-y-2">
-              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block">Notas F1 Descubrimiento</span>
-              {isEditingNotes ? (
-                <textarea
-                  value={editF1Notes}
-                  onChange={(e) => setEditF1Notes(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#101415] border border-cyan-500/30 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 font-sans resize-none"
-                  placeholder="Sin notas de F1..."
-                />
-              ) : (
-                <p className="text-cyan-100 leading-relaxed italic">
-                  {cand.f1Notes || editF1Notes || "Sin anotaciones en Fase 1."}
-                </p>
-              )}
-            </div>
-
-            {/* Notes 3: F2 Evaluación */}
-            <div className="p-4 rounded-2xl bg-purple-500/5 border border-purple-500/15 space-y-2">
-              <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">Notas F2 Evaluación</span>
-              {isEditingNotes ? (
-                <textarea
-                  value={editF2Notes}
-                  onChange={(e) => setEditF2Notes(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#101415] border border-purple-500/30 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-400 font-sans resize-none"
-                  placeholder="Sin notas de F2..."
-                />
-              ) : (
-                <p className="text-purple-100 leading-relaxed italic">
-                  {cand.f2Notes || editF2Notes || "Sin anotaciones de evaluación técnica."}
-                </p>
-              )}
-            </div>
-
-            {/* Notes 4: F3 Presentación Cliente */}
-            <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/15 space-y-2">
-              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">Notas F3 Cliente Presentación</span>
-              {isEditingNotes ? (
-                <textarea
-                  value={editF3Notes}
-                  onChange={(e) => setEditF3Notes(e.target.value)}
-                  rows={4}
-                  className="w-full bg-[#101415] border border-amber-500/30 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-sans resize-none"
-                  placeholder="Notas de interacción con cliente..."
-                />
-              ) : (
-                <p className="text-amber-100 leading-relaxed italic">
-                  {cand.f3Notes || editF3Notes || "Expediente entregado al cliente sin observaciones adicionales."}
-                </p>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Client & AI Diagnostic Tools Tabbed Navigation ── */}
-        <section className="glass-panel p-6 rounded-3xl border border-white/10 space-y-6">
-          
-          {/* Tab Selector Buttons */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/10">
-            <button
-              onClick={() => setActiveTab("general")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "general"
-                  ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>General & Briefing</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("analitica")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "analitica"
-                  ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>Analítica Zoom</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("traductor")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "traductor"
-                  ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Languages className="w-3.5 h-3.5" />
-              <span>Traductor ATS</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("briefing")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "briefing"
-                  ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Briefing Ejecutivo</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("agenda")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "agenda"
-                  ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Orquestador Agendas</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("tracker")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === "tracker"
-                  ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-                  : "bg-white/5 text-[#879391] hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Bell className="w-3.5 h-3.5" />
-              <span>Rastreador SLA</span>
-            </button>
-          </div>
-
-          {/* TAB 1: General Info */}
-          {activeTab === "general" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                <h4 className="text-sm font-bold text-white">Resumen Ejecutivo de Calibración</h4>
-                <p className="text-[#879391] leading-relaxed">
-                  {`El expediente de ${cand.name} para la vacante de ${cand.role} en ${cand.client} se encuentra presentado activamente.`}
-                </p>
-                <div className="flex items-center gap-4 text-[#c4c1fb] font-mono">
-                  <span>Años Experiencia: {cand.experienceYears} años</span>
-                  <span>cNPS Evaluador: {cand.cNPS || 9}</span>
-                  <span>Fit Score: {cand.score}%</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: Analítica Zoom */}
-          {activeTab === "analitica" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Analítica Telemétrica Zoom / Meet</h4>
-                  <p className="text-[10px] text-[#879391]">Transcripciones e inferencias de sentimiento del postulante</p>
-                </div>
-                <button
-                  onClick={runZoomAnalysis}
-                  disabled={isSimulatingAnalysis}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/20"
-                >
-                  {isSimulatingAnalysis ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Zap className="w-3.5 h-3.5" />
-                  )}
-                  <span>Ejecutar Análisis Telemétrico</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Sentiment Score General</span>
-                  <span className="text-2xl font-black text-amber-400">{cand.toolsDetails.analitica.sentimentScore} / 100</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold block w-fit">
-                    {cand.toolsDetails.analitica.globalSentiment}
-                  </span>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Microexpresiones Detectadas</span>
-                  <ul className="space-y-1">
-                    {cand.toolsDetails.analitica.microExpressionsDetected.map((m, idx) => (
-                      <li key={idx} className="flex items-center gap-1.5 text-[#e0e3e5]">
-                        <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                        <span>{m}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Transcripts */}
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                <span className="text-[10px] font-bold text-white/40 uppercase block">Snippets de Transcripción Registrados</span>
-                <div className="space-y-2">
-                  {cand.toolsDetails.analitica.transcriptSnippets.map((t, idx) => (
-                    <div key={idx} className="p-2.5 rounded-xl bg-black/40 border border-white/5 text-[11px]">
-                      <span className="font-bold text-[#6bd8cb] block">{t.speaker}:</span>
-                      <p className="text-[#879391] italic">"{t.text}"</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: Traductor ATS */}
-          {activeTab === "traductor" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Traductor & Estandarizador ATS</h4>
-                  <p className="text-[10px] text-[#879391]">Formateo unificado de currículums en inglés para clientes corporativos</p>
-                </div>
-                <button
-                  onClick={runTranslationAndStadardizer}
-                  disabled={isSimulatingTranslation}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/20"
-                >
-                  {isSimulatingTranslation ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Languages className="w-3.5 h-3.5" />
-                  )}
-                  <span>Traducir CV al Inglés</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">CV Original</span>
-                  <p className="text-[#879391] leading-relaxed italic">{cand.toolsDetails.traductor.originalCVText}</p>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                  <span className="text-[10px] font-bold text-[#6bd8cb] uppercase block">Resumen Traducido ATS</span>
-                  <p className="text-[#e0e3e5] leading-relaxed font-mono">
-                    {cand.toolsDetails.traductor.translatedCVText}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: Briefing Ejecutivo */}
-          {activeTab === "briefing" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Candidate Briefing Ejecutivo por IA</h4>
-                  <p className="text-[10px] text-[#879391]">Documento estructurado de presentación para el Hiring Manager</p>
-                </div>
-                <button
-                  onClick={runBriefingGenerator}
-                  disabled={isSimulatingBriefingGen}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/20"
-                >
-                  {isSimulatingBriefingGen ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5" />
-                  )}
-                  <span>Generar Briefing IA</span>
-                </button>
-              </div>
-
-              {cand.toolsDetails.briefing.generated ? (
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Briefing Listo</span>
-                    <button
-                      onClick={() => handleCopyText(cand.toolsDetails.briefing.content, "briefing")}
-                      className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-white text-[10px] flex items-center gap-1 cursor-pointer"
-                    >
-                      <Copy className="w-3 h-3 text-amber-500" />
-                      <span>{copiedTextType === "briefing" ? "¡Copiado!" : "Copiar Briefing"}</span>
-                    </button>
                   </div>
-                  <p className="text-[#e0e3e5] leading-relaxed whitespace-pre-line">
-                    {cand.toolsDetails.briefing.content}
-                  </p>
-                </div>
-              ) : (
-                <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-[#879391]">
-                  Aún no se ha generado el briefing ejecutivo. Haz clic en el botón superior para generarlo.
-                </div>
-              )}
-            </div>
-          )}
+                )}
 
-          {/* TAB 5: Orquestador Agendas */}
-          {activeTab === "agenda" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Orquestador de Agendas Condicional</h4>
-                  <p className="text-[10px] text-[#879391]">Mapeo de slots óptimos para entrevista con el Hiring Manager</p>
+                {/* 6. Bot SLA Tracker */}
+                {activeTab === "tracker" && (
+                  <div className="space-y-4 animate-fadeIn text-xs">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Bot Rastreador de SLA</h4>
+                        <p className="text-[10px] text-[#879391]">Monitoreo de horas de espera y envío de recordatorios al cliente</p>
+                      </div>
+                      <button
+                        onClick={sendSlaAlertPing}
+                        disabled={isSimulatingSlaPing}
+                        className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20"
+                      >
+                        {isSimulatingSlaPing ? (
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                        <span>Enviar Alerta SLA</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Horas Transcurridas</span>
+                        <span className="text-xl font-black text-white">{cand.toolsDetails.tracker.hoursSinceSent} horas</span>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Estado SLA</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded inline-block ${
+                          cand.toolsDetails.tracker.slaExceeded ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        }`}>
+                          {cand.toolsDetails.tracker.slaExceeded ? "Excedido (>48h)" : "Normal (<48h)"}
+                        </span>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
+                        <span className="text-[10px] font-bold text-white/40 uppercase block">Alertas Enviadas</span>
+                        <span className="text-xl font-black text-amber-400">{cand.toolsDetails.tracker.totalRemindersSent} alertas</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+
+          {/* ══════════════════════════════════
+              SIDEBAR (col-span-1)
+          ══════════════════════════════════ */}
+          <div className="space-y-6">
+
+            {/* ── Acciones F3 ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-5 text-left">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider pb-2 border-b border-white/5">
+                Acciones del Pipeline F3
+              </h3>
+
+              {/* Cambio de Estado */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold text-[#879391] block">Cambio de Estado Interno</span>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => handleTransitionState("09_shortlist")}
+                    disabled={cand.currentPhase === "09_shortlist"}
+                    className="w-full py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/15 hover:text-white transition-all text-xs font-bold text-amber-400 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    <span>09 - Shortlist</span>
+                  </button>
+                  <button
+                    onClick={() => handleTransitionState("10_entrevista_cliente")}
+                    disabled={cand.currentPhase === "10_entrevista_cliente"}
+                    className="w-full py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/15 hover:text-white transition-all text-xs font-bold text-emerald-400 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    <span>10 - Entrevista Cliente</span>
+                  </button>
+                  <button
+                    onClick={() => handleTransitionState("11_standby")}
+                    disabled={cand.currentPhase === "11_standby"}
+                    className="w-full py-2.5 rounded-xl border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/15 hover:text-white transition-all text-xs font-bold text-purple-400 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    <span>11 - Stand-by</span>
+                  </button>
+
+                  <button
+                    onClick={handleRevertToEvalPhase}
+                    disabled={isRevertingPhase}
+                    className="w-full py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/15 text-amber-400 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+                    title="Cambia el estado del expediente al primer estado de la Fase 2 Evaluación (05_screening)"
+                  >
+                    {isRevertingPhase ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ChevronsLeft className="w-3.5 h-3.5" />
+                    )}
+                    <span>Volver a Fase Evaluación</span>
+                  </button>
                 </div>
-                <button
-                  onClick={suggestOptimalSlot}
-                  disabled={isSimulatingAgendasSlot}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/20"
-                >
-                  {isSimulatingAgendasSlot ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Calendar className="w-3.5 h-3.5" />
-                  )}
-                  <span>Reservar Slot Óptimo</span>
-                </button>
               </div>
 
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                <span className="text-[10px] font-bold text-white/40 uppercase block">Slots Sugeridos Disponibles</span>
-                <div className="space-y-2">
-                  {cand.toolsDetails.agenda.suggestedSlots.map((slot, idx) => (
-                    <div key={idx} className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between text-xs">
-                      <span className="text-[#e0e3e5]">{slot}</span>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold">Disponible</span>
-                    </div>
-                  ))}
+              {/* Avanzar Fase */}
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold text-[#879391] block">Avance de Fase</span>
+                <button
+                  onClick={() => setIsAdvanceModalOpen(true)}
+                  className="w-full py-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 hover:bg-emerald-500 hover:text-stone-950 transition-all text-xs font-black text-emerald-400 flex items-center justify-center gap-2 cursor-pointer shadow shadow-emerald-500/5"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>Avanzar a Fase 4 (Cierre)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ── Datos del Pipeline ── */}
+            {activePipelineItem && (
+              <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-4 text-left">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider pb-2 border-b border-white/5">
+                  Trazabilidad del Pipeline
+                </h3>
+
+                <div className="space-y-2 text-xs">
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">ID Pipeline</span>
+                    <span className="font-mono text-white/80 select-all text-[10px]">{activePipelineItem.id}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">ID Búsqueda</span>
+                    <span className="font-mono text-white/80 select-all text-[10px]">{activePipelineItem.claves_conexion.id_busqueda}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">Estado en Pipeline</span>
+                    <span className="text-[#c4c1fb] font-bold block mt-0.5">{activePipelineItem.flujo.estado_actual}</span>
+                  </div>
+                  <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
+                    <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">Última Modificación</span>
+                    <span className="text-white/80 block mt-0.5 text-[10px]">
+                      {activePipelineItem.flujo.fecha_ultimo_cambio
+                        ? new Date(activePipelineItem.flujo.fecha_ultimo_cambio).toLocaleString()
+                        : "No especificado"}
+                    </span>
+                  </div>
                 </div>
 
-                {cand.toolsDetails.agenda.recruiterSlotSelected && (
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 space-y-1">
-                    <span className="text-[10px] font-bold uppercase block">Slot Seleccionado</span>
-                    <span className="font-bold">{cand.toolsDetails.agenda.recruiterSlotSelected}</span>
+                {/* Historial SLA */}
+                {activePipelineItem.flujo.historial_estados && activePipelineItem.flujo.historial_estados.length > 0 ? (
+                  <div className="pt-4 border-t border-white/5 space-y-4">
+                    <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider block">
+                      Historial y Trazabilidad de Estados (SLA)
+                    </span>
+                    <div className="relative pl-6 border-l border-white/10 space-y-5 ml-2 pt-1 pb-1">
+                      {activePipelineItem.flujo.historial_estados.map((entry, idx) => (
+                        <div key={idx} className="relative space-y-1">
+                          <div className={`absolute -left-[29.5px] top-1 w-2.5 h-2.5 rounded-full border border-[#101415] shadow-sm ${
+                            idx === 0 ? "bg-[#c4c1fb] ring-4 ring-[#c4c1fb]/20" : "bg-[#879391]"
+                          }`} />
+                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1">
+                            <span className={`text-xs font-bold ${idx === 0 ? "text-white" : "text-white/60"}`}>
+                              {entry.estado}
+                            </span>
+                            <span className="text-[10px] text-[#879391] font-mono">
+                              {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-4 border-t border-white/5">
+                    <p className="text-[11px] text-[#879391] italic">
+                      No se registra historial previo de transiciones para esta postulación.
+                    </p>
                   </div>
                 )}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* TAB 6: Bot SLA Tracker */}
-          {activeTab === "tracker" && (
-            <div className="space-y-4 animate-fadeIn text-xs">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Bot Rastreador de SLA</h4>
-                  <p className="text-[10px] text-[#879391]">Monitoreo de horas de espera y envío de recordatorios al cliente</p>
-                </div>
-                <button
-                  onClick={sendSlaAlertPing}
-                  disabled={isSimulatingSlaPing}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/20"
-                >
-                  {isSimulatingSlaPing ? (
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Send className="w-3.5 h-3.5" />
-                  )}
-                  <span>Enviar Alerta SLA</span>
-                </button>
+            {/* ── Score visual ── */}
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 text-center space-y-3">
+              <span className="text-[10px] uppercase tracking-wider font-bold text-white/30 block">Fit Score F3</span>
+              <div className="relative inline-flex items-center justify-center w-24 h-24 mx-auto">
+                <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+                  <circle
+                    cx="48" cy="48" r="40"
+                    fill="none"
+                    stroke="#6bd8cb"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 40}`}
+                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - cand.score / 100)}`}
+                    className="transition-all duration-700"
+                  />
+                </svg>
+                <span className="absolute text-xl font-black text-[#6bd8cb] font-mono">{cand.score}%</span>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Horas Transcurridas</span>
-                  <span className="text-xl font-black text-white">{cand.toolsDetails.tracker.hoursSinceSent} horas</span>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Estado SLA</span>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded inline-block ${
-                    cand.toolsDetails.tracker.slaExceeded ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                  }`}>
-                    {cand.toolsDetails.tracker.slaExceeded ? "Excedido (>48h)" : "Normal (<48h)"}
-                  </span>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
-                  <span className="text-[10px] font-bold text-white/40 uppercase block">Alertas Enviadas</span>
-                  <span className="text-xl font-black text-amber-400">{cand.toolsDetails.tracker.totalRemindersSent} alertas</span>
-                </div>
+              <div className="flex items-center justify-center gap-1.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`w-3.5 h-3.5 ${i < Math.round(cand.score / 20) ? "text-amber-400 fill-amber-400" : "text-white/10"}`}
+                  />
+                ))}
               </div>
+              <p className="text-[10px] text-[#879391]">
+                {cand.score >= 85 ? "Candidato destacado — alta prioridad de presentación" : cand.score >= 70 ? "Candidato apto — seguimiento recomendado" : "Candidato en calibración"}
+              </p>
             </div>
-          )}
 
-        </section>
+          </div>
+
+        </div>
 
       </div>
 
@@ -1554,7 +1714,7 @@ export default function PresentacionDetallePage() {
 
             <div className="space-y-3 text-xs text-[#879391]">
               <p>
-                ¿Confirmas que deseas graduar al candidato <strong className="text-white">{cand.name}</strong> a la <strong className="text-emerald-400">Fase 4: Cierre del Proceso (11 - Oferta Extendida)</strong>?
+                ¿Confirmas que deseas graduar al candidato <strong className="text-white">{cand.name}</strong> a la <strong className="text-emerald-400">Fase 4: Cierre del Proceso (12 - Oferta Extendida)</strong>?
               </p>
               <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px]">
                 El expediente se moverá formalmente a la mesa de oferta y negociación en el pipeline de cierre.
@@ -1584,6 +1744,7 @@ export default function PresentacionDetallePage() {
           </div>
         </div>
       )}
+
       {/* --- MODAL CREAR / EDITAR REUNIÓN --- */}
       {isMeetingModalOpen && (
         <div className="fixed inset-0 bg-[#101415]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1720,6 +1881,6 @@ export default function PresentacionDetallePage() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }

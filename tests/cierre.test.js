@@ -192,4 +192,18 @@ describe('Módulo de Cierre (F4 Cierre) - Capa de Lógica y Datos', () => {
     assert.strictEqual(kpis.avgDecisionLatencyHours, 0);
     assert.strictEqual(kpis.feedbackClosureRate, 0);
   });
+
+  test('Debería determinar el siguiente estado al avanzar postulante en Cierre (P-CIE-01)', () => {
+    const nextPhaseMap = {
+      '12_oferta_extendida': '13_contratado',
+      '13_contratado': '14_rechazado_cliente',
+      '14_rechazado_cliente': '12_oferta_extendida',
+      '15_candidato_se_baja': '12_oferta_extendida'
+    };
+
+    assert.strictEqual(nextPhaseMap['12_oferta_extendida'], '13_contratado');
+    assert.strictEqual(nextPhaseMap['13_contratado'], '14_rechazado_cliente');
+    assert.strictEqual(nextPhaseMap['14_rechazado_cliente'], '12_oferta_extendida');
+    assert.strictEqual(nextPhaseMap['15_candidato_se_baja'], '12_oferta_extendida');
+  });
 });

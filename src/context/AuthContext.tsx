@@ -78,6 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+
+
   const logout = async () => {
     setUser(null);
     clearTokenCookie();

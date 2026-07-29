@@ -38,8 +38,7 @@ export default function BusquedasPage() {
   const [selectedSearch, setSelectedSearch] = useState<Busqueda | undefined>(undefined);
 
   const handleEditClick = (item: Busqueda) => {
-    setSelectedSearch(item);
-    setIsSlideOpen(true);
+    router.push(`/busquedas/${item.id}`);
   };
 
   // Client-side authentication redirection guard
