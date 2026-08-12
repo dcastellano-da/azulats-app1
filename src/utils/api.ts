@@ -2,7 +2,7 @@
  * Helper to construct clean API URLs supporting local dev and Cloud Run environments.
  */
 export function getApiEndpoint(path: string): string {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
+  const envUrl = process.env.NEXT_PUBLIC_ATS_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1";
   const cleanEnvUrl = envUrl.replace(/\/+$/, "");
   const cleanPath = path.replace(/^\/+/, "");
   

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import SlideOver from "../components/SlideOver";
 import SearchForm from "../components/SearchForm";
+import MockModeBadge from "../components/MockModeBadge";
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 
 export default function BusquedasPage() {
@@ -143,6 +144,7 @@ export default function BusquedasPage() {
                   <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
                     ID: P-BUS-01
                   </span>
+                  <MockModeBadge />
                 </div>
                 <h1 className="text-2xl font-extrabold tracking-tight text-white mt-0.5">Gestión de Posiciones</h1>
               </div>

@@ -46,9 +46,16 @@ azulats-app1/
 
 ## Configuración y Variables de Entorno
 
-Crea un archivo `.env.local` en la raíz del proyecto para conectar las claves cliente oficiales de Firebase:
+Crea un archivo `.env.local` en la raíz del proyecto para definir la conexión con la API de backend en Cloud Run y las claves de Firebase:
 
 ```env
+# URL Base del Microservicio REST de Azul ATS en Google Cloud Run
+NEXT_PUBLIC_ATS_API_URL=https://api-azulats-yur42lfa-ew.a.run.app
+# Alternativa compatible: NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+
+# Flag de Modo Mock para Desarrollo Local y QA (true = usar mocks locales, false/no definido = backend real)
+NEXT_PUBLIC_USE_MOCKS=false
+
 # Claves Cliente de Firebase Auth
 NEXT_PUBLIC_FIREBASE_API_KEY=tu_firebase_api_key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=tu_firebase_auth_domain
@@ -57,6 +64,11 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=tu_firebase_storage_bucket
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=tu_firebase_messaging_sender_id
 NEXT_PUBLIC_FIREBASE_APP_ID=tu_firebase_app_id
 ```
+
+### Control de Mocks y Conexión Backend (`NEXT_PUBLIC_USE_MOCKS`)
+
+* **Uso en Desarrollo Local / QA (`NEXT_PUBLIC_USE_MOCKS=true`):** Al activar esta variable en `true`, la aplicación intercepta las acciones de búsquedas (`crearBusquedaAPI`, `getBusquedasAPI`) y retorna datasets estáticos sin realizar llamadas HTTP de red. Además, renderizará un indicador visual destacado (**`⚠️ MOCKS ACTIVOS`**) en la interfaz de usuario.
+* **Comportamiento en Producción (`NEXT_PUBLIC_USE_MOCKS=false` o sin definir):** La aplicación ejecutará la comunicación HTTP real (`POST`, `GET`, `PATCH`) hacia el servicio en Cloud Run definido en `NEXT_PUBLIC_ATS_API_URL`. Si se produce una falla de red o error de servidor, no se realizará ningún fallback silencioso a mocks; la UI capturará el error e informará claramente al usuario mediante un banner de alerta (`AlertCircle`).
 
 > [!NOTE]
 > Para facilitar las pruebas visuales y el desarrollo local rápido, la pantalla de inicio de sesión incluye una pestaña **"Panel Demo"** (Mock Mode). Este modo permite el ingreso con cualquier credencial de correo y password simulada sin llamadas API de red a Firebase, permitiendo una maqueta preliminar 100% funcional.
@@ -238,15 +250,63 @@ Para simplificar la interacción en los prompts de desarrollo y la localización
 
 
 --------------------------------------------------------------------------------------------------------
-# Despliegue en hosting Pruebas de Firebase
-```bash
-git add .   
-git commit -m "Texto del cambio" 
-git push origin main
-```
+# Arquitectura de Entornos y Estrategia de Despliegue (Firebase App Hosting)
+
+El frontend de la aplicación cuenta con una **separación física de entornos** desplegada sobre **Firebase App Hosting**, sincronizada de forma continua con la estrategia de ramas del repositorio de GitHub.
+
+## 1. Estrategia de Ramas en GitHub
+
+*   **`main` (Producción):** Rama exclusiva e intocable para el trabajo diario. Queda estrictamente restringido realizar commits directos sobre ella. Únicamente recibe código funcional, probado y auditado a través de integraciones (*Merges* / *Pull Requests*) desde la rama `develop`.
+*   **`develop` (Staging / Desarrollo):** Rama central de desarrollo e integración continua. Es el punto neurálgico donde se consolida el trabajo diario, las nuevas funcionalidades (*features*) y las resoluciones de errores (*bugfixes*).
+
+## 2. Entornos de Despliegue Automatizado
+
+*   **Entorno de Pruebas (Staging / QA):**
+    *   **Rama origen:** Conectado a `develop`.
+    *   **Automatización CI/CD:** Cualquier evento de *push* o *merge* entrante en `develop` dispara automáticamente un pipeline de compilación (Build) y despliegue en el proyecto de pruebas de **Firebase App Hosting**.
+*   **Entorno de Producción:**
+    *   **Rama origen:** Conectado estrictamente a `main`.
+    *   **Aislamiento de Infraestructura:** El pipeline de *release* despliega la aplicación sobre un proyecto de Firebase completamente independiente y aislado a nivel de recursos respecto del entorno de pruebas.
+
+## 3. Flujo de Trabajo del Desarrollador (Developer Workflow)
+
+Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarrollo debe seguir rigurosamente las siguientes pautas:
+
+1.  **Creación de Ramas Temporales (*Feature Branches*):**
+    Todo desarrollo de nuevas pantallas, componentes o correcciones debe iniciarse creando una rama de trabajo temporal partiendo **siempre desde `develop`** (nunca desde `main`):
+    ```bash
+    git checkout develop
+    git pull origin develop
+    git checkout -b feature/nombre-de-la-funcionalidad
+    ```
+
+2.  **Integración y Despliegue en Staging:**
+    Una vez finalizado y probado el desarrollo localmente, se sube la rama temporal y se solicita su fusión hacia `develop` para activar el despliegue automático al entorno de pruebas:
+    ```bash
+    git push origin feature/nombre-de-la-funcionalidad
+    # Crear Pull Request de feature/nombre-de-la-funcionalidad -> develop
+    ```
+
+3.  **Promoción a Producción:**
+    Tras la validación funcional satisfactoria en el entorno de Staging, la promoción a Producción se ejecuta mediante el Merge validado desde `develop` hacia `main`:
+    ```bash
+    # Transición controlada a Producción mediante PR / Merge: develop -> main
+    ```
 
 --------------------------------------------------------------------------------------------------------
 # Historico de Cambios (ordenados por los recientes cambios primeros)
+
+*   **12/08/2026:** Conexión Real a Cloud Run, Flag `NEXT_PUBLIC_USE_MOCKS` y Badge DX/QA (`⚠️ MOCKS ACTIVOS`):
+    *   **Conexión Real de Creación de Búsquedas:** Refactorización de `crearBusquedaAPI` y `getBusquedasAPI` en `src/actions/busquedas.ts` para conectar con la API en Cloud Run definida en `NEXT_PUBLIC_ATS_API_URL` (o `NEXT_PUBLIC_API_URL`), inyectando cabeceras `Authorization: Bearer <token>` y `Content-Type: application/json`.
+    *   **Control de Mocks por Variable de Entorno:** Implementación del flag de entorno `NEXT_PUBLIC_USE_MOCKS`. Si la variable es `true`, las Server Actions retornan datos estáticos locales; si es `false` o no está definida (entorno de Producción), la aplicación fuerza la llamada HTTP real a la API.
+    *   **Manejo de Errores Sin Fallback Silencioso:** Remoción de fallbacks silenciosos a datos falsos en caso de fallas de red o errores HTTP del backend. Captura explícita de códigos de respuesta con feedback visual al usuario en `SearchForm.tsx` vía banner de alerta (`AlertCircle`).
+    *   **Indicador Visual DX/QA (`MockModeBadge`):** Creación del componente `src/app/components/MockModeBadge.tsx` que muestra un badge amarillo/naranja con pulso (`⚠️ MOCKS ACTIVOS`). Devuelve `null` estricto en Producción o cuando `NEXT_PUBLIC_USE_MOCKS !== "true"`. Integrado en `layout.tsx` y en el encabezado de `busquedas/page.tsx`.
+    *   **Suite de Pruebas Automatizadas:** Creación de `tests/crear_busqueda_api.test.js` bajo `node:test` para validar el comportamiento estático cuando el flag de mocks está activo y la emisión del payload HTTP `POST` a la URL de Cloud Run cuando está inactivo.
+
+*   **12/08/2026:** Separación Física de Entornos y Estrategia de Ramas en GitHub (`Firebase App Hosting`):
+    *   **Separación de Entornos:** Documentación e integración de entornos físicamente independientes en **Firebase App Hosting** para Staging y Producción.
+    *   **Estrategia de Ramas:** Definición de `main` como rama exclusiva de Producción (protegida para trabajo diario, solo recibe código vía Merge desde `develop`) y `develop` como rama central de integración para Staging.
+    *   **Flujo de Trabajo del Desarrollador:** Regla obligatoria de creación de ramas temporales (*feature branches*) partiendo siempre desde `develop` (`git checkout -b feature/nombre-tarea develop`).
 
 *   **31/07/2026:** Indicador de Suma de Pesos en Sección "Criterios de Screening" (`ID: P-BUS-02` — `src/app/components/SearchForm.tsx`):
     *   **Indicador Visual en Tiempo Real:** Añadido un panel informativo debajo del header de la sección "5. Criterios de Screening (Máximo 5)" que se muestra únicamente cuando existe al menos un criterio configurado. Calcula en tiempo real la suma de los campos `peso` de todos los criterios de tipo `deseable` y la compara contra el valor objetivo de **100 puntos**.

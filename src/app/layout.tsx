@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
+import MockModeBadge from "@/app/components/MockModeBadge";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -25,6 +26,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-[#101415] text-[#e0e3e5] font-sans">
         <AuthProvider>
+          <div className="fixed top-3 right-4 z-50 pointer-events-auto">
+            <MockModeBadge />
+          </div>
           {children}
         </AuthProvider>
       </body>

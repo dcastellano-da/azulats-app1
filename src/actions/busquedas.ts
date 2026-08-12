@@ -1,8 +1,8 @@
 'use server';
 
-import { cookies } from "next/headers";
-import { CriterioScreening } from "@/types/screening";
-import { getApiEndpoint } from "@/utils/api";
+import { cookies } from "next/headers.js";
+import type { CriterioScreening } from "../types/screening.ts";
+import { getApiEndpoint } from "../utils/api.ts";
 
 export interface BusquedaPayload {
   cliente: string;
@@ -165,13 +165,17 @@ let fallbackBusquedas: Busqueda[] = [
  * (via setTokenCookie in src/lib/firebase/auth.ts) after login.
  */
 async function getServerAuthToken(): Promise<string> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("azul_ats_token")?.value;
-  if (!token) {
-    console.log("[Server Action busquedas] Token de sesión no encontrado en cookie, usando mock-token-recruiter para conectar a Express local puerto 8080");
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("azul_ats_token")?.value;
+    if (!token) {
+      console.log("[Server Action busquedas] Token de sesión no encontrado en cookie, usando mock-token-recruiter para conectar a Express local puerto 8080");
+      return "mock-token-recruiter";
+    }
+    return token;
+  } catch {
     return "mock-token-recruiter";
   }
-  return token;
 }
 
 
@@ -180,6 +184,7 @@ async function getServerAuthToken(): Promise<string> {
  */
 export async function crearBusquedaAPI(payload: BusquedaPayload): Promise<APIResponse> {
   try {
+    const useMocks = process.env.NEXT_PUBLIC_USE_MOCKS === "true";
     const token = await getServerAuthToken();
     const url = getApiEndpoint("busquedas");
 
@@ -190,7 +195,8 @@ export async function crearBusquedaAPI(payload: BusquedaPayload): Promise<APIRes
       peso: c.tipo === 'knockout' ? 0 : Number(c.peso || 0)
     }));
 
-    if (token === "mock_session_token_for_docs_generation") {
+    if (useMocks || token === "mock_session_token_for_docs_generation") {
+      console.log("[Server Action crearBusquedaAPI] Flag NEXT_PUBLIC_USE_MOCKS activo o token de docs. Retornando datos mock estáticos.");
       const newBusqueda: Busqueda = {
         id: payload.id_busqueda || `REQ-MOCK-${Date.now()}`,
         cliente: payload.cliente,
@@ -216,7 +222,7 @@ export async function crearBusquedaAPI(payload: BusquedaPayload): Promise<APIRes
       return {
         status: 201,
         success: true,
-        message: "Búsqueda guardada en la base de datos.",
+        message: "Búsqueda guardada en la base de datos (Modo Mock).",
         data: newBusqueda
       };
     }
@@ -307,6 +313,11 @@ export async function crearBusquedaAPI(payload: BusquedaPayload): Promise<APIRes
  */
 export async function getBusquedasAPI(): Promise<Busqueda[]> {
   try {
+    const useMocks = process.env.NEXT_PUBLIC_USE_MOCKS === "true";
+    if (useMocks) {
+      console.log("[Server Action getBusquedasAPI] Flag NEXT_PUBLIC_USE_MOCKS activo. Retornando datos mock estáticos.");
+      return fallbackBusquedas;
+    }
     const token = await getServerAuthToken();
     const url = getApiEndpoint("busquedas");
 
