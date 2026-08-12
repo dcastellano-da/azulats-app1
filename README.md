@@ -312,6 +312,10 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     Tras la validación funcional satisfactoria en el entorno de Staging, la promoción a Producción se ejecuta mediante el Merge validado desde `develop` hacia `main`:
     ```bash
     # Transición controlada a Producción mediante PR / Merge: develop -> main
+    git checkout main
+    git merge develop
+    git push origin main
+    git checkout develop
     ```
 
 --------------------------------------------------------------------------------------------------------
