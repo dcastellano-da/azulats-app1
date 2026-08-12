@@ -1,8 +1,8 @@
 'use server';
 
-import { cookies } from "next/headers.js";
-import type { CriterioScreening } from "../types/screening.ts";
-import { getApiEndpoint } from "../utils/api.ts";
+import { cookies } from "next/headers";
+import type { CriterioScreening } from "@/types/screening";
+import { getApiEndpoint } from "@/utils/api";
 
 export interface BusquedaPayload {
   cliente: string;

@@ -246,7 +246,11 @@ Para simplificar la interacción en los prompts de desarrollo y la localización
     ```bash
     export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && node --experimental-strip-types --test tests/busquedas_screening.test.js
     ```
-12. Abre [http://localhost:3000](http://localhost:3000) en el navegador.
+12. **Verificación de Tipos TypeScript:**
+    ```bash
+    npx tsc --noEmit
+    ```
+13. Abre [http://localhost:3000](http://localhost:3000) en el navegador.
 
 
 --------------------------------------------------------------------------------------------------------
@@ -285,6 +289,23 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     ```bash
     git push origin feature/nombre-de-la-funcionalidad
     # Crear Pull Request de feature/nombre-de-la-funcionalidad -> develop
+
+    # Mis pasos para guardar el desarrollo en la rama desarrollo:
+    # Verificar que estoy en desarrollo
+    git checkout develop
+
+    # Actualizar con los ultimos cambios de la rama desarrollo (no se si aplica siempre)
+    git pull origin develop
+   
+    # Agregar los cambios
+    git add .
+    # Commit de los cambios
+    git commit -m "feat: conexión a API real en Cloud Run, control de mocks y badge QA"
+    # Push de los cambios
+    git push origin develop
+
+    # Volver a la rama desarrollo para continuar desarrollando
+    git checkout develop
     ```
 
 3.  **Promoción a Producción:**
@@ -295,6 +316,11 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
 
 --------------------------------------------------------------------------------------------------------
 # Historico de Cambios (ordenados por los recientes cambios primeros)
+
+*   **12/08/2026:** Corrección de Importaciones con Extensiones `.ts`/`.js` para Despliegue en Firebase App Hosting (`src/actions/busquedas.ts`):
+    *   **Resolución de Error TS5097 en Build de Next.js:** Eliminación de extensiones de archivo explícitas (`.ts` y `.js`) en las rutas de importación en `src/actions/busquedas.ts` (`CriterioScreening`, `getApiEndpoint`, `cookies`).
+    *   **Homologación de Importaciones con Alias (`@/`)**: Estandarización de las rutas relativas (`../types/screening`, `../utils/api`) al alias global `@/` (`@/types/screening` y `@/utils/api`), alineándolo con `candidatos.ts` y `pipeline.ts`.
+    *   **Auditoría y Validación:** Inspección en todo el directorio `src/` confirmando la ausencia de otras extensiones en importaciones y verificación mediante `npx tsc --noEmit` (**0 errores**).
 
 *   **12/08/2026:** Conexión Real a Cloud Run, Flag `NEXT_PUBLIC_USE_MOCKS` y Badge DX/QA (`⚠️ MOCKS ACTIVOS`):
     *   **Conexión Real de Creación de Búsquedas:** Refactorización de `crearBusquedaAPI` y `getBusquedasAPI` en `src/actions/busquedas.ts` para conectar con la API en Cloud Run definida en `NEXT_PUBLIC_ATS_API_URL` (o `NEXT_PUBLIC_API_URL`), inyectando cabeceras `Authorization: Bearer <token>` y `Content-Type: application/json`.
