@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition } from "react";
-import { Sparkles, AlertTriangle, CheckCircle2, HelpCircle, XCircle, Quote, RefreshCw } from "lucide-react";
+import { Sparkles, AlertTriangle, CheckCircle2, HelpCircle, XCircle, Quote, RefreshCw, Edit2, Save } from "lucide-react";
 import { CriterioScreening, ResultadoScreeningItem } from "@/types/screening";
 import { actualizarResultadoScreeningAction } from "@/actions/pipeline";
 
@@ -28,6 +28,12 @@ export default function ScreeningPanel({
   const [localResultado, setLocalResultado] = useState<ResultadoScreeningItem[]>(resultadoScreening);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Accordion state: tracks which criteria have their evidence panel expanded
+  const [expandedEvidencia, setExpandedEvidencia] = useState<Record<string, boolean>>({});
+  // Inline evidence edit state
+  const [editingEvidencia, setEditingEvidencia] = useState<Record<string, boolean>>({});
+  const [editEvidenciaText, setEditEvidenciaText] = useState<Record<string, string>>({});
+  const [savingEvidencia, setSavingEvidencia] = useState<Record<string, boolean>>({});
 
   // Sync props when parent updates without triggering infinite re-render loops
   const prevResultadoJson = React.useRef(JSON.stringify(resultadoScreening || []));
@@ -85,6 +91,46 @@ export default function ScreeningPanel({
     });
   };
 
+  // Handle inline evidence save
+  const handleSaveEvidencia = async (criterioId: string, idx: number) => {
+    const newText = editEvidenciaText[criterioId] ?? "";
+    setSavingEvidencia(prev => ({ ...prev, [criterioId]: true }));
+
+    const updatedArray = localResultado.map(r => {
+      const matchId = r.id_criterio === criterioId || (r as any).criterio_id === criterioId || (r as any).id === criterioId;
+      const matchIdx = !matchId && localResultado.indexOf(r) === idx;
+      if (matchId || matchIdx) {
+        return { ...r, evidencia_cv: newText };
+      }
+      return r;
+    });
+
+    // If no item matched, append one
+    if (!updatedArray.find(r => r.id_criterio === criterioId)) {
+      const crit = criteriosBusqueda.find(c => c.id === criterioId);
+      if (crit) {
+        updatedArray.push({
+          id_criterio: criterioId,
+          evaluacion: (localResultado[idx]?.evaluacion || "NO") as "SI" | "INFERIDO" | "NO",
+          evidencia_cv: newText,
+          es_knockout: crit.tipo === "knockout",
+          puntaje_obtenido: localResultado[idx]?.puntaje_obtenido || 0
+        });
+      }
+    }
+
+    setLocalResultado(updatedArray);
+    setEditingEvidencia(prev => ({ ...prev, [criterioId]: false }));
+
+    try {
+      await actualizarResultadoScreeningAction(pipelineId, updatedArray);
+    } catch (error) {
+      console.error("Error al guardar evidencia:", error);
+    } finally {
+      setSavingEvidencia(prev => ({ ...prev, [criterioId]: false }));
+    }
+  };
+
   // Helper function for ultra-flexible criteria evaluation matching
   const findEvaluationForCriterion = (crit: CriterioScreening, idx: number): ResultadoScreeningItem | undefined => {
     if (!localResultado || localResultado.length === 0) return undefined;
@@ -132,7 +178,7 @@ export default function ScreeningPanel({
   const displayScore = hasEvaluations ? (fitScore > 0 ? fitScore : calculatedScore) : 0;
   const isKnockoutActive = tieneKnockout || calculatedKnockout;
 
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
+
 
   return (
     <div className="p-5 rounded-2xl bg-[#15181a] border border-white/10 shadow-xl space-y-4 text-white">
@@ -156,15 +202,6 @@ export default function ScreeningPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Diagnostic Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setShowDebugInfo(!showDebugInfo)}
-            title="Ver inspector de diagnóstico de datos REST / Firestore"
-            className="p-1.5 rounded-lg border border-white/10 text-[10px] text-[#879391] hover:text-white hover:bg-white/5 font-mono cursor-pointer transition-all"
-          >
-            🐛 Debug
-          </button>
 
           {/* Fit Score Badge */}
           {hasEvaluations && (
@@ -187,25 +224,7 @@ export default function ScreeningPanel({
         </div>
       </div>
 
-      {/* Widget de Diagnóstico en Tiempo Real */}
-      {showDebugInfo && (
-        <div className="p-3.5 rounded-xl bg-black/60 border border-cyan-500/30 text-[10px] font-mono space-y-1.5 text-cyan-200 animate-fadeIn">
-          <div className="flex justify-between items-center font-bold border-b border-cyan-500/20 pb-1">
-            <span>Inspector de Datos REST (P-DIS-02)</span>
-            <span className="text-[9px] bg-cyan-500/20 px-1.5 py-0.5 rounded text-cyan-300">Live DB</span>
-          </div>
-          <p>Pipeline ID: <span className="text-white">{pipelineId}</span></p>
-          <p>Criterios Búsqueda: <span className="text-white">{criteriosBusqueda.length}</span></p>
-          <p>Resultados Recibidos DB: <span className="text-white">{resultadoScreening?.length || 0} ítems</span></p>
-          <p>Fit Score DB: <span className="text-white">{fitScore}</span> | Knockout DB: <span className="text-white">{tieneKnockout ? "TRUE" : "FALSE"}</span></p>
-          <div className="pt-1">
-            <span className="opacity-70 block mb-0.5">Payload Crudo `resultado_screening`:</span>
-            <pre className="p-2 rounded bg-black/80 text-[9px] text-emerald-400 overflow-x-auto max-h-28 custom-scrollbar">
-              {JSON.stringify(resultadoScreening || [], null, 2)}
-            </pre>
-          </div>
-        </div>
-      )}
+
 
       {/* Alerta de Knockout Activo */}
       {isKnockoutActive && (
@@ -285,7 +304,7 @@ export default function ScreeningPanel({
 
                 {/* Semáforo Interactivo (Human-in-the-Loop + UI Optimista) */}
                 <div className="flex items-center gap-1.5 pt-1">
-                  <span className="text-[10px] text-[#879391] mr-1 uppercase tracking-wider font-semibold">
+                  <span className="text-[10px] text-[#879391] mr-1 uppercase tracking-wider font-semibold shrink-0">
                     Semáforo:
                   </span>
 
@@ -294,13 +313,13 @@ export default function ScreeningPanel({
                     type="button"
                     onClick={() => handleEvaluacionChange(crit.id, "SI")}
                     disabled={isPending}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                    className={`flex items-center justify-center gap-1 py-1 rounded-lg text-[11px] font-bold transition-all border flex-1 min-w-0 ${
                       evaluacion === "SI"
                         ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm shadow-emerald-500/20 scale-105"
                         : "bg-white/5 text-[#879391] border-white/10 hover:bg-white/10 hover:text-white"
                     }`}
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                     <span>SÍ</span>
                   </button>
 
@@ -309,14 +328,14 @@ export default function ScreeningPanel({
                     type="button"
                     onClick={() => handleEvaluacionChange(crit.id, "INFERIDO")}
                     disabled={isPending}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                    className={`flex items-center justify-center gap-1 py-1 rounded-lg text-[11px] font-bold transition-all border flex-1 min-w-0 ${
                       evaluacion === "INFERIDO"
                         ? "bg-amber-500/20 text-amber-400 border-amber-500/40 shadow-sm shadow-amber-500/20 scale-105"
                         : "bg-white/5 text-[#879391] border-white/10 hover:bg-white/10 hover:text-white"
                     }`}
                   >
-                    <HelpCircle className="w-3.5 h-3.5" />
-                    <span>INFERIDO ({crit.tipo === "deseable" ? Math.round(crit.peso / 2) : 0} pts)</span>
+                    <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>INFERIDO</span>
                   </button>
 
                   {/* NO */}
@@ -324,29 +343,128 @@ export default function ScreeningPanel({
                     type="button"
                     onClick={() => handleEvaluacionChange(crit.id, "NO")}
                     disabled={isPending}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+                    className={`flex items-center justify-center gap-1 py-1 rounded-lg text-[11px] font-bold transition-all border flex-1 min-w-0 ${
                       evaluacion === "NO"
                         ? "bg-red-500/20 text-red-400 border-red-500/40 shadow-sm shadow-red-500/20 scale-105"
                         : "bg-white/5 text-[#879391] border-white/10 hover:bg-white/10 hover:text-white"
                     }`}
                   >
-                    <XCircle className="w-3.5 h-3.5" />
+                    <XCircle className="w-3.5 h-3.5 shrink-0" />
                     <span>NO</span>
                   </button>
                 </div>
 
-                {/* Caja de Evidencia ("Prueba de Vida") */}
-                <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 text-[11px] flex items-start gap-2">
-                  <Quote className="w-4 h-4 text-[#6bd8cb] shrink-0 mt-0.5 opacity-70" />
-                  <div>
-                    <span className="text-[10px] text-[#879391] font-bold uppercase tracking-wider block mb-0.5">
-                      Evidencia del CV (Prueba de Vida):
-                    </span>
-                    <blockquote className="italic text-[#c4c1fb] leading-relaxed">
-                      "{evidencia}"
-                    </blockquote>
-                  </div>
-                </div>
+                {/* Caja de Evidencia ("Prueba de Vida") — acordeón colapsable con edición inline */}
+                {(() => {
+                  const key = crit.id || String(idx);
+                  const isExpanded = expandedEvidencia[key];
+                  const isEditing = editingEvidencia[key];
+                  const isSaving = savingEvidencia[key];
+                  const currentText = isEditing
+                    ? (editEvidenciaText[key] ?? evidencia)
+                    : evidencia;
+
+                  return (
+                    <div className="rounded-lg border border-white/5 text-[11px] overflow-hidden">
+                      {/* Accordion header */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedEvidencia(prev => ({
+                            ...prev,
+                            [key]: !prev[key]
+                          }))
+                        }
+                        className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 bg-black/30 hover:bg-black/50 transition-colors cursor-pointer text-left"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Quote className="w-3.5 h-3.5 text-[#6bd8cb] shrink-0 opacity-70" />
+                          <span className="text-[10px] text-[#879391] font-bold uppercase tracking-wider">
+                            Evidencia del CV (Prueba de Vida)
+                          </span>
+                        </div>
+                        <span
+                          className={`text-[#879391] text-[10px] transition-transform duration-200 ${
+                            isExpanded ? "rotate-180" : ""
+                          }`}
+                        >
+                          ▾
+                        </span>
+                      </button>
+
+                      {/* Expanded body */}
+                      {isExpanded && (
+                        <div className="px-2.5 py-2 bg-black/40 border-t border-white/5 space-y-2">
+                          {isEditing ? (
+                            <>
+                              <textarea
+                                value={currentText}
+                                onChange={e =>
+                                  setEditEvidenciaText(prev => ({
+                                    ...prev,
+                                    [key]: e.target.value
+                                  }))
+                                }
+                                rows={4}
+                                className="w-full bg-black/60 border border-[#6bd8cb]/30 rounded-lg px-2.5 py-2 text-[11px] text-[#c4c1fb] italic leading-relaxed resize-none focus:outline-none focus:border-[#6bd8cb]/60 placeholder:text-[#879391]/50 transition-colors"
+                                placeholder="Escribe la evidencia del CV…"
+                                autoFocus
+                              />
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditingEvidencia(prev => ({
+                                      ...prev,
+                                      [key]: false
+                                    }))
+                                  }
+                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-[#879391] border border-white/10 hover:bg-white/5 transition-colors cursor-pointer"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isSaving}
+                                  onClick={() => handleSaveEvidencia(crit.id, idx)}
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#6bd8cb] text-stone-950 hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer"
+                                >
+                                  {isSaving
+                                    ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                    : <Save className="w-3 h-3" />}
+                                  {isSaving ? "Guardando…" : "Guardar"}
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex items-start gap-2">
+                              <blockquote className="italic text-[#c4c1fb] leading-relaxed flex-1">
+                                &ldquo;{currentText}&rdquo;
+                              </blockquote>
+                              <button
+                                type="button"
+                                title="Editar evidencia"
+                                onClick={() => {
+                                  setEditEvidenciaText(prev => ({
+                                    ...prev,
+                                    [key]: evidencia
+                                  }));
+                                  setEditingEvidencia(prev => ({
+                                    ...prev,
+                                    [key]: true
+                                  }));
+                                }}
+                                className="shrink-0 p-1 rounded-md text-[#879391] hover:text-[#6bd8cb] hover:bg-white/5 transition-colors cursor-pointer"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

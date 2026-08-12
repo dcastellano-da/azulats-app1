@@ -532,6 +532,42 @@ export default function SearchForm({
               </button>
             </div>
 
+            {/* Indicador de suma de pesos — solo visible cuando hay criterios */}
+            {criteriosScreening.length > 0 && (() => {
+              const sumaPeso = criteriosScreening
+                .filter(c => c.tipo === "deseable")
+                .reduce((acc, c) => acc + (c.peso || 0), 0);
+              const hasDeseable = criteriosScreening.some(c => c.tipo === "deseable");
+              const isExact = sumaPeso === 100;
+              const isOver  = sumaPeso > 100;
+              // Colors
+              const colorBg     = isExact ? "bg-emerald-500/10 border-emerald-500/25" : isOver ? "bg-red-500/10 border-red-500/25" : "bg-amber-500/10 border-amber-500/20";
+              const colorBadge  = isExact ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : isOver ? "bg-red-500/20 text-red-300 border-red-500/30" : "bg-amber-500/20 text-amber-300 border-amber-500/30";
+              const colorMsg    = isExact ? "text-emerald-300" : isOver ? "text-red-300" : "text-amber-300";
+              const mensaje     = isExact
+                ? "✓ Los pesos ponderados suman exactamente 100. ¡Configuración óptima para el scoring de IA!"
+                : isOver
+                ? `⚠ Los pesos suman ${sumaPeso} pts, que supera el máximo de 100. Reduce el peso de algún criterio.`
+                : hasDeseable
+                ? `Los pesos "Deseable" suman ${sumaPeso} pts. Se recomienda que la suma sea 100 para un scoring equilibrado.`
+                : "Aún no hay criterios de tipo Deseable. Los criterios Knockout no puntúan.";
+
+              return (
+                <div className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-[10px] leading-relaxed ${colorBg}`}>
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-80" style={{ color: isExact ? "#6ee7b7" : isOver ? "#fca5a5" : "#fcd34d" }} />
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`font-bold ${colorMsg}`}>Suma de pesos ponderados:</span>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${colorBadge}`}>
+                        {sumaPeso} / 100 pts
+                      </span>
+                    </div>
+                    <p className={`${colorMsg} opacity-90`}>{mensaje}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
             {initialData && (
               <div className="flex gap-2.5 p-3 rounded-xl border border-amber-500/20 bg-amber-500/10 text-xs text-amber-300">
                 <AlertTriangle className="w-5 h-5 shrink-0 text-amber-400" />

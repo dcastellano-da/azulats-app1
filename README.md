@@ -190,7 +190,7 @@ Para simplificar la interacción en los prompts de desarrollo y la localización
 
 # Ejecución del Servidor Local and Tests
 
-1.  **Instala las dependencias:**
+1.  **Instala las dependencias (falta ver cuando aplica):**
     ```bash
     npm install
     ```
@@ -247,6 +247,23 @@ git push origin main
 
 --------------------------------------------------------------------------------------------------------
 # Historico de Cambios (ordenados por los recientes cambios primeros)
+
+*   **31/07/2026:** Indicador de Suma de Pesos en Sección "Criterios de Screening" (`ID: P-BUS-02` — `src/app/components/SearchForm.tsx`):
+    *   **Indicador Visual en Tiempo Real:** Añadido un panel informativo debajo del header de la sección "5. Criterios de Screening (Máximo 5)" que se muestra únicamente cuando existe al menos un criterio configurado. Calcula en tiempo real la suma de los campos `peso` de todos los criterios de tipo `deseable` y la compara contra el valor objetivo de **100 puntos**.
+    *   **Sistema de Semáforo de Colores:**
+        *   🟢 **Verde** (`suma === 100`): Mensaje "✓ Los pesos ponderados suman exactamente 100. ¡Configuración óptima para el scoring de IA!"
+        *   🟡 **Ámbar** (`suma < 100`): Mensaje "Los pesos 'Deseable' suman X pts. Se recomienda que la suma sea 100 para un scoring equilibrado."
+        *   🔴 **Rojo** (`suma > 100`): Mensaje "⚠ Los pesos suman X pts, que supera el máximo de 100. Reduce el peso de algún criterio."
+        *   🟡 **Ámbar sin deseable**: Mensaje "Aún no hay criterios de tipo Deseable. Los criterios Knockout no puntúan."
+    *   **Nota técnica:** Los criterios de tipo `knockout` tienen su campo `peso` bloqueado en `0` y se excluyen del cálculo. El indicador es puramente informativo y no bloquea el guardado.
+
+*   **30/07/2026:** Mejoras UI/UX en Sección "Screening Inteligente IA" (`ID: P-DIS-02` — `src/app/components/ScreeningPanel.tsx`):
+    *   **Renombrado de Botón Semáforo "INFERIDO":** Eliminado el texto de puntos `(X pts)` del botón INFERIDO del semáforo interactivo para simplificar la lectura. El botón ahora muestra únicamente la etiqueta `INFERIDO`.
+    *   **Edición Inline de Evidencia del CV ("Prueba de Vida"):** Implementada la capacidad de edición manual del campo `evidencia_cv` directamente desde el acordeón desplegable de cada criterio. Al expandir el acordeón, se muestra la cita con un icono de lápiz (`Edit2`). Al hacer clic en el lápiz se activa un `textarea` editable. Al confirmar con el botón **"Guardar"** se llama a `actualizarResultadoScreeningAction` (via `PATCH /api/v1/pipeline/:id`) para persistir el cambio en Firestore. El guardado usa UI optimista: `localResultado` se actualiza inmediatamente antes de la respuesta del backend. Botón "Cancelar" descarta la edición sin guardar.
+    *   **Cálculo del Fit Score (`displayScore`):** El Fit Score visible en el badge del panel se calcula siguiendo esta lógica de prioridad:
+        1.  Si no hay evaluaciones (`!hasEvaluations`): se muestra `0`.
+        2.  Si `fitScore` (prop recibida desde Firestore vía backend) es mayor que `0`: se usa ese valor directamente (calculado por el backend tras la inferencia de Gemini).
+        3.  En caso contrario (evaluaciones locales sin respuesta de backend): se suma el campo `puntaje_obtenido` de cada ítem con `tipo === "deseable"` en `localResultado` (los criterios `knockout` no suman puntos). `puntaje_obtenido` vale `crit.peso` para `SI`, `Math.round(crit.peso / 2)` para `INFERIDO`, y `0` para `NO`.
 
 *   **29/07/2026:** Consulta Directa por ID de Documento Pipeline en `ID: P-DIS-02` (`GET /api/v1/pipeline/:id`):
     *   **Consulta Prioritaria por ID (`getPipelineItemAPI`):** Implementada en `src/app/descubrimiento/[id]/page.tsx` la llamada directa a `GET /api/v1/pipeline/${id}` como Capa 1 de resolución. Permite recuperar inmediatamente documentos individuales de pipeline desde Firestore (ej. `6EDjceRl0vxbPbOvfRNH`) sin depender exclusivamente del filtrado por búsqueda.
