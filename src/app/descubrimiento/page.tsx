@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { getApiEndpoint } from "@/utils/api";
 import { 
   Compass, 
   Building2, 
@@ -49,11 +50,17 @@ import { analyzeSemanticMatchLive, generateBooleanQueryLive, SemanticMatchResult
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, Candidato, crearCandidatoAPI } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, crearPipelineAPI, actualizarPipelineAPI } from "@/actions/pipeline";
+import { ResultadoScreeningItem } from "@/types/screening";
 
 // Candidate interface for Phase 1
 interface SourcedCandidate {
   pipeId?: string; // Cache the pipeline item UUID
   id: string;
+
+  searchId?: string;
+  searchCode?: string;
+  searchRole?: string;
+  searchClient?: string;
 
   name: string;
   role: string;
@@ -77,6 +84,11 @@ interface SourcedCandidate {
   };
   rejectionReason?: string;
   url_cv?: string;
+
+  // Screening Inteligente IA fields
+  resultadoScreening?: ResultadoScreeningItem[];
+  fitScoreScreening?: number;
+  tieneKnockout?: boolean;
 }
 
 const SEMANTIC_MATCH_DB: Record<string, SemanticMatchResult> = {
@@ -236,7 +248,12 @@ const mapPipelineToSourcedCandidates = (
   busquedasList: Busqueda[]
 ): SourcedCandidate[] => {
   const candidatoMap = new Map(candidatosList.map(c => [c.id, c]));
-  const busquedaMap = new Map(busquedasList.map(b => [b.id, b]));
+  const busquedaMap = new Map<string, Busqueda>();
+  busquedasList.forEach(b => {
+    if (b.id) busquedaMap.set(b.id, b);
+    if (b.id_busqueda) busquedaMap.set(b.id_busqueda, b);
+    if (b.codigo_busqueda) busquedaMap.set(b.codigo_busqueda, b);
+  });
 
   return pipelineItems.map(pipe => {
     const cand = candidatoMap.get(pipe.claves_conexion.id_candidato);
@@ -297,9 +314,17 @@ const mapPipelineToSourcedCandidates = (
       };
     }
 
+    const resultadoScreening = pipe.resultado_screening || (pipe as any).resultadoScreening || (pipe as any).f1_descubrimiento?.resultado_screening || undefined;
+    const fitScoreScreening = pipe.fit_score_screening ?? (pipe as any).fitScoreScreening ?? pipe.f1_descubrimiento?.analisis_semantico?.fit_score ?? score;
+    const tieneKnockout = pipe.tiene_knockout ?? (pipe as any).tieneKnockout ?? (resultadoScreening?.some((r: any) => r.es_knockout && r.evaluacion === "NO") || false);
+
     return {
       id: pipe.claves_conexion.id_candidato,
       pipeId: pipe.id,
+      searchId: busq?.id_busqueda || busq?.id || pipe.claves_conexion.id_busqueda,
+      searchCode: busq?.codigo_busqueda,
+      searchRole: busq?.perfil_busqueda,
+      searchClient: busq?.cliente,
       name: cand?.nombre_completo || "Candidato Desconocido",
       role: cand?.puesto || busq?.perfil_busqueda || "Developer",
       client: busq?.cliente || "Cliente Genérico",
@@ -317,7 +342,10 @@ const mapPipelineToSourcedCandidates = (
       recruiterNotes: pipe.f1_descubrimiento?.notas_reclutador || undefined,
       socialLinks,
       rejectionReason,
-      url_cv: cand?.url_cv || undefined
+      url_cv: cand?.url_cv || undefined,
+      resultadoScreening,
+      fitScoreScreening,
+      tieneKnockout
     };
   });
 };
@@ -334,116 +362,180 @@ const ACTIVE_BUSQUEDAS = [
 ];
 
 const INITIAL_SOURCED_CANDIDATES: SourcedCandidate[] = [
-    {
-      id: "C-301",
-      name: "Diego Lozano",
-      role: "Software Architect Rust",
-      client: "SEAT S.A.",
-      location: "Barcelona / Remoto",
-      phase1State: "01_nuevo",
-      score: 94,
-      lastChangeDate: "Hace 2 horas",
-      ttfme: "--",
-      outreachVariation: "A",
-      customOutreachA: "Hola Diego, vi tu excelente trabajo en el repositorio de WebAssembly para sistemas embebidos de SEAT. Nos entusiasma tu perfil para liderar la arquitectura en...",
-      customOutreachB: "Hola Diego, estamos buscando un Arquitecto Rust para SEAT. ¿Te interesaría conocer los detalles del puesto?",
-      motivationNote: "Interesado en metodologías ágiles y arquitecturas edge de baja latencia.",
-      recruiterNotes: "Candidato con perfil sobresaliente. Muy buena disposición para entrevista técnica."
-    },
-    {
-      id: "C-302",
-      name: "María Belmonte",
-      role: "UX Research Lead",
-      client: "Inditex S.A.",
-      location: "La Coruña / Híbrido",
-      phase1State: "02_contactado",
-      score: 91,
-      lastChangeDate: "Hace 1 día",
-      ttfme: "1.2d",
-      outreachVariation: "A",
-      customOutreachA: "Hola María, tu investigación sobre diseño centrado en el usuario de retail digital es asombrosa. En Inditex queremos invitarte a liderar el... ",
-      customOutreachB: "Hola María, hay una posición abierta de UX Research Lead en Inditex. ¿Hablamos esta semana?",
-      motivationNote: "Especialista en e-commerce y testeos A/B a gran escala.",
-      recruiterNotes: "Respuesta rápida al contacto inicial. Solicita modalidad 100% remota.",
-      socialLinks: {
-        portfolio: "https://mariabelmonte.design"
-      }
-    },
-    {
-      id: "C-303",
-      name: "Carlos Tejera",
-      role: "Principal Data Engineer",
-      client: "Telefónica S.A.",
-      location: "Madrid / Remoto España",
-      phase1State: "03_bloqueado",
-      score: 87,
-      lastChangeDate: "Hace 3 días",
-      ttfme: "2.1d",
-      outreachVariation: "A",
-      customOutreachA: "Hola Carlos, tus aportes en Spark y lagos de datos híbridos son notables en la comunidad de BigData España. En Telefónica buscamos tu expertise para...",
-      customOutreachB: "Hola Carlos, ¿cómo estás? Te contacto por una vacante de Data Engineer para Telefónica. Avísame si estás disponible.",
-      blockReason: "Falta pretensión salarial",
-      missingField: "salario",
-      motivationNote: "Lidera comunidades locales de Cassandra y Kafka.",
-      recruiterNotes: "Falta pretensión salarial exacta. Pendiente de llamada de triage.",
-      socialLinks: {
-        github: "https://github.com/ctejera-data",
-        stackoverflow: "https://stackoverflow.com/users/ctejera"
-      }
-    },
-    {
-      id: "C-304",
-      name: "Marta Galiano",
-      role: "DevOps / SRE Lead",
-      client: "Banco Santander",
-      location: "Madrid / Presencial",
-      phase1State: "03_bloqueado",
-      score: 96,
-      lastChangeDate: "Hace 12 horas",
-      ttfme: "1.8d",
-      outreachVariation: "B",
-      customOutreachA: "Hola Marta, sigo tus artículos sobre Kubernetes y seguridad multinube. En Santander estamos construyendo la nueva división sandbox de Cloud Sec...",
-      customOutreachB: "Hola Marta, ¿qué tal? Vimos tu experiencia como DevOps en finanzas. Nos gustaría ver si encajas en el equipo de Cloud de Santander. ¿Revisamos?",
-      blockReason: "Falta CV PDF actualizado",
-      missingField: "cv",
-      motivationNote: "Certificada en GCP Cloud Security Professional y CKA.",
-      recruiterNotes: "Experiencia en DevOps comprobada. Solicitado CV actualizado."
-    },
-    {
-      id: "C-305",
-      name: "Alberto Ruiz",
-      role: "Backend Python Developer",
-      client: "Mercadona S.A.",
-      location: "Valencia / Híbrido",
-      phase1State: "04_rechazado",
-      score: 79,
-      lastChangeDate: "Hace 4 días",
-      ttfme: "1.0d",
-      outreachVariation: "B",
-      customOutreachA: "Hola Alberto, tu perfil en microservicios Django encaja excelente con el backend de logística de Mercadona. Te gustaría...",
-      customOutreachB: "Hola Alberto, buscamos desarrollador backend Django para Mercadona. ¿Tienes interés en escuchar la oferta?",
-      rejectionReason: "Presupuesto",
-      motivationNote: "Pretensiones salariales fuera de rango (65.000€ vs tope de 52.000€).",
-      recruiterNotes: "Expectativa salarial (65k) supera presupuesto máximo de la vacante (52k)."
-    },
-    {
-      id: "C-306",
-      name: "Lucía Pousa",
-      role: "Frontend React Native Developer",
-      client: "Amadeus España",
-      location: "Madrid / Remoto",
-      phase1State: "04_rechazado",
-      score: 82,
-      lastChangeDate: "Hace 2 días",
-      ttfme: "1.5d",
-      outreachVariation: "A",
-      customOutreachA: "Hola Lucía, vi tu app móvil open-source de reserva de billetes. En Amadeus estamos estructurando el equipo NextGen Mobile y...",
-      customOutreachB: "Hola Lucía, ¿te interesa un cambio? Buscamos desarrollador React Native en Amadeus España. Avísame si comentamos.",
-      rejectionReason: "Nivel de Inglés",
-      motivationNote: "El puesto exige nivel C1 fluido conversación. Candidata cuenta con B1/B2.",
-      recruiterNotes: "Nivel de inglés intermedio (B1/B2), no alcanza requerimiento C1."
+  {
+    id: "C-301",
+    name: "Diego Lozano",
+    role: "Software Architect Rust",
+    client: "SEAT S.A.",
+    location: "Barcelona / Remoto",
+    phase1State: "01_nuevo",
+    score: 94,
+    fitScoreScreening: 94,
+    tieneKnockout: false,
+    resultadoScreening: [
+      { id_criterio: "crit-1", pregunta: "¿Tiene al menos 3 años de experiencia en desarrollo de sistemas con Rust?", evaluacion: "SI", es_knockout: true, puntaje_obtenido: 50, evidencia_cv: "5+ años en Rust y WebAssembly en repositorios activos de SEAT" },
+      { id_criterio: "crit-2", pregunta: "¿Experiencia previa en sectores automotriz o de sistemas embebidos?", evaluacion: "SI", es_knockout: false, puntaje_obtenido: 44, evidencia_cv: "Arquitectura edge cloud comprobada en Linux Foundation" }
+    ],
+    lastChangeDate: "Hace 2 horas",
+    ttfme: "--",
+    outreachVariation: "A",
+    customOutreachA: "Hola Diego, vi tu excelente trabajo en el repositorio de WebAssembly para sistemas embebidos de SEAT. Nos entusiasma tu perfil para liderar la arquitectura en...",
+    customOutreachB: "Hola Diego, estamos buscando un Arquitecto Rust para SEAT. ¿Te interesaría conocer los detalles del puesto?",
+    motivationNote: "Interesado en metodologías ágiles y arquitecturas edge de baja latencia.",
+    recruiterNotes: "Candidato con perfil sobresaliente. Muy buena disposición para entrevista técnica."
+  },
+  {
+    id: "C-302",
+    name: "María Belmonte",
+    role: "UX Research Lead",
+    client: "Inditex S.A.",
+    location: "La Coruña / Híbrido",
+    phase1State: "02_contactado",
+    score: 91,
+    fitScoreScreening: 91,
+    tieneKnockout: false,
+    resultadoScreening: [
+      { id_criterio: "crit-1", pregunta: "¿Manejo avanzado de Figma y creación de Design Systems escalables?", evaluacion: "SI", es_knockout: true, puntaje_obtenido: 50, evidencia_cv: "Liderazgo de User Research en Inditex y testeos A/B a gran escala" },
+      { id_criterio: "crit-2", pregunta: "¿Experiencia previa diseñando interfaces para e-commerce de alto tráfico?", evaluacion: "INFERIDO", es_knockout: false, puntaje_obtenido: 41, evidencia_cv: "Experiencia cualitativa en diseño de interacción y prototipado" }
+    ],
+    lastChangeDate: "Hace 1 día",
+    ttfme: "1.2d",
+    outreachVariation: "A",
+    customOutreachA: "Hola María, tu investigación sobre diseño centrado en el usuario de retail digital es asombrosa. En Inditex queremos invitarte a liderar el... ",
+    customOutreachB: "Hola María, hay una posición abierta de UX Research Lead en Inditex. ¿Hablamos esta semana?",
+    motivationNote: "Especialista en e-commerce y testeos A/B a gran escala.",
+    recruiterNotes: "Respuesta rápida al contacto inicial. Solicita modalidad 100% remota.",
+    socialLinks: {
+      portfolio: "https://mariabelmonte.design"
     }
+  },
+  {
+    id: "C-303",
+    name: "Carlos Tejera",
+    role: "Principal Data Engineer",
+    client: "Telefónica S.A.",
+    location: "Madrid / Remoto España",
+    phase1State: "03_bloqueado",
+    score: 87,
+    fitScoreScreening: 87,
+    tieneKnockout: false,
+    resultadoScreening: [
+      { id_criterio: "crit-1", pregunta: "¿Tiene al menos 4 años de experiencia sólida en React y TypeScript?", evaluacion: "SI", es_knockout: true, puntaje_obtenido: 50, evidencia_cv: "Principal Data Engineer en Telefónica con Apache Spark y Cassandra" },
+      { id_criterio: "crit-2", pregunta: "¿Posee nivel de inglés B2 o C1 conversacional?", evaluacion: "INFERIDO", es_knockout: false, puntaje_obtenido: 37, evidencia_cv: "Nivel de inglés intermedio (B2 lectura), requiere validación hablada" }
+    ],
+    lastChangeDate: "Hace 3 días",
+    ttfme: "2.1d",
+    outreachVariation: "A",
+    customOutreachA: "Hola Carlos, tus aportes en Spark y lagos de datos híbridos son notables en la comunidad de BigData España. En Telefónica buscamos tu expertise para...",
+    customOutreachB: "Hola Carlos, ¿cómo estás? Te contacto por una vacante de Data Engineer para Telefónica. Avísame si estás disponible.",
+    blockReason: "Falta pretensión salarial",
+    missingField: "salario",
+    motivationNote: "Lidera comunidades locales de Cassandra y Kafka.",
+    recruiterNotes: "Falta pretensión salarial exacta. Pendiente de llamada de triage.",
+    socialLinks: {
+      github: "https://github.com/ctejera-data",
+      stackoverflow: "https://stackoverflow.com/users/ctejera"
+    }
+  },
+  {
+    id: "C-304",
+    name: "Marta Galiano",
+    role: "DevOps / SRE Lead",
+    client: "Banco Santander",
+    location: "Madrid / Presencial",
+    phase1State: "03_bloqueado",
+    score: 96,
+    fitScoreScreening: 96,
+    tieneKnockout: false,
+    resultadoScreening: [
+      { id_criterio: "crit-1", pregunta: "¿Posee certificaciones vigentes de Seguridad Cloud (ej. AWS Security, GCP Security)?", evaluacion: "SI", es_knockout: true, puntaje_obtenido: 50, evidencia_cv: "Certificaciones GCP Cloud Security Professional y CKA activas" },
+      { id_criterio: "crit-2", pregunta: "¿Demuestra experiencia en diseño de políticas IAM y hardening de Kubernetes?", evaluacion: "SI", es_knockout: false, puntaje_obtenido: 46, evidencia_cv: "Liderazgo de infraestructura Kubernetes en Banco Santander" }
+    ],
+    lastChangeDate: "Hace 12 horas",
+    ttfme: "1.8d",
+    outreachVariation: "B",
+    customOutreachA: "Hola Marta, sigo tus artículos sobre Kubernetes y seguridad multinube. En Santander estamos construyendo la nueva división sandbox de Cloud Sec...",
+    customOutreachB: "Hola Marta, ¿qué tal? Vimos tu experiencia como DevOps en finanzas. Nos gustaría ver si encajas en el equipo de Cloud de Santander. ¿Revisamos?",
+    blockReason: "Falta CV PDF actualizado",
+    missingField: "cv",
+    motivationNote: "Certificada en GCP Cloud Security Professional y CKA.",
+    recruiterNotes: "Experiencia en DevOps comprobada. Solicitado CV actualizado."
+  },
+  {
+    id: "C-305",
+    name: "Alberto Ruiz",
+    role: "Backend Python Developer",
+    client: "Mercadona S.A.",
+    location: "Valencia / Híbrido",
+    phase1State: "04_rechazado",
+    score: 79,
+    fitScoreScreening: 0,
+    tieneKnockout: true,
+    resultadoScreening: [
+      { id_criterio: "crit-1", pregunta: "¿Pretensión salarial dentro del presupuesto máximo de la vacante (52.000€)?", evaluacion: "NO", es_knockout: true, puntaje_obtenido: 0, evidencia_cv: "Pretensión salarial de 65.000€ supera el límite máximo de 52.000€" },
+      { id_criterio: "crit-2", pregunta: "¿Experiencia previa en desarrollo Backend Python Django en logística?", evaluacion: "SI", es_knockout: false, puntaje_obtenido: 40, evidencia_cv: "Desarrollador Backend Python Django en logística" }
+    ],
+    lastChangeDate: "Hace 4 días",
+    ttfme: "1.0d",
+    outreachVariation: "B",
+    customOutreachA: "Hola Alberto, tu perfil en microservicios Django encaja excelente con el backend de logística de Mercadona. Te gustaría...",
+    customOutreachB: "Hola Alberto, buscamos desarrollador backend Django para Mercadona. ¿Tienes interés en escuchar la oferta?",
+    rejectionReason: "Presupuesto",
+    motivationNote: "Pretensiones salariales fuera de rango (65.000€ vs tope de 52.000€).",
+    recruiterNotes: "Expectativa salarial (65k) supera presupuesto máximo de la vacante (52k)."
+  },
+  {
+    id: "C-306",
+    name: "Lucía Pousa",
+    role: "Frontend React Native Developer",
+    client: "Amadeus España",
+    location: "Madrid / Remoto",
+    phase1State: "04_rechazado",
+    score: 82,
+    fitScoreScreening: 0,
+    tieneKnockout: true,
+    resultadoScreening: [
+      { id_criterio: "crit-1", pregunta: "¿Nivel de inglés C1 conversacional fluido para proyectos internacionales?", evaluacion: "NO", es_knockout: true, puntaje_obtenido: 0, evidencia_cv: "Nivel de Inglés B1/B2 incumple requerimiento excluyente C1" },
+      { id_criterio: "crit-2", pregunta: "¿Experiencia previa en desarrollo React Native para apps móviles de alto tráfico?", evaluacion: "SI", es_knockout: false, puntaje_obtenido: 42, evidencia_cv: "Desarrolladora React Native para app móvil de reservas" }
+    ],
+    lastChangeDate: "Hace 2 días",
+    ttfme: "1.5d",
+    outreachVariation: "A",
+    customOutreachA: "Hola Lucía, vi tu app móvil open-source de reserva de billetes. En Amadeus estamos estructurando el equipo NextGen Mobile y...",
+    customOutreachB: "Hola Lucía, ¿te interesa un cambio? Buscamos desarrollador React Native en Amadeus España. Avísame si comentamos.",
+    rejectionReason: "Nivel de Inglés",
+    motivationNote: "El puesto exige nivel C1 fluido conversación. Candidata cuenta con B1/B2.",
+    recruiterNotes: "Nivel de inglés intermedio (B1/B2), no alcanza requerimiento C1."
+  }
 ];
+
+const getCriterionQuestion = (
+  item: ResultadoScreeningItem,
+  candidate: SourcedCandidate,
+  idx: number,
+  activeBusquedas: Busqueda[] = []
+): string => {
+  if (item.pregunta && item.pregunta.trim() !== "") {
+    return item.pregunta;
+  }
+  if ((item as any).pregunta_condicion && String((item as any).pregunta_condicion).trim() !== "") {
+    return (item as any).pregunta_condicion;
+  }
+  if (activeBusquedas && activeBusquedas.length > 0) {
+    const matchedBusq = activeBusquedas.find(
+      b => b.id === candidate.searchId || b.id_busqueda === candidate.searchId || b.codigo_busqueda === candidate.searchCode
+    );
+    if (matchedBusq && matchedBusq.criterios_screening) {
+      const matchedCrit = matchedBusq.criterios_screening.find(
+        c => c.id === item.id_criterio
+      );
+      if (matchedCrit && matchedCrit.pregunta) {
+        return matchedCrit.pregunta;
+      }
+    }
+  }
+  return item.es_knockout ? `Criterio Knockout #${idx + 1}` : `Criterio #${idx + 1}`;
+};
 
 export default function DescubrimientoPage() {
   const router = useRouter();
@@ -460,7 +552,12 @@ export default function DescubrimientoPage() {
 
   const currentSearches = React.useMemo(() => {
     return activeBusquedas.length > 0 
-      ? activeBusquedas.map(b => ({ id: b.id, client: b.cliente, role: b.perfil_busqueda }))
+      ? activeBusquedas.map(b => ({
+          id: b.id_busqueda || b.id,
+          client: b.cliente,
+          role: b.perfil_busqueda,
+          code: b.codigo_busqueda || b.id_busqueda || b.id
+        }))
       : ACTIVE_BUSQUEDAS;
   }, [activeBusquedas]);
 
@@ -483,7 +580,7 @@ export default function DescubrimientoPage() {
       let pipeItems: PipelineItem[] = [];
       if (selectedSearch === "Todos") {
         if (searches.length > 0) {
-          const promises = searches.map(s => getPipelineAPI(s.id));
+          const promises = searches.map(s => getPipelineAPI(s.id_busqueda || s.id));
           const results = await Promise.all(promises);
           results.forEach(res => {
             if (res.success && Array.isArray(res.data)) {
@@ -492,10 +589,14 @@ export default function DescubrimientoPage() {
           });
         }
       } else {
-        // Find matching search ID from selectedSearch string (client - role)
-        const match = searches.find(s => `${s.cliente} - ${s.perfil_busqueda}` === selectedSearch);
+        // Find matching search ID from selectedSearch string or IDs
+        const match = searches.find(s => 
+          (s.id_busqueda || s.id) === selectedSearch || 
+          s.codigo_busqueda === selectedSearch || 
+          `${s.cliente} - ${s.perfil_busqueda}` === selectedSearch
+        );
         if (match) {
-          const res = await getPipelineAPI(match.id);
+          const res = await getPipelineAPI(match.id_busqueda || match.id);
           if (res.success && Array.isArray(res.data)) {
             pipeItems = res.data;
           }
@@ -593,7 +694,7 @@ export default function DescubrimientoPage() {
   };
 
   // List View and Status Filter State
-  const [viewMode, setViewMode] = useState<"kanban" | "lista">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "lista" | "screening_ia">("kanban");
   const [filterStatus, setFilterStatus] = useState<string>("Todos");
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -609,7 +710,7 @@ export default function DescubrimientoPage() {
       }
     } else {
       setSortField(field);
-      setSortDirection("asc");
+      setSortDirection(field === "score" ? "desc" : "asc");
     }
   };
 
@@ -970,8 +1071,7 @@ export default function DescubrimientoPage() {
     if (urlCv.startsWith("gs://")) {
       const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
       const token = match ? match[2] : "";
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      const downloadUrl = getApiEndpoint(`candidatos/${candId}/cv?token=${token}`);
       window.open(downloadUrl, "_blank");
     } else {
       window.open(urlCv, "_blank");
@@ -1146,8 +1246,13 @@ export default function DescubrimientoPage() {
       c.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.client.toLowerCase().includes(searchTerm.toLowerCase());
 
+    const searchRoleCombined = `${c.searchClient || c.client} - ${c.searchRole || c.role}`;
     const matchesSearchFilter = 
-      selectedSearch === "Todos" || `${c.client} - ${c.role}` === selectedSearch;
+      selectedSearch === "Todos" ||
+      c.searchId === selectedSearch ||
+      c.searchCode === selectedSearch ||
+      searchRoleCombined === selectedSearch ||
+      `${c.client} - ${c.role}` === selectedSearch;
 
     return matchesSearch && matchesSearchFilter;
   });
@@ -1168,8 +1273,8 @@ export default function DescubrimientoPage() {
       valA = a.name.toLowerCase();
       valB = b.name.toLowerCase();
     } else if (sortField === "score") {
-      valA = a.score;
-      valB = b.score;
+      valA = viewMode === "screening_ia" ? (a.fitScoreScreening ?? a.score ?? 0) : (a.score ?? 0);
+      valB = viewMode === "screening_ia" ? (b.fitScoreScreening ?? b.score ?? 0) : (b.score ?? 0);
     } else if (sortField === "position") {
       valA = `${a.client} - ${a.role}`.toLowerCase();
       valB = `${b.client} - ${b.role}`.toLowerCase();
@@ -1184,6 +1289,20 @@ export default function DescubrimientoPage() {
       const noteB = (b.recruiterNotes || b.motivationNote || "").toLowerCase();
       valA = noteA;
       valB = noteB;
+    } else if (sortField === "knockout") {
+      const statusOrder = (cand: SourcedCandidate) => {
+        const isKO = cand.tieneKnockout || cand.resultadoScreening?.some(r => r.es_knockout && r.evaluacion === "NO");
+        const hasScreening = cand.resultadoScreening && cand.resultadoScreening.length > 0;
+        if (isKO) return 2; // INCUMPLIDO
+        if (hasScreening) return 0; // CUMPLIDO
+        return 1; // PENDIENTE
+      };
+      valA = statusOrder(a);
+      valB = statusOrder(b);
+    }
+
+    if (typeof valA === "number" && typeof valB === "number") {
+      return sortDirection === "asc" ? valA - valB : valB - valA;
     }
 
     if (valA < valB) return sortDirection === "asc" ? -1 : 1;
@@ -1891,16 +2010,21 @@ export default function DescubrimientoPage() {
                 className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] cursor-pointer w-full md:w-auto"
               >
                 <option value="Todos" className="bg-[#15181a]">Todas las Búsquedas</option>
-                {currentSearches.map((b) => (
-                  <option key={b.id} value={`${b.client} - ${b.role}`} className="bg-[#15181a] text-white">
-                    {b.client} - {b.role}
-                  </option>
-                ))}
+                {activeBusquedas.map((b) => {
+                  const searchVal = b.id_busqueda || b.id;
+                  const codeLabel = b.codigo_busqueda ? `[${b.codigo_busqueda}] ` : "";
+                  const optionLabel = `${codeLabel}${b.cliente} - ${b.perfil_busqueda}`;
+                  return (
+                    <option key={searchVal} value={searchVal} className="bg-[#15181a] text-white">
+                      {optionLabel}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
-            {/* Additional Status Filter (only shown in List View) */}
-            {viewMode === "lista" && (
+            {/* Additional Status Filter (shown in List View and Screening IA View) */}
+            {(viewMode === "lista" || viewMode === "screening_ia") && (
               <div className="flex items-center gap-2 w-full md:w-auto animate-fadeIn shrink-0">
                 <span className="text-xs text-[#c4c1fb] whitespace-nowrap font-medium">Estado Cand.:</span>
                 <select
@@ -1918,7 +2042,7 @@ export default function DescubrimientoPage() {
             )}
           </div>
 
-          {/* Toggle buttons for Kanban vs List view mode & Fullscreen */}
+          {/* Toggle buttons for Kanban vs List vs Screening IA view mode & Fullscreen */}
           <div className="flex items-center flex-wrap gap-3 w-full 2xl:w-auto justify-center 2xl:justify-end shrink-0">
             <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 select-none">
               <button
@@ -1942,6 +2066,17 @@ export default function DescubrimientoPage() {
               >
                 <List className="w-3.5 h-3.5" />
                 <span>Lista Detallada</span>
+              </button>
+              <button
+                onClick={() => setViewMode("screening_ia")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === "screening_ia"
+                    ? "bg-[#6bd8cb] text-[#101415] shadow shadow-[#0d9488]/10"
+                    : "text-[#879391] hover:text-white"
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Lista Screening IA</span>
               </button>
             </div>
 
@@ -2071,7 +2206,7 @@ export default function DescubrimientoPage() {
             </div>
 
           </div>
-        ) : (
+        ) : viewMode === "lista" ? (
           /* --- Premium Glassmorphism Table List View --- */
           <div className="glass-panel rounded-3xl overflow-hidden border border-white/10 text-left animate-fadeIn">
             <div className="overflow-x-auto">
@@ -2165,7 +2300,13 @@ export default function DescubrimientoPage() {
                         {/* Candidate info */}
                         <td className="py-4 px-5 font-bold text-white">
                           <div className="flex flex-col">
-                            <span className="text-white text-xs">{cad.name}</span>
+                            <Link 
+                              href={`/descubrimiento/${cad.pipeId || cad.id}`}
+                              className="text-white text-xs font-bold hover:text-[#6bd8cb] underline-offset-2 hover:underline transition-colors cursor-pointer"
+                              title="Ver expediente detallado del candidato"
+                            >
+                              {cad.name}
+                            </Link>
                             {cad.socialLinks && (Object.keys(cad.socialLinks).length > 0) && (
                               <div className="flex gap-2 mt-1">
                                 {cad.socialLinks.github && (
@@ -2330,6 +2471,346 @@ export default function DescubrimientoPage() {
                   {sortedListCandidates.length === 0 && (
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-[#879391] font-bold text-xs uppercase tracking-wider">
+                        No hay perfiles que coincidan con los filtros seleccionados.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          /* --- Screening Inteligente IA Premium Table View --- */
+          <div className="glass-panel rounded-3xl overflow-hidden border border-white/10 text-left animate-fadeIn">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/10 bg-[#161a1b]/60 text-[10px] uppercase font-bold tracking-wider text-[#c4c1fb]">
+                    <th 
+                      onClick={() => handleSort("name")}
+                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group"
+                    >
+                      <div className="flex items-center">
+                        <span>Candidato</span>
+                        {renderSortIcon("name")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort("score")}
+                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[130px]"
+                    >
+                      <div className="flex items-center">
+                        <span>Fit Score IA</span>
+                        {renderSortIcon("score")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort("knockout")}
+                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[200px] max-w-[260px]"
+                    >
+                      <div className="flex items-center">
+                        <span>Alerta Knockout</span>
+                        {renderSortIcon("knockout")}
+                      </div>
+                    </th>
+                    <th className="py-4 px-5 select-none min-w-[340px] max-w-[440px]">
+                      <span>Desglose Criterios & Semáforo</span>
+                    </th>
+                    <th 
+                      onClick={() => handleSort("notes")}
+                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[220px] max-w-[280px]"
+                    >
+                      <div className="flex items-center">
+                        <span>NOTAS DESCUBRIMIENTO</span>
+                        {renderSortIcon("notes")}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort("status")}
+                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[180px]"
+                    >
+                      <div className="flex items-center">
+                        <span>Estado</span>
+                        {renderSortIcon("status")}
+                      </div>
+                    </th>
+                    <th className="py-4 px-5 text-center select-none text-[#c4c1fb]/50 min-w-[460px]">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-[11px] text-white">
+                  {sortedListCandidates.map((cad) => {
+                    let statusLabel = "";
+                    let statusColor = "";
+                    if (cad.phase1State === "01_nuevo") {
+                      statusLabel = "01 - Nuevo en Revisión";
+                      statusColor = "text-indigo-400 bg-indigo-500/10 border-indigo-500/20";
+                    } else if (cad.phase1State === "02_contactado") {
+                      statusLabel = "02 - Bloqueado / Pendiente";
+                      statusColor = "text-[#6bd8cb] bg-[#6bd8cb]/10 border-[#6bd8cb]/20";
+                    } else if (cad.phase1State === "03_bloqueado") {
+                      statusLabel = "03 - En Duda a Confirmar";
+                      statusColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
+                    } else if (cad.phase1State === "04_rechazado") {
+                      statusLabel = "04 - Rechazado en Fase Inicial";
+                      statusColor = "text-rose-400 bg-rose-500/10 border-rose-500/20";
+                    }
+
+                    const fitVal = cad.fitScoreScreening ?? cad.score;
+                    const isKnockoutActive = cad.tieneKnockout ?? false;
+
+                    return (
+                      <tr key={cad.id} className="hover:bg-white/[0.02] transition-colors">
+                        {/* Candidate Info */}
+                        <td className="py-4 px-5 font-bold text-white">
+                          <div className="flex flex-col">
+                            <Link 
+                              href={`/descubrimiento/${cad.pipeId || cad.id}`}
+                              className="text-white text-xs font-bold hover:text-[#6bd8cb] underline-offset-2 hover:underline transition-colors cursor-pointer"
+                              title="Ver expediente detallado del candidato"
+                            >
+                              {cad.name}
+                            </Link>
+                            <span className="text-[10px] text-[#879391] font-normal">{cad.role}</span>
+                            <span className="text-[9px] text-[#6bd8cb] font-normal mt-0.5">{cad.client} • {cad.location}</span>
+                          </div>
+                        </td>
+
+                        {/* Fit Score IA */}
+                        <td className="py-4 px-5">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`px-2.5 py-1 rounded-xl font-bold text-xs border ${
+                              fitVal >= 90 
+                                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                                : fitVal >= 75
+                                ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                                : "bg-rose-500/15 border-rose-500/30 text-rose-400"
+                            }`}>
+                              {fitVal > 0 ? `${fitVal} pts` : "0 pts"}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Alerta Knockout */}
+                        <td className="py-4 px-5 min-w-[200px] max-w-[260px]">
+                          {(() => {
+                            const hasProcessedScreening = cad.resultadoScreening && cad.resultadoScreening.length > 0;
+                            const failedKnockouts = cad.resultadoScreening?.filter(item => item.es_knockout && item.evaluacion === "NO") || [];
+                            const allKnockouts = cad.resultadoScreening?.filter(item => item.es_knockout) || [];
+                            
+                            if (isKnockoutActive) {
+                              return (
+                                <div className="flex flex-col gap-1 w-max max-w-[240px]">
+                                  <span className="px-2 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 font-bold text-[10px] flex items-center gap-1 w-max">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>INCUMPLIDO</span>
+                                  </span>
+                                  {failedKnockouts.length > 0 ? (
+                                    failedKnockouts.map((kItem, kIdx) => {
+                                      const qName = getCriterionQuestion(kItem, cad, kIdx, activeBusquedas);
+                                      return (
+                                        <span key={kIdx} className="text-[10px] text-rose-300/90 leading-tight font-medium" title={qName}>
+                                          • {qName}
+                                        </span>
+                                      );
+                                    })
+                                  ) : (
+                                    <span className="text-[10px] text-rose-300/90 leading-tight italic">
+                                      • Regla excluyente no superada
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            } else if (hasProcessedScreening) {
+                              return (
+                                <div className="flex flex-col gap-1 w-max max-w-[240px]">
+                                  <span className="px-2 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] flex items-center gap-1 w-max">
+                                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                    <span>CUMPLIDO</span>
+                                  </span>
+                                  {allKnockouts.map((kItem, kIdx) => {
+                                    const qName = getCriterionQuestion(kItem, cad, kIdx, activeBusquedas);
+                                    return (
+                                      <span key={kIdx} className="text-[9px] text-[#879391] leading-tight" title={`Cumplido: ${qName}`}>
+                                        • {qName}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="flex flex-col gap-1 w-max max-w-[240px]">
+                                  <span className="px-2 py-1 rounded-xl bg-slate-500/15 border border-slate-500/30 text-slate-400 font-bold text-[10px] flex items-center gap-1 w-max">
+                                    <Clock className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                                    <span>PENDIENTE</span>
+                                  </span>
+                                  <span className="text-[9px] text-[#879391] leading-tight italic">
+                                    • Screening no ejecutado
+                                  </span>
+                                </div>
+                              );
+                            }
+                          })()}
+                        </td>
+
+                        {/* Desglose Criterios & Semáforo */}
+                        <td className="py-4 px-5 min-w-[340px] max-w-[440px]">
+                          <div className="flex flex-col gap-2">
+                            {cad.resultadoScreening && cad.resultadoScreening.length > 0 ? (
+                              cad.resultadoScreening.map((item, idx) => {
+                                let semLabel = "SÍ";
+                                let semClass = "bg-emerald-500/20 border-emerald-500/30 text-emerald-300";
+                                if (item.evaluacion === "INFERIDO") {
+                                  semLabel = "INFERIDO";
+                                  semClass = "bg-sky-500/20 border-sky-500/30 text-sky-300";
+                                } else if (item.evaluacion === "NO") {
+                                  semLabel = "NO";
+                                  semClass = "bg-rose-500/20 border-rose-500/30 text-rose-300";
+                                }
+
+                                const qText = getCriterionQuestion(item, cad, idx, activeBusquedas);
+
+                                return (
+                                  <div key={idx} className="flex items-start gap-2 text-[10px]">
+                                    <span className={`px-1.5 py-0.5 rounded border font-bold text-[9px] shrink-0 mt-0.5 ${semClass}`}>
+                                      {semLabel}
+                                    </span>
+                                    <div className="flex flex-col">
+                                      <span className="text-[#c4c1fb]/90 font-medium leading-snug" title={qText}>
+                                        {qText}
+                                      </span>
+                                      <span className="text-[9px] text-[#879391] font-mono mt-0.5">
+                                        #{idx + 1} {item.es_knockout ? "(KNOCKOUT)" : `(+${item.puntaje_obtenido} pts)`}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <span className="text-[10px] text-[#879391] italic">Sin criterios procesados</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* NOTAS DESCUBRIMIENTO */}
+                        <td className="py-4 px-5 min-w-[220px] max-w-[280px]">
+                          {cad.recruiterNotes ? (
+                            <div className="bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 rounded-xl p-2.5 text-[#6bd8cb] text-[11px] font-normal leading-relaxed shadow-sm shadow-[#6bd8cb]/5">
+                              {cad.recruiterNotes}
+                            </div>
+                          ) : (
+                            <span className="text-[#879391] text-[10px] italic">Sin notas registradas</span>
+                          )}
+                        </td>
+
+                        {/* Estado */}
+                        <td className="py-4 px-5 min-w-[180px]">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusColor} inline-block`}>
+                            {statusLabel}
+                          </span>
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="py-4 px-5 text-center min-w-[460px]">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            <Link
+                              href={`/descubrimiento/${cad.pipeId || cad.id}`}
+                              className="px-2.5 py-1 rounded bg-white/5 border border-white/10 hover:bg-white/15 text-white font-bold transition-all text-[10px] cursor-pointer flex items-center gap-1"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                              <span>Detalles</span>
+                            </Link>
+
+                            {cad.url_cv && (
+                              <a
+                                href={cad.url_cv}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1"
+                                title="Ver Curriculum Vitae"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>CV</span>
+                              </a>
+                            )}
+
+                            <button
+                              onClick={() => {
+                                setSemanticCandidate(cad);
+                                setIsSemanticOpen(true);
+                              }}
+                              className="px-2 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-[#101415] transition-all text-[10px] cursor-pointer flex items-center gap-1"
+                              title="Re-evaluar con IA"
+                            >
+                              <Cpu className="w-3.5 h-3.5" />
+                              <span>Re-evaluar IA</span>
+                            </button>
+
+                            {cad.phase1State === "01_nuevo" && (
+                              <button
+                                onClick={() => handleTransitionState(cad.id, "02_contactado")}
+                                title="A 02 - Bloqueado / Pendiente"
+                                className="px-2.5 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1"
+                              >
+                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                                <span>Avanzar estado</span>
+                              </button>
+                            )}
+
+                            {cad.phase1State === "02_contactado" && (
+                              <button
+                                onClick={() => handleTransitionState(cad.id, "03_bloqueado", { 
+                                  blockReason: "Esperando confirmación pretensiones de sueldo y CV",
+                                  missingField: "salario"
+                                })}
+                                title="A 03 - En Duda a Confirmar"
+                                className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold hover:bg-amber-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1"
+                              >
+                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                                <span>Avanzar estado</span>
+                              </button>
+                            )}
+
+                            {cad.phase1State === "03_bloqueado" && (
+                              <button
+                                onClick={() => handleTransitionState(cad.id, "04_rechazado", {
+                                  rejectionReason: "Falta de información en aclaración"
+                                })}
+                                title="A 04 - Rechazado en Fase Inicial"
+                                className="px-2.5 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold hover:bg-rose-500 hover:text-white transition-all text-[10px] cursor-pointer flex items-center gap-1"
+                              >
+                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
+                                <span>Avanzar estado</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => setCandidateToAdvance(cad)}
+                              className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                              title="Avanzar a Fase 2 Evaluación"
+                            >
+                              <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                              <span>Avanzar Fase</span>
+                            </button>
+
+                            {cad.phase1State !== "04_rechazado" && (
+                              <button
+                                onClick={() => triggerRejectionFlow(cad.id)}
+                                className="px-2 py-1 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-red-400 font-bold transition-all text-[10px] cursor-pointer flex items-center gap-1"
+                                title="Rechazar Candidato"
+                              >
+                                <Ban className="w-3.5 h-3.5 shrink-0" />
+                                <span>Rechazar</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {sortedListCandidates.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-[#879391] font-bold text-xs uppercase tracking-wider">
                         No hay perfiles que coincidan con los filtros seleccionados.
                       </td>
                     </tr>
@@ -2841,7 +3322,7 @@ export default function DescubrimientoPage() {
                   >
                     {simulatedImportDone ? (
                       <>
-                        <span>¡2 Candidatos Importados Exitosamente a columna 'Nuevo'!</span>
+                        <span>¡2 Candidatos Importados Exitosamente a columna &apos;Nuevo&apos;!</span>
                       </>
                     ) : (
                       <>

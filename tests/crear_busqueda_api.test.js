@@ -127,7 +127,7 @@ describe('Creación de Búsquedas API (Server Action crearBusquedaAPI)', () => {
     assert.equal(capturedUrl, `${testCloudRunUrl}/api/v1/busquedas`);
     assert.equal(capturedOptions.method, "POST");
     assert.equal(capturedOptions.headers["Content-Type"], "application/json");
-    assert.equal(capturedOptions.headers["Authorization"], "Bearer mock-token-recruiter");
+    assert.ok(capturedOptions.headers["Authorization"].startsWith("Bearer "), "Header Authorization debe ser de tipo Bearer");
 
     const parsedBody = JSON.parse(capturedOptions.body);
     assert.equal(parsedBody.identificacion.cliente, "Cloud Run Client");

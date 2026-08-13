@@ -113,7 +113,7 @@ export default function DetalleBusquedaPage() {
                   {searchItem ? searchItem.perfil_busqueda : "Editar Búsqueda"}
                 </h1>
                 <p className="text-xs text-[#879391]">
-                  {searchItem ? `Cliente: ${searchItem.cliente} • ID: ${searchItem.id}` : "Formulario completo de edición"}
+                  {searchItem ? `Cliente: ${searchItem.cliente} • Código: ${searchItem.codigo_busqueda || searchItem.id_busqueda || searchItem.id}` : "Formulario completo de edición"}
                 </p>
               </div>
             </div>

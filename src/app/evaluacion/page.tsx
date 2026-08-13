@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { getApiEndpoint } from "@/utils/api";
 import { 
   Compass, 
   Building2, 
@@ -106,7 +107,12 @@ const mapPipelineToEvaluacionCandidates = (
   busquedasList: Busqueda[]
 ): EvaluacionCandidate[] => {
   const candMap = new Map(candidatosList.map(c => [c.id, c]));
-  const busqMap = new Map(busquedasList.map(b => [b.id, b]));
+  const busqMap = new Map<string, Busqueda>();
+  busquedasList.forEach(b => {
+    if (b.id) busqMap.set(b.id, b);
+    if (b.id_busqueda) busqMap.set(b.id_busqueda, b);
+    if (b.codigo_busqueda) busqMap.set(b.codigo_busqueda, b);
+  });
 
   const result: EvaluacionCandidate[] = [];
 
@@ -142,6 +148,11 @@ const mapPipelineToEvaluacionCandidates = (
     result.push({
       id: cand?.id || pipe.claves_conexion?.id_candidato || pipe.id,
       pipeId: pipe.id,
+      busqObj: busq,
+      searchId: busq?.id_busqueda || busq?.id || pipe.claves_conexion?.id_busqueda,
+      searchCode: busq?.codigo_busqueda,
+      searchRole: busq?.perfil_busqueda,
+      searchClient: busq?.cliente,
       name: candName,
       role,
       client,
@@ -197,8 +208,7 @@ export default function EvaluacionPage() {
     if (urlCv.startsWith("gs://")) {
       const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
       const token = match ? match[2] : "";
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      const downloadUrl = getApiEndpoint(`candidatos/${candId}/cv?token=${token}`);
       window.open(downloadUrl, "_blank");
     } else {
       window.open(urlCv, "_blank");
@@ -249,7 +259,7 @@ export default function EvaluacionPage() {
       let pipeItems: PipelineItem[] = [];
       if (selectedSearch === "Todos") {
         if (searchesList.length > 0) {
-          const promises = searchesList.map(s => getPipelineAPI(s.id));
+          const promises = searchesList.map(s => getPipelineAPI(s.id_busqueda || s.id));
           const results = await Promise.all(promises);
           results.forEach(res => {
             if (res.success && Array.isArray(res.data)) {
@@ -263,9 +273,13 @@ export default function EvaluacionPage() {
           }
         }
       } else {
-        const match = searchesList.find(s => `${s.cliente} - ${s.perfil_busqueda}` === selectedSearch);
+        const match = searchesList.find(s => 
+          (s.id_busqueda || s.id) === selectedSearch || 
+          s.codigo_busqueda === selectedSearch || 
+          `${s.cliente} - ${s.perfil_busqueda}` === selectedSearch
+        );
         if (match) {
-          const res = await getPipelineAPI(match.id);
+          const res = await getPipelineAPI(match.id_busqueda || match.id);
           if (res.success && Array.isArray(res.data)) {
             pipeItems = res.data;
           }
@@ -429,8 +443,13 @@ export default function EvaluacionPage() {
       c.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.client.toLowerCase().includes(searchTerm.toLowerCase());
 
+    const searchRoleCombined = `${c.searchClient || c.client} - ${c.searchRole || c.role}`;
     const matchesSearchFilter = 
-      selectedSearch === "Todos" || `${c.client} - ${c.role}` === selectedSearch;
+      selectedSearch === "Todos" ||
+      c.searchId === selectedSearch ||
+      c.searchCode === selectedSearch ||
+      searchRoleCombined === selectedSearch ||
+      `${c.client} - ${c.role}` === selectedSearch;
 
     return matchesSearch && matchesSearchFilter;
   });
@@ -850,11 +869,16 @@ export default function EvaluacionPage() {
                 className="bg-[#101415]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] cursor-pointer w-full md:w-auto"
               >
                 <option value="Todos" className="bg-[#15181a]">Todas las Búsquedas</option>
-                {activeBusquedas.map((b) => (
-                  <option key={b.id} value={`${b.cliente} - ${b.perfil_busqueda}`} className="bg-[#15181a] text-white">
-                    {b.cliente} - {b.perfil_busqueda}
-                  </option>
-                ))}
+                {activeBusquedas.map((b) => {
+                  const searchVal = b.id_busqueda || b.id;
+                  const codeLabel = b.codigo_busqueda ? `[${b.codigo_busqueda}] ` : "";
+                  const optionLabel = `${codeLabel}${b.cliente} - ${b.perfil_busqueda}`;
+                  return (
+                    <option key={searchVal} value={searchVal} className="bg-[#15181a] text-white">
+                      {optionLabel}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

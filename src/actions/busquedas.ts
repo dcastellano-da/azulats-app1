@@ -14,6 +14,7 @@ export interface BusquedaPayload {
 
   // Nuevos campos del backend
   id_busqueda?: string;
+  codigo_busqueda?: string;
   seniority?: string;
   skills_excluyentes?: string[];
   skills_deseables?: string[];
@@ -45,6 +46,7 @@ export interface Busqueda {
 
   // Nuevos campos del backend
   id_busqueda?: string;
+  codigo_busqueda?: string;
   seniority?: string;
   skills_excluyentes?: string[];
   skills_deseables?: string[];
@@ -71,6 +73,7 @@ let fallbackBusquedas: Busqueda[] = [
     fecha_creacion: "2026-07-01",
     candidatos_contador: 8,
     id_busqueda: "REQ-001",
+    codigo_busqueda: "REQ-001",
     seniority: "Senior",
     skills_excluyentes: ["React", "TypeScript", "Next.js"],
     skills_deseables: ["TailwindCSS", "GraphQL"],
@@ -96,6 +99,7 @@ let fallbackBusquedas: Busqueda[] = [
     fecha_creacion: "2026-07-05",
     candidatos_contador: 5,
     id_busqueda: "REQ-002",
+    codigo_busqueda: "REQ-002",
     seniority: "Lead / Architect",
     skills_excluyentes: ["Rust", "WASM", "C++"],
     skills_deseables: ["Docker", "Kubernetes"],
@@ -120,6 +124,7 @@ let fallbackBusquedas: Busqueda[] = [
     fecha_creacion: "2026-07-10",
     candidatos_contador: 6,
     id_busqueda: "REQ-003",
+    codigo_busqueda: "REQ-003",
     seniority: "Senior",
     skills_excluyentes: ["AWS", "GCP", "Kubernetes", "IAM"],
     skills_deseables: ["Terraform", "Python"],
@@ -144,6 +149,7 @@ let fallbackBusquedas: Busqueda[] = [
     fecha_creacion: "2026-06-20",
     candidatos_contador: 4,
     id_busqueda: "REQ-004",
+    codigo_busqueda: "REQ-004",
     seniority: "Mid-Senior",
     skills_excluyentes: ["Figma", "Design Systems", "Prototyping"],
     skills_deseables: ["User Research", "HTML/CSS"],
@@ -197,8 +203,9 @@ export async function crearBusquedaAPI(payload: BusquedaPayload): Promise<APIRes
 
     if (useMocks || token === "mock_session_token_for_docs_generation") {
       console.log("[Server Action crearBusquedaAPI] Flag NEXT_PUBLIC_USE_MOCKS activo o token de docs. Retornando datos mock estáticos.");
+      const generatedCode = payload.codigo_busqueda || payload.id_busqueda || `REQ-MOCK-${Date.now()}`;
       const newBusqueda: Busqueda = {
-        id: payload.id_busqueda || `REQ-MOCK-${Date.now()}`,
+        id: payload.id_busqueda || generatedCode,
         cliente: payload.cliente,
         perfil_busqueda: payload.perfil_busqueda,
         estado_fase: payload.estado_fase || "Abierta",
@@ -207,7 +214,8 @@ export async function crearBusquedaAPI(payload: BusquedaPayload): Promise<APIRes
         fecha_inicio_objetivo: payload.fecha_inicio_objetivo,
         fecha_creacion: new Date().toISOString(),
         candidatos_contador: 0,
-        id_busqueda: payload.id_busqueda,
+        id_busqueda: payload.id_busqueda || generatedCode,
+        codigo_busqueda: generatedCode,
         seniority: payload.seniority,
         skills_excluyentes: payload.skills_excluyentes,
         skills_deseables: payload.skills_deseables,
@@ -230,6 +238,7 @@ export async function crearBusquedaAPI(payload: BusquedaPayload): Promise<APIRes
     // Map flat frontend payload to the 4-block nested structure required by backend
     const nestedPayload = {
       id_busqueda: payload.id_busqueda || undefined,
+      codigo_busqueda: payload.codigo_busqueda || undefined,
       identificacion: {
         cliente: payload.cliente,
         hiring_manager: payload.responsable_operativo || "",
@@ -358,6 +367,7 @@ export async function getBusquedasAPI(): Promise<Busqueda[]> {
 
       // Nuevos campos del backend
       const id_busqueda = item.id_busqueda || item.id || "";
+      const codigo_busqueda = item.codigo_busqueda || item.codigo || item.id_busqueda || item.id || "";
       const seniority = item.perfil_tecnico?.seniority ?? item.seniority ?? "";
       const skills_excluyentes = Array.isArray(item.perfil_tecnico?.skills_excluyentes) ? item.perfil_tecnico.skills_excluyentes : (item.skills_excluyentes || []);
       const skills_deseables = Array.isArray(item.perfil_tecnico?.skills_deseables) ? item.perfil_tecnico.skills_deseables : (item.skills_deseables || []);
@@ -395,6 +405,7 @@ export async function getBusquedasAPI(): Promise<Busqueda[]> {
         fecha_creacion: item.createdAt || item.fecha_creacion,
         candidatos_contador: item.candidatos_contador ?? 0,
         id_busqueda,
+        codigo_busqueda,
         seniority,
         skills_excluyentes,
         skills_deseables,

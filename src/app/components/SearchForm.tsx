@@ -35,6 +35,7 @@ export default function SearchForm({
 
   // Nuevos campos del backend
   const [idBusqueda, setIdBusqueda] = useState("");
+  const [codigoBusqueda, setCodigoBusqueda] = useState("");
   const [seniority, setSeniority] = useState("");
   const [skillsExcluyentes, setSkillsExcluyentes] = useState("");
   const [skillsDeseables, setSkillsDeseables] = useState("");
@@ -66,6 +67,7 @@ export default function SearchForm({
 
       // Vincular nuevos campos
       setIdBusqueda(initialData.id_busqueda || initialData.id || "");
+      setCodigoBusqueda(initialData.codigo_busqueda || initialData.id_busqueda || initialData.id || "");
       setSeniority(initialData.seniority || "");
       setSkillsExcluyentes(Array.isArray(initialData.skills_excluyentes) ? initialData.skills_excluyentes.join(", ") : "");
       setSkillsDeseables(Array.isArray(initialData.skills_deseables) ? initialData.skills_deseables.join(", ") : "");
@@ -89,6 +91,7 @@ export default function SearchForm({
       setEstadoFase("Abierta");
 
       setIdBusqueda("");
+      setCodigoBusqueda("");
       setSeniority("");
       setSkillsExcluyentes("");
       setSkillsDeseables("");
@@ -162,6 +165,7 @@ export default function SearchForm({
 
       // Mapear nuevos campos
       id_busqueda: idBusqueda.trim() || undefined,
+      codigo_busqueda: codigoBusqueda.trim() || undefined,
       seniority: seniority.trim(),
       skills_excluyentes: skillsExcluyentes ? skillsExcluyentes.split(",").map(s => s.trim()).filter(Boolean) : [],
       skills_deseables: skillsDeseables ? skillsDeseables.split(",").map(s => s.trim()).filter(Boolean) : [],
@@ -253,9 +257,9 @@ export default function SearchForm({
                 </label>
                 <input
                   type="text"
-                  value={idBusqueda}
-                  onChange={(e) => setIdBusqueda(e.target.value)}
-                  placeholder="Ej. REQ-MOCK-001"
+                  value={codigoBusqueda}
+                  onChange={(e) => setCodigoBusqueda(e.target.value)}
+                  placeholder="Ej. REQ-001"
                   disabled={isPending || !!initialData}
                   className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#6bd8cb] focus:outline-none transition-all placeholder-[#879391] font-medium disabled:opacity-50 disabled:bg-white/[0.02]"
                 />

@@ -1,6 +1,13 @@
+import type { Busqueda } from "@/actions/busquedas";
+
 export interface EvaluacionCandidate {
   id: string;
   pipeId?: string;
+  busqObj?: Busqueda;
+  searchId?: string;
+  searchCode?: string;
+  searchRole?: string;
+  searchClient?: string;
   name: string;
   role: string;
   client: string;

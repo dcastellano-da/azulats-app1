@@ -4,6 +4,7 @@ import React, { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { getApiEndpoint } from "@/utils/api";
 import { 
   Contact, 
   Search,
@@ -283,8 +284,7 @@ export default function TalentoPage() {
     if (urlCv.startsWith("gs://")) {
       const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
       const token = match ? match[2] : "";
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      const downloadUrl = getApiEndpoint(`candidatos/${candId}/cv?token=${token}`);
       window.open(downloadUrl, "_blank");
     } else {
       window.open(urlCv, "_blank");
@@ -1270,7 +1270,7 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                     const searchId = busqueda.id || busqueda.id_busqueda || "";
                     return (
                       <option key={searchId} value={searchId}>
-                        {busqueda.perfil_busqueda} ({busqueda.cliente})
+                        {busqueda.codigo_busqueda ? `[${busqueda.codigo_busqueda}] ` : ""}{busqueda.perfil_busqueda} ({busqueda.cliente})
                       </option>
                     );
                   })}

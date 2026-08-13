@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { getApiEndpoint } from "@/utils/api";
 import { 
   Building2, 
   MapPin, 
@@ -563,8 +564,7 @@ export default function SourcedCandidateDetailPage() {
     if (urlCv.startsWith("gs://")) {
       const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
       const token = match ? match[2] : "";
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      const downloadUrl = getApiEndpoint(`candidatos/${candId}/cv?token=${token}`);
       window.open(downloadUrl, "_blank");
     } else {
       window.open(urlCv, "_blank");
@@ -616,7 +616,7 @@ export default function SourcedCandidateDetailPage() {
 
       // Search loop fallback across searches
       if (!foundPipeItem && searchesList.length > 0) {
-        const promises = searchesList.map(s => getPipelineAPI(s.id || (s as any).id_busqueda));
+        const promises = searchesList.map(s => getPipelineAPI(s.id_busqueda || s.id));
         const results = await Promise.all(promises);
         
         for (let i = 0; i < results.length; i++) {
@@ -650,7 +650,10 @@ export default function SourcedCandidateDetailPage() {
       // Resolve specific search & criteria for this pipeline item
       let resolvedSearch = foundSearch;
       if (!resolvedSearch && foundPipeItem?.claves_conexion?.id_busqueda) {
-        resolvedSearch = searchesList.find(s => s.id === foundPipeItem?.claves_conexion?.id_busqueda);
+        resolvedSearch = searchesList.find(s => 
+          (s.id_busqueda || s.id) === foundPipeItem?.claves_conexion?.id_busqueda ||
+          s.codigo_busqueda === foundPipeItem?.claves_conexion?.id_busqueda
+        );
       }
       if (!resolvedSearch) {
         resolvedSearch = activeBusqueda;
@@ -1943,7 +1946,11 @@ export default function SourcedCandidateDetailPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
                   <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
                     <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block font-sans">ID Búsqueda Activa</span>
-                    <span className="font-mono text-white/80 select-all">{activePipelineItem.claves_conexion.id_busqueda}</span>
+                    <span className="font-mono text-white/80 select-all">
+                      {activeBusquedaObj?.codigo_busqueda 
+                        ? `${activeBusquedaObj.codigo_busqueda} (${activePipelineItem.claves_conexion.id_busqueda})` 
+                        : activePipelineItem.claves_conexion.id_busqueda}
+                    </span>
                   </div>
                   <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
                     <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block font-sans">ID Postulante</span>

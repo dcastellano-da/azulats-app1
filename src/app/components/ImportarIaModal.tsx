@@ -29,6 +29,8 @@ export interface SearchOption {
   role?: string;
   perfil_busqueda?: string;
   cliente?: string;
+  codigo_busqueda?: string;
+  code?: string;
 }
 
 export interface ImportarIaModalProps {
@@ -417,8 +419,9 @@ export default function ImportarIaModal({
 
   // Find active search label for display in result
   const activeSearchObj = searches.find(s => s.id === selectedSearchId);
+  const activeCodeLabel = activeSearchObj?.codigo_busqueda || activeSearchObj?.code || activeSearchObj?.id;
   const activeSearchLabel = activeSearchObj 
-    ? `${activeSearchObj.role || activeSearchObj.perfil_busqueda || activeSearchObj.id} (${activeSearchObj.client || activeSearchObj.cliente || "Empresa"})`
+    ? `${activeCodeLabel ? `[${activeCodeLabel}] ` : ""}${activeSearchObj.role || activeSearchObj.perfil_busqueda || activeSearchObj.id} (${activeSearchObj.client || activeSearchObj.cliente || "Empresa"})`
     : selectedSearchId;
 
   return (
@@ -486,7 +489,8 @@ export default function ImportarIaModal({
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all cursor-pointer"
                 >
                   {searches.map((s) => {
-                    const label = `${s.id} - ${s.role || s.perfil_busqueda || "Posición"} (${s.client || s.cliente || "Cliente"})`;
+                    const codeLabel = s.codigo_busqueda || s.code || s.id;
+                    const label = `${codeLabel} - ${s.role || s.perfil_busqueda || "Posición"} (${s.client || s.cliente || "Cliente"})`;
                     return (
                       <option key={s.id} value={s.id} className="bg-[#15181a] text-white">
                         {label}

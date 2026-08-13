@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { getApiEndpoint } from "@/utils/api";
 import { 
   Building2, 
   MapPin, 
@@ -40,7 +41,7 @@ import {
 } from "lucide-react";
 
 // Backend API Actions
-import { getBusquedasAPI } from "@/actions/busquedas";
+import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, actualizarPipelineAPI, Reunion } from "@/actions/pipeline";
 import { EvaluacionCandidate } from "@/lib/evaluacion";
@@ -167,7 +168,7 @@ export default function EvaluacionDetallePage() {
 
       let pipeItems: PipelineItem[] = [];
       if (searches.length > 0) {
-        const promises = searches.map(s => getPipelineAPI(s.id));
+        const promises = searches.map(s => getPipelineAPI(s.id_busqueda || s.id));
         const results = await Promise.all(promises);
         results.forEach(res => {
           if (res.success && Array.isArray(res.data)) {
@@ -181,7 +182,12 @@ export default function EvaluacionDetallePage() {
 
       if (targetPipe || targetCand) {
         const candMap = new Map(candidatesList.map(c => [c.id, c]));
-        const busqMap = new Map(searches.map(b => [b.id, b]));
+        const busqMap = new Map<string, Busqueda>();
+        searches.forEach(b => {
+          if (b.id) busqMap.set(b.id, b);
+          if (b.id_busqueda) busqMap.set(b.id_busqueda, b);
+          if (b.codigo_busqueda) busqMap.set(b.codigo_busqueda, b);
+        });
 
         const cObj = targetCand || candMap.get(targetPipe?.claves_conexion?.id_candidato || "");
         const bObj = busqMap.get(targetPipe?.claves_conexion?.id_busqueda || "");
@@ -453,8 +459,7 @@ export default function EvaluacionDetallePage() {
     if (urlCv.startsWith("gs://")) {
       const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
       const token = match ? match[2] : "";
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      const downloadUrl = getApiEndpoint(`candidatos/${candId}/cv?token=${token}`);
       window.open(downloadUrl, "_blank");
     } else {
       window.open(urlCv, "_blank");
@@ -1317,7 +1322,11 @@ export default function EvaluacionDetallePage() {
                   </div>
                   <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
                     <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">ID Búsqueda</span>
-                    <span className="font-mono text-white/80 select-all text-[10px]">{activePipelineItem.claves_conexion.id_busqueda}</span>
+                    <span className="font-mono text-white/80 select-all text-[10px]">
+                      {cand?.busqObj?.codigo_busqueda 
+                        ? `${cand.busqObj.codigo_busqueda} (${activePipelineItem.claves_conexion.id_busqueda})` 
+                        : activePipelineItem.claves_conexion.id_busqueda}
+                    </span>
                   </div>
                   <div className="space-y-1 p-3 bg-white/5 border border-white/5 rounded-2xl">
                     <span className="text-[9px] uppercase tracking-wider text-white/30 font-bold block">Estado en Pipeline</span>

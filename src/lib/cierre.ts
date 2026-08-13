@@ -5,6 +5,11 @@ import { Busqueda } from "@/actions/busquedas";
 export interface CierreCandidate {
   id: string;
   pipeId?: string;
+  busqObj?: Busqueda;
+  searchId?: string;
+  searchCode?: string;
+  searchRole?: string;
+  searchClient?: string;
   name: string;
   role: string;
   client: string;
@@ -105,7 +110,12 @@ export const mapPipelineToCierreCandidates = (
   busquedasList: Busqueda[]
 ): CierreCandidate[] => {
   const candMap = new Map(candidatosList.map(c => [c.id, c]));
-  const busqMap = new Map(busquedasList.map(b => [b.id, b]));
+  const busqMap = new Map<string, Busqueda>();
+  busquedasList.forEach(b => {
+    if (b.id) busqMap.set(b.id, b);
+    if (b.id_busqueda) busqMap.set(b.id_busqueda, b);
+    if (b.codigo_busqueda) busqMap.set(b.codigo_busqueda, b);
+  });
 
   const result: CierreCandidate[] = [];
 
@@ -154,8 +164,13 @@ export const mapPipelineToCierreCandidates = (
     const defaults = generateDefaultCierreToolsDetails(candName, role, score);
 
     result.push({
-      id: cand?.id || pipe.claves_conexion?.id_candidato || pipe.id,
+      id: cand ? cand.id : pipe.claves_conexion?.id_candidato || pipe.id,
       pipeId: pipe.id,
+      busqObj: busq,
+      searchId: busq?.id_busqueda || busq?.id || pipe.claves_conexion?.id_busqueda,
+      searchCode: busq?.codigo_busqueda,
+      searchRole: busq?.perfil_busqueda,
+      searchClient: busq?.cliente,
       name: candName,
       role,
       client,

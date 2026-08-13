@@ -246,11 +246,15 @@ Para simplificar la interacción en los prompts de desarrollo y la localización
     ```bash
     export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && node --experimental-strip-types --test tests/busquedas_screening.test.js
     ```
-12. **Verificación de Tipos TypeScript:**
+12. **Ejecutar pruebas de Integración Global de Búsquedas (Todas las Pantallas):**
+    ```bash
+    export PATH="/Users/dcastellano/.local/node-v20.12.2-darwin-arm64/bin:$PATH" && npx tsx --test tests/busquedas_pantallas.test.js tests/busquedas_migracion.test.js
+    ```
+13. **Verificación de Tipos TypeScript:**
     ```bash
     npx tsc --noEmit
     ```
-13. Abre [http://localhost:3000](http://localhost:3000) en el navegador.
+14. Abre [http://localhost:3000](http://localhost:3000) en el navegador.
 
 
 --------------------------------------------------------------------------------------------------------
@@ -311,7 +315,7 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
 3.  **Promoción a Producción:**
     Tras la validación funcional satisfactoria en el entorno de Staging, la promoción a Producción se ejecuta mediante el Merge validado desde `develop` hacia `main`:
     ```bash
-    # Transición controlada a Producción mediante PR / Merge: develop -> main
+    # Transición controlada a Producción mediante PR / Merge: develop -> main // Si da error, es que quedan cambios en desarrollo que subir
     git checkout main
     git merge develop
     git push origin main
@@ -320,6 +324,23 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
 
 --------------------------------------------------------------------------------------------------------
 # Historico de Cambios (ordenados por los recientes cambios primeros)
+
+*   **13/08/2026:** Migración de Base de Datos Firestore y Desacoplamiento de `id_busqueda` vs. `codigo_busqueda` (`ID: P-BUS-01`, `ID: P-BUS-02`):
+    *   **Desacoplamiento Estricto de IDs:** Adaptación de todas las capas del frontend (`src/actions/busquedas.ts`, `src/app/busquedas/page.tsx`, `SearchForm.tsx` y `src/app/busquedas/[id]/page.tsx`) a la migración de Firestore donde el documento posee un `id_busqueda` autogenerado (UUID/Hash técnico) y un campo separado `codigo_busqueda` para el código legible por humanos (ej. "REQ-001").
+    *   **Maestro de Búsquedas (`ID: P-BUS-01`):**
+        - Columna "ID" visual renderiza `codigo_busqueda` con fallback a `id_busqueda` (`busqueda.codigo_busqueda || busqueda.id_busqueda`).
+        - Enrutamiento estricto: El botón "Editar" y los eventos de clic en la fila construyen la URL utilizando siempre el ID técnico de Firestore (`/busquedas/${busqueda.id_busqueda}`).
+        - Buscador textual interactivo ampliado para filtrar por `codigo_busqueda` e `id_busqueda`.
+    *   **Formularios de Creación / Edición (`ID: P-BUS-02`):**
+        - El campo "Código Búsqueda" mapea el texto tecleado por el usuario hacia `codigo_busqueda` en el payload REST de creación/edición en `SearchForm.tsx`.
+        - La vista de detalle a pantalla completa renderiza `codigo_busqueda` en el badge de la cabecera superior (`Cliente: X • Código: REQ-001`).
+    *   **Suite de Pruebas Automatizadas (`tests/busquedas_migracion.test.js`):** Creación e integración de suite unitaria bajo el test runner nativo de Node.js con `tsx` para validar el comportamiento en modo Mock y REST (3/3 pruebas aprobadas, **100% de éxito en 8/8 pruebas totales** de búsquedas).
+    *   **Compilación Estática:** Verificación estricta en TypeScript mediante `npx tsc --noEmit` (**0 errores**).
+
+*   **13/08/2026:** Corrección de Duplicación de URL `/api/v1` en Server Actions y Vistas de Descarga de CV (`src/actions/candidatos.ts` & `src/app/**`):
+    *   **Estandarización de URLs de API con `getApiEndpoint`:** Refactorización de `crearCandidatoAPI`, `actualizarCandidatoAPI`, `eliminarCandidatoAPI` e `importarCandidatoIA_API` en `src/actions/candidatos.ts` para sustituir la concatenación manual `${apiBaseUrl}/api/v1/...` por la utilidad normalizadora `getApiEndpoint(...)`, solucionando el error 404 por ruta duplicada (`http://localhost:8080/api/v1/api/v1/candidatos/importar-ia`).
+    *   **Actualización de Vistas de Descarga de CV (`src/app/**`):** Estandarización en 10 páginas de componentes de vistas (`cierre`, `descubrimiento`, `evaluacion`, `presentacion`, `talento`) reemplazando concatenaciones manuales por `getApiEndpoint("candidatos/" + candId + "/cv?token=" + token)`.
+    *   **Suite de Pruebas Automatizadas Unitarias (`src/utils/__tests__/api.test.ts`):** Creación e integración de pruebas unitarias bajo `node:test` (ejecutable con `npm test`) que validan la normalización automática de URLs independientemente de si las variables de entorno contienen o carecen del segmento `/api/v1`.
 
 *   **12/08/2026:** Corrección de Importaciones con Extensiones `.ts`/`.js` para Despliegue en Firebase App Hosting (`src/actions/busquedas.ts`):
     *   **Resolución de Error TS5097 en Build de Next.js:** Eliminación de extensiones de archivo explícitas (`.ts` y `.js`) en las rutas de importación en `src/actions/busquedas.ts` (`CriterioScreening`, `getApiEndpoint`, `cookies`).
@@ -668,6 +689,20 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     *   **Seguridad en Edge:** Configuración del proxy interceptor perimetral `src/proxy.ts` para proteger la ruta `/talento`, forzando redirección automática a `/login` para usuarios no autenticados.
     *   **Conector API REST & Mock Fallback:** Creación de Server Actions en `src/actions/candidatos.ts` para operaciones CRUD en Cloud Run con un sistema seguro de datos simulados en memoria (Mock database fallback), previniendo fallos en pruebas locales y forzando `acepta_privacidad: true` y control de inmutabilidad selectiva.
     *   **Navegación Coherente:** Integración del enlace universal y horizontal hacia `/talento` (Talent Mixer, representado con icono `Sliders`) en todas las barras superiores compartidas: Dashboard, Búsquedas, Reclutamiento y Ajustes.
+
+*   **13/08/2026:** Homologación y Fix del Combo Desplegable "Búsqueda" en todo el Pipeline (`F1 Descubrimiento`, `F2 Evaluación`, `F3 Presentación`, `F4 Cierre`):
+    *   **Inclusión de Propiedades de Vacante en Candidato:** Inyección de `searchId`, `searchCode`, `searchRole` y `searchClient` en los modelos de candidato (`SourcedCandidate`, `EvaluacionCandidate`, `PresentacionCandidate`, `CierreCandidate`) y en los utilitarios de mapeo (`src/lib/presentacion.ts`, `src/lib/cierre.ts`).
+    *   **Regla de Filtrado Multicapa Resiliente (`matchesSearchFilter`):** Se actualizó el filtrado en las 4 páginas del pipeline (`descubrimiento`, `evaluacion`, `presentacion`, `cierre`) para evaluar la coincidencia del candidato por ID técnico (`searchId`), por código legible (`searchCode`), por título compuesto de vacante (`searchRoleCombined`) o por puesto individual. Esto soluciona la divergencia cuando `cand.puesto` ("No especificado") difiere de `busq.perfil_busqueda` y garantiza que los candidatos se muestren correctamente en el tablero al filtrar por una búsqueda.
+    *   **Identificadores Técnicos en Valores `<option>`:** Estandarización de `value={b.id_busqueda || b.id}` en los elementos `<select>` manteniendo las etiquetas legibles `[codigo_busqueda] Cliente - Perfil`.
+
+*   **13/08/2026:** Requerimiento Funcional en Pantalla P-DIS-01 (Descubrimiento): Incorporación de la vista "Lista Screening IA":
+    *   **3er Modo de Vista en Sección de Filtros:** Expansión del selector de vistas (`Kanban`, `Lista Detallada`, `Lista Screening IA`) con ícono `Sparkles` y resplandor esmeralda. El filtro por estado `Estado Cand.` se encuentra disponible dinámicamente para ambos modos de lista.
+    *   **Columnas de Screening Inteligente IA (Homologadas a P-DIS-02):** Implementación de la tabla glassmorphic con columnas dedicadas: *Fit Score IA* (`fit_score_screening` / `pts`), *Alerta Knockout* (`🔴 INCUMPLIDO` / `🟢 CUMPLIDO`), *Desglose Criterios & Semáforo* (`SÍ` 🟢, `INFERIDO` 🔵, `NO` 🔴), *Evidencia CV (Prueba de Vida)* (citas textuales del CV), *NOTAS DESCUBRIMIENTO* (recruiterNotes en glassmorphism cyan), *Estado* y *Acciones* (`Detalles`, `CV`, `Avanzar estado`, `Avanzar Fase`, `Rechazar`, e icono `Re-evaluar IA`).
+    *   **Suite de Pruebas Automatizadas:** Creación del archivo de pruebas unitarias/integración `tests/descubrimiento_screening_ia_view.test.js` con verificación de `viewMode`, mapeos de campos de screening, alertas knockout y semáforos.
+
+*   **13/08/2026:** Extensión global del soporte `codigo_busqueda` e `id_busqueda` en todas las pantallas del pipeline (`P-DIS-01`, `P-DIS-02`, `P-EVA-01`, `P-EVA-02`, `P-PRE-01`, `P-PRE-02`, `P-CIE-01`, `P-CIE-02`, `P-TAL-01`, `M-IMP-01/02`). Se formatearon las opciones de los desplegables `<select>` de Búsqueda con la etiqueta legible `[codigo_busqueda] Cliente - Perfil`, se actualizó la indexación multiclave en los utilitarios `busqMap`, y se incluyeron los badges de trazabilidad en los expedientes de candidato.
+
+*   **13/08/2026:** Adaptación del frontend ante la migración de esquema en Firestore para la colección `busquedas` (`id_busqueda` como ID técnico Firestore y `codigo_busqueda` como código alfanumérico legible). Actualizadas las interfaces `Busqueda` y `BusquedaPayload` en `src/actions/busquedas.ts`, el renderizado en la tabla `P-BUS-01`, el formulario `P-BUS-02` y el enrutamiento seguro.
 
 *   **13/07/2026:** Finalización del CRUD del Maestro de Búsquedas mediante el desarrollo de flujos interactivos de lectura y actualización (Edit Mode). Se agregaron filas clicables y botones de acción en la tabla (`src/app/busquedas/page.tsx`), soporte de datos reactivos `initialData` en `SearchForm.tsx` con selectors dinámicos de fase editables, e integración hacia el endpoint Server Action `actualizarBusquedaAPI(id, payload)` vía PATCH.
 

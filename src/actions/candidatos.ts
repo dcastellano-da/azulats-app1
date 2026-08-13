@@ -628,14 +628,6 @@ export async function getCandidatosAPI(): Promise<APIResponse> {
 export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse> {
   try {
     const token = await getServerAuthToken();
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiBaseUrl) {
-      return {
-        status: 500,
-        success: false,
-        message: "Error de configuración: NEXT_PUBLIC_API_URL no está definido."
-      };
-    }
 
     const nombre = formData.get("nombre_completo")?.toString()?.trim();
     const email = formData.get("email")?.toString()?.trim();
@@ -672,7 +664,7 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
       };
     }
 
-    const url = `${apiBaseUrl}/api/v1/candidatos`;
+    const url = getApiEndpoint("candidatos");
     console.log(`[Candidatos Action] POST multipart/form-data a: ${url}`);
     
     // Construct clean FormData matching backend key names
@@ -762,14 +754,6 @@ export async function crearCandidatoAPI(formData: FormData): Promise<APIResponse
 export async function actualizarCandidatoAPI(id: string, payload: Partial<Candidato>): Promise<APIResponse> {
   try {
     const token = await getServerAuthToken();
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiBaseUrl) {
-      return {
-        status: 500,
-        success: false,
-        message: "Error de configuración: NEXT_PUBLIC_API_URL no está definido."
-      };
-    }
 
     // Mutability Matrix Safeguard: Do not allow unauthorized modifications
     const forbiddenKeys: Array<keyof Candidato> = ["id", "acepta_privacidad", "origen", "url_cv", "createdAt"];
@@ -804,7 +788,7 @@ export async function actualizarCandidatoAPI(id: string, payload: Partial<Candid
     if (payload.rubros !== undefined) apiPayload.rubros = payload.rubros;
     if (payload.canal_ingreso !== undefined) apiPayload.canal_ingreso = payload.canal_ingreso;
 
-    const url = `${apiBaseUrl}/api/v1/candidatos/${id}`;
+    const url = getApiEndpoint(`candidatos/${id}`);
     console.log(`[Candidatos Action] PATCH a: ${url}`);
     const response = await fetch(url, {
       method: "PATCH",
@@ -857,21 +841,13 @@ export async function actualizarCandidatoAPI(id: string, payload: Partial<Candid
 export async function eliminarCandidatoAPI(id: string, hardDelete: boolean): Promise<APIResponse> {
   try {
     const token = await getServerAuthToken();
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiBaseUrl) {
-      return {
-        status: 500,
-        success: false,
-        message: "Error de configuración: NEXT_PUBLIC_API_URL no está definido."
-      };
-    }
 
     // A Soft Delete translates to a PATCH changing status to 'Descartado'
     if (!hardDelete) {
       return await actualizarCandidatoAPI(id, { estado_revision: "Descartado" });
     }
 
-    const url = `${apiBaseUrl}/api/v1/candidatos/${id}`;
+    const url = getApiEndpoint(`candidatos/${id}`);
     console.log(`[Candidatos Action] DELETE a: ${url}`);
     const response = await fetch(url, {
       method: "DELETE",
@@ -917,14 +893,6 @@ export async function eliminarCandidatoAPI(id: string, hardDelete: boolean): Pro
 export async function importarCandidatoIA_API(formData: FormData): Promise<APIResponse> {
   try {
     const token = await getServerAuthToken();
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiBaseUrl) {
-      return {
-        status: 500,
-        success: false,
-        message: "Error de configuración: NEXT_PUBLIC_API_URL no está definido."
-      };
-    }
 
     const cvFile = formData.get("cv");
     if (!cvFile) {
@@ -935,7 +903,7 @@ export async function importarCandidatoIA_API(formData: FormData): Promise<APIRe
       };
     }
 
-    const url = `${apiBaseUrl}/api/v1/candidatos/importar-ia`;
+    const url = getApiEndpoint("candidatos/importar-ia");
     console.log(`[Candidatos Action] POST (Importar IA) a: ${url}`);
     
     const apiFormData = new FormData();

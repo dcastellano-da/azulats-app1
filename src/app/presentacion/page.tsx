@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { getApiEndpoint } from "@/utils/api";
 import { 
   Compass, 
   Building2, 
@@ -111,8 +112,7 @@ export default function PresentacionPage() {
     if (urlCv.startsWith("gs://")) {
       const match = document.cookie.match(/(^| )azul_ats_token=([^;]+)/);
       const token = match ? match[2] : "";
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      const downloadUrl = `${apiBaseUrl}/api/v1/candidatos/${candId}/cv?token=${token}`;
+      const downloadUrl = getApiEndpoint(`candidatos/${candId}/cv?token=${token}`);
       window.open(downloadUrl, "_blank");
     } else {
       window.open(urlCv, "_blank");
@@ -139,7 +139,7 @@ export default function PresentacionPage() {
       let pipeItems: PipelineItem[] = [];
       if (selectedSearch === "Todos") {
         if (searchesList.length > 0) {
-          const promises = searchesList.map(s => getPipelineAPI(s.id));
+          const promises = searchesList.map(s => getPipelineAPI(s.id_busqueda || s.id));
           const results = await Promise.all(promises);
           results.forEach(res => {
             if (res.success && Array.isArray(res.data)) {
@@ -153,9 +153,13 @@ export default function PresentacionPage() {
           }
         }
       } else {
-        const match = searchesList.find(s => `${s.cliente} - ${s.perfil_busqueda}` === selectedSearch);
+        const match = searchesList.find(s => 
+          (s.id_busqueda || s.id) === selectedSearch || 
+          s.codigo_busqueda === selectedSearch || 
+          `${s.cliente} - ${s.perfil_busqueda}` === selectedSearch
+        );
         if (match) {
-          const res = await getPipelineAPI(match.id);
+          const res = await getPipelineAPI(match.id_busqueda || match.id);
           if (res.success && Array.isArray(res.data)) {
             pipeItems = res.data;
           }
@@ -479,8 +483,13 @@ export default function PresentacionPage() {
       c.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.client.toLowerCase().includes(searchTerm.toLowerCase());
 
+    const searchRoleCombined = `${c.searchClient || c.client} - ${c.searchRole || c.role}`;
     const matchesSearchFilter =
-      selectedSearch === "Todos" || `${c.client} - ${c.role}` === selectedSearch;
+      selectedSearch === "Todos" ||
+      c.searchId === selectedSearch ||
+      c.searchCode === selectedSearch ||
+      searchRoleCombined === selectedSearch ||
+      `${c.client} - ${c.role}` === selectedSearch;
 
     const matchesPhaseFilter =
       viewMode === "kanban" || filterStatus === "Todos" || c.currentPhase === filterStatus;
@@ -894,11 +903,16 @@ export default function PresentacionPage() {
                 className="bg-[#101415]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer w-full md:w-auto font-bold"
               >
                 <option value="Todos" className="bg-[#15181a]">Todas las Búsquedas</option>
-                {activeBusquedas.map((b) => (
-                  <option key={b.id} value={`${b.cliente} - ${b.perfil_busqueda}`} className="bg-[#15181a] text-white">
-                    {b.cliente} - {b.perfil_busqueda}
-                  </option>
-                ))}
+                {activeBusquedas.map((b) => {
+                  const searchVal = b.id_busqueda || b.id;
+                  const codeLabel = b.codigo_busqueda ? `[${b.codigo_busqueda}] ` : "";
+                  const optionLabel = `${codeLabel}${b.cliente} - ${b.perfil_busqueda}`;
+                  return (
+                    <option key={searchVal} value={searchVal} className="bg-[#15181a] text-white">
+                      {optionLabel}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 

@@ -11,6 +11,7 @@ export interface ResultadoScreeningItem {
   evidencia_cv: string;
   es_knockout: boolean;
   puntaje_obtenido: number;
+  pregunta?: string;
 }
 
 export interface PipelineScreeningData {

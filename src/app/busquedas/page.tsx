@@ -39,7 +39,8 @@ export default function BusquedasPage() {
   const [selectedSearch, setSelectedSearch] = useState<Busqueda | undefined>(undefined);
 
   const handleEditClick = (item: Busqueda) => {
-    router.push(`/busquedas/${item.id}`);
+    const technicalId = item.id_busqueda || item.id;
+    router.push(`/busquedas/${technicalId}`);
   };
 
   // Client-side authentication redirection guard
@@ -88,7 +89,9 @@ export default function BusquedasPage() {
     const matchesSearch = 
       (item.perfil_busqueda || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.cliente || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.responsable_operativo || "").toLowerCase().includes(searchTerm.toLowerCase());
+      (item.responsable_operativo || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.codigo_busqueda || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.id_busqueda || "").toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = 
       selectedStatus === "Todos" || item.estado_fase === selectedStatus;
@@ -338,12 +341,12 @@ export default function BusquedasPage() {
                 ) : filteredSearches.length > 0 ? (
                   filteredSearches.map((item) => (
                     <tr 
-                      key={item.id}
+                      key={item.id_busqueda || item.id}
                       onClick={() => handleEditClick(item)}
                       className="group hover:bg-white/[0.04] transition-colors duration-250 cursor-pointer"
                     >
                       <td className="py-4 px-6 font-mono text-[#879391]">
-                        {item.id.substring(0, 8)}
+                        {item.codigo_busqueda || item.id_busqueda || item.id}
                       </td>
                       <td className="py-4 px-6 font-bold group-hover:text-[#6bd8cb] transition-colors">
                         <div className="flex items-center gap-2">
