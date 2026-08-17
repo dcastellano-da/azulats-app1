@@ -238,10 +238,10 @@ export default function EvaluarScreeningModal({
                         </span>
                         <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold shrink-0 ${
                           crit.tipo === "knockout" 
-                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30" 
+                            ? "bg-purple-500/20 text-purple-300 border border-purple-500/30" 
                             : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
                         }`}>
-                          {crit.tipo === "knockout" ? "KNOCKOUT" : `PESO: ${crit.peso} pts`}
+                          {crit.tipo === "knockout" ? "EXCLUYENTE" : `PESO: ${crit.peso} pts`}
                         </span>
                       </div>
                     </div>

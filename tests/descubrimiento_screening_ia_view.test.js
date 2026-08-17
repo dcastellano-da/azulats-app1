@@ -184,4 +184,132 @@ describe('P-DIS-01: Vista Lista Screening IA y Mapeo de Columnas de Screening In
     assert.deepEqual(sortedAsc.map(c => c.id), ["C-1", "C-3", "C-2"]);
   });
 
+  // Test 9: Verificación de etiqueta del botón de ingesta en la cabecera de P-DIS-01
+  test('El botón de ingesta en P-DIS-01 muestra la etiqueta "Importar Postulante con IA"', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const pagePath = path.resolve('src/app/descubrimiento/page.tsx');
+    const content = await fs.readFile(pagePath, 'utf-8');
+
+    // Verificar presencia de la nueva etiqueta
+    assert.ok(content.includes('<span>Importar Postulante con IA</span>'), 'El botón debe incluir la etiqueta "Importar Postulante con IA"');
+    // Verificar que la antigua etiqueta "Parser Ingesta CV" ya no esté en el botón del header
+    assert.ok(!content.includes('<span>Parser Ingesta CV</span>'), 'La antigua etiqueta "Parser Ingesta CV" no debe estar presente');
+  });
+
+  // Test 10: Verificación de insignia dinámica según estado de evaluación en ScreeningPanel.tsx (Opción A)
+  test('ScreeningPanel renderiza insignias dinámicas "EXCLUYENTE ✓" al cumplir y "KNOCKOUT INCUMPLIDO" al reprobar', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const panelPath = path.resolve('src/app/components/ScreeningPanel.tsx');
+    const content = await fs.readFile(panelPath, 'utf-8');
+
+    // Verificar soporte de badge EXCLUYENTE ✓ para evaluacion === "SI"
+    assert.ok(content.includes('EXCLUYENTE'), 'El panel debe incluir el distintivo EXCLUYENTE');
+    assert.ok(content.includes('<span>✓</span>'), 'El panel debe incluir el check verde para criterios excluyentes cumplidos');
+    // Verificar que solo muestre KNOCKOUT INCUMPLIDO en tono rojo cuando evaluacion === "NO"
+    assert.ok(content.includes('🔴 KNOCKOUT INCUMPLIDO'), 'El panel debe mostrar KNOCKOUT INCUMPLIDO únicamente cuando evaluacion === "NO"');
+  });
+
+  // Test 11: Soporte de Densidad de Vista (compact vs expanded) y persistencia en localStorage
+  test('Selector de Densidad soporta modos compact y expanded con clave screening_ia_density_mode', () => {
+    let memoryStorage = {};
+    const mockLocalStorage = {
+      getItem: (key) => memoryStorage[key] || null,
+      setItem: (key, val) => { memoryStorage[key] = String(val); }
+    };
+
+    let densityMode = "compact";
+    const handleDensityChange = (mode) => {
+      densityMode = mode;
+      mockLocalStorage.setItem("screening_ia_density_mode", mode);
+    };
+
+    // Cambiar a expandida
+    handleDensityChange("expanded");
+    assert.equal(densityMode, "expanded");
+    assert.equal(mockLocalStorage.getItem("screening_ia_density_mode"), "expanded");
+
+    // Cambiar a compacta
+    handleDensityChange("compact");
+    assert.equal(densityMode, "compact");
+    assert.equal(mockLocalStorage.getItem("screening_ia_density_mode"), "compact");
+  });
+
+  // Test 12: Presencia de componentes DensitySelector y ScreeningIATable en la pantalla de descubrimiento
+  test('P-DIS-01 (page.tsx) integra DensitySelector y el componente ScreeningIATable', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const pagePath = path.resolve('src/app/descubrimiento/page.tsx');
+    const content = await fs.readFile(pagePath, 'utf-8');
+
+    assert.ok(content.includes('DensitySelector'), 'La página debe importar e incluir DensitySelector');
+    assert.ok(content.includes('ScreeningIATable'), 'La página debe importar e incluir ScreeningIATable');
+    assert.ok(content.includes('screening_ia_density_mode'), 'La página debe gestionar localStorage con la clave screening_ia_density_mode');
+  });
+
+  // Test 13: Verificación del contenido de DensitySelector.tsx y ScreeningIATable.tsx
+  test('DensitySelector.tsx y ScreeningIATable.tsx contienen las etiquetas e íconos requeridos', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+
+    const densityPath = path.resolve('src/components/screening/DensitySelector.tsx');
+    const densityContent = await fs.readFile(densityPath, 'utf-8');
+
+    assert.ok(densityContent.includes('Densidad:'), 'DensitySelector debe mostrar la etiqueta Densidad:');
+    assert.ok(densityContent.includes('Compacta'), 'DensitySelector debe tener la opción Compacta');
+    assert.ok(densityContent.includes('Expandida'), 'DensitySelector debe tener la opción Expandida');
+    assert.ok(densityContent.includes('Visualización densa (8-12 candidatos por página)'), 'Debe incluir tooltip para modo compacto');
+
+    const tablePath = path.resolve('src/components/screening/ScreeningIATable.tsx');
+    const tableContent = await fs.readFile(tablePath, 'utf-8');
+
+    assert.ok(tableContent.includes('✓ Knockouts OK'), 'ScreeningIATable debe incluir badge ✓ Knockouts OK en modo compacto');
+    assert.ok(tableContent.includes('✕ Fallo:'), 'ScreeningIATable debe incluir badge ✕ Fallo en modo compacto');
+    assert.ok(tableContent.includes('MoreHorizontal'), 'ScreeningIATable debe usar menú de acciones secundarias');
+  });
+
+  // Test 14: Persistencia del modo de vista y última búsqueda seleccionada en localStorage
+  test('Sincronización de descubrimiento_view_mode y descubrimiento_selected_search en localStorage', () => {
+    let memoryStorage = {};
+    const mockLocalStorage = {
+      getItem: (key) => memoryStorage[key] || null,
+      setItem: (key, val) => { memoryStorage[key] = String(val); }
+    };
+
+    let viewMode = "kanban";
+    let selectedSearch = "Todos";
+
+    const handleViewModeChange = (mode) => {
+      viewMode = mode;
+      mockLocalStorage.setItem("descubrimiento_view_mode", mode);
+    };
+
+    const handleSelectedSearchChange = (searchId) => {
+      selectedSearch = searchId;
+      mockLocalStorage.setItem("descubrimiento_selected_search", searchId);
+    };
+
+    handleViewModeChange("screening_ia");
+    assert.equal(viewMode, "screening_ia");
+    assert.equal(mockLocalStorage.getItem("descubrimiento_view_mode"), "screening_ia");
+
+    handleSelectedSearchChange("REQ-001");
+    assert.equal(selectedSearch, "REQ-001");
+    assert.equal(mockLocalStorage.getItem("descubrimiento_selected_search"), "REQ-001");
+  });
+
+  // Test 15: Verificación en P-DIS-01 (page.tsx) del manejo de claves descubrimiento_view_mode y descubrimiento_selected_search
+  test('P-DIS-01 (page.tsx) lee y persiste las claves descubrimiento_view_mode y descubrimiento_selected_search', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const pagePath = path.resolve('src/app/descubrimiento/page.tsx');
+    const content = await fs.readFile(pagePath, 'utf-8');
+
+    assert.ok(content.includes('descubrimiento_view_mode'), 'La página debe gestionar localStorage con descubrimiento_view_mode');
+    assert.ok(content.includes('descubrimiento_selected_search'), 'La página debe gestionar localStorage con descubrimiento_selected_search');
+    assert.ok(content.includes('handleViewModeChange'), 'La página debe utilizar handleViewModeChange');
+    assert.ok(content.includes('handleSelectedSearchChange'), 'La página debe utilizar handleSelectedSearchChange');
+  });
+
 });

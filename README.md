@@ -15,6 +15,10 @@ Este repositorio contiene la SPA y la interfaz de usuario de **Azul ATS**, const
 ```text
 azulats-app1/
 ├── src/
+│   ├── components/
+│   │   └── screening/
+│   │       ├── DensitySelector.tsx # Control segmentado para alternar densidad de vista (Compacta vs Expandida)
+│   │       └── ScreeningIATable.tsx# Tabla modular con micro-chips horizontales y badges reducidos en modo compacto
 │   ├── app/
 │   │   ├── components/
 │   │   │   ├── KpiCards.tsx       # Tarjetas rápidas de indicadores (Volumen, Tiempos, Candidatos)
@@ -298,7 +302,7 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     # Verificar que estoy en desarrollo
     git checkout develop
 
-    # Actualizar con los ultimos cambios de la rama desarrollo (no se si aplica siempre)
+    # Actualizar con los ultimos cambios de la rama desarrollo
     git pull origin develop
    
     # Agregar los cambios
@@ -323,9 +327,13 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     ```
 
 --------------------------------------------------------------------------------------------------------
-# Historico de Cambios (ordenados por los recientes cambios primeros)
+# Historico de Cambios (ordenados por los recientes cambios primeros, formato de fecha "AAAA/MM/DD")
 
-*   **13/08/2026:** Migración de Base de Datos Firestore y Desacoplamiento de `id_busqueda` vs. `codigo_busqueda` (`ID: P-BUS-01`, `ID: P-BUS-02`):
+*   **2026/08/14:** Actualización de UI/UX en Pantalla P-DIS-01 (Descubrimiento):
+    *   **Cambio de Etiqueta en Botón de Ingesta Inteligente:** Se actualizó el texto del botón principal de ingesta en la cabecera de la pantalla `P-DIS-01` de **`Parser Ingesta CV`** a **`Importar Postulante con IA`**.
+    *   **Verificación con Pruebas Automatizadas:** Se incorporó la prueba unitaria en `tests/descubrimiento_screening_ia_view.test.js` para asegurar la presencia del nuevo texto y prevenir regresiones.
+
+*   **2026/08/13:** Migración de Base de Datos Firestore y Desacoplamiento de `id_busqueda` vs. `codigo_busqueda` (`ID: P-BUS-01`, `ID: P-BUS-02`):
     *   **Desacoplamiento Estricto de IDs:** Adaptación de todas las capas del frontend (`src/actions/busquedas.ts`, `src/app/busquedas/page.tsx`, `SearchForm.tsx` y `src/app/busquedas/[id]/page.tsx`) a la migración de Firestore donde el documento posee un `id_busqueda` autogenerado (UUID/Hash técnico) y un campo separado `codigo_busqueda` para el código legible por humanos (ej. "REQ-001").
     *   **Maestro de Búsquedas (`ID: P-BUS-01`):**
         - Columna "ID" visual renderiza `codigo_busqueda` con fallback a `id_busqueda` (`busqueda.codigo_busqueda || busqueda.id_busqueda`).
@@ -689,6 +697,17 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     *   **Seguridad en Edge:** Configuración del proxy interceptor perimetral `src/proxy.ts` para proteger la ruta `/talento`, forzando redirección automática a `/login` para usuarios no autenticados.
     *   **Conector API REST & Mock Fallback:** Creación de Server Actions en `src/actions/candidatos.ts` para operaciones CRUD en Cloud Run con un sistema seguro de datos simulados en memoria (Mock database fallback), previniendo fallos en pruebas locales y forzando `acepta_privacidad: true` y control de inmutabilidad selectiva.
     *   **Navegación Coherente:** Integración del enlace universal y horizontal hacia `/talento` (Talent Mixer, representado con icono `Sliders`) en todas las barras superiores compartidas: Dashboard, Búsquedas, Reclutamiento y Ajustes.
+
+
+*   **17/08/2026:** Implementación del Selector de Densidad de Vista (Vista Compacta Híbrida vs. Vista Expandida) y Persistencia Extendida en Pantalla P-DIS-01 ("Lista Screening IA"):
+    *   **Selector de Densidad (`DensitySelector.tsx`):** Control segmentado (`Densidad: [ ☰ Compacta | ≡ Expandida ]`) integrado en la barra de herramientas cuando `viewMode === "screening_ia"`, claramente diferenciado del botón `[ ↗ Maximizar / Restaurar ]` y con persistencia de la preferencia del usuario en `localStorage` (`screening_ia_density_mode`).
+    *   **Persistencia Global de Vista y Búsqueda Seleccionada:** Extensión del almacenamiento persistente en `localStorage` para guardar el modo de vista preferido (`descubrimiento_view_mode`: `kanban`, `lista` o `screening_ia`) y la última búsqueda elegida en el desplegable (`descubrimiento_selected_search`), restaurándolos automáticamente al recargar o navegar.
+    *   **Arquitectura Híbrida en Tabla (`ScreeningIATable.tsx`):** La Vista Compacta presenta badges reducidos de Alerta Knockout (`🟢 ✓ Knockouts OK` / `🔴 ✕ Fallo: [Criterio]`), micro-chips horizontales (`[ SÍ ]`, `[ NO ]`, `[ INF ]`) con tooltips interactivos completos para el desglose de criterios, y menú contextual de acciones secundarias `[...]` para optimizar la densidad a 8-12 postulantes por pantalla (~52px-60px por fila).
+    *   **Suite de Pruebas Automatizadas:** Actualización de `tests/descubrimiento_screening_ia_view.test.js` (15 pruebas unitarias) para certificar el funcionamiento de los modos compact y expanded, la persistencia en `localStorage` de las 3 claves y las micro-interacciones.
+
+*   **14/08/2026:** Mejora de UI/UX en Pantalla P-DIS-02 (Screening Inteligente IA):
+    *   **Rediseño Dinámico de Insignia de Criterio Excluyente (Knockout):** Se corrigió la falsa alerta roja que se mostraba en criterios excluyentes cumplidos. La insignia ahora responde dinámicamente al estado de evaluación: muestra **`EXCLUYENTE ✓`** en todo esmeralda suave cuando se cumple (`SÍ`), **`EXCLUYENTE ?`** en ámbar cuando es `INFERIDO`, y reserva únicamente la alerta roja **`🔴 KNOCKOUT INCUMPLIDO`** con resplandor para cuando el postulante reprueba el criterio (`NO`).
+    *   **Homologación de Estilos:** Se estandarizó la etiqueta neutra a `EXCLUYENTE` en `EvaluarScreeningModal.tsx` (`M-IMP-02`) para evitar alarmar visualmente al usuario antes de procesar la inferencia.
 
 *   **13/08/2026:** Homologación y Fix del Combo Desplegable "Búsqueda" en todo el Pipeline (`F1 Descubrimiento`, `F2 Evaluación`, `F3 Presentación`, `F4 Cierre`):
     *   **Inclusión de Propiedades de Vacante en Candidato:** Inyección de `searchId`, `searchCode`, `searchRole` y `searchClient` en los modelos de candidato (`SourcedCandidate`, `EvaluacionCandidate`, `PresentacionCandidate`, `CierreCandidate`) y en los utilitarios de mapeo (`src/lib/presentacion.ts`, `src/lib/cierre.ts`).

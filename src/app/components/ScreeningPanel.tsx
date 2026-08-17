@@ -287,9 +287,25 @@ export default function ScreeningPanel({
 
                   <div className="flex items-center gap-2">
                     {crit.tipo === "knockout" ? (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/30">
-                        Knockout
-                      </span>
+                      evaluacion === "NO" ? (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/40 shadow-sm shadow-red-500/20 animate-pulse">
+                          🔴 KNOCKOUT INCUMPLIDO
+                        </span>
+                      ) : evaluacion === "SI" ? (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                          <span>EXCLUYENTE</span>
+                          <span>✓</span>
+                        </span>
+                      ) : evaluacion === "INFERIDO" ? (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                          <span>EXCLUYENTE</span>
+                          <span>?</span>
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                          EXCLUYENTE
+                        </span>
+                      )
                     ) : (
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#6bd8cb]/10 text-[#6bd8cb] border border-[#6bd8cb]/30">
                         +{crit.peso} pts

@@ -46,6 +46,8 @@ import {
   X
 } from "lucide-react";
 import ImportarIaModal from "../components/ImportarIaModal";
+import DensitySelector, { DensityMode } from "@/components/screening/DensitySelector";
+import ScreeningIATable from "@/components/screening/ScreeningIATable";
 import { analyzeSemanticMatchLive, generateBooleanQueryLive, SemanticMatchResult } from "@/lib/gemini";
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, Candidato, crearCandidatoAPI } from "@/actions/candidatos";
@@ -695,10 +697,49 @@ export default function DescubrimientoPage() {
 
   // List View and Status Filter State
   const [viewMode, setViewMode] = useState<"kanban" | "lista" | "screening_ia">("kanban");
+  const [densityMode, setDensityMode] = useState<DensityMode>("compact");
   const [filterStatus, setFilterStatus] = useState<string>("Todos");
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedView = localStorage.getItem("descubrimiento_view_mode");
+      if (savedView === "kanban" || savedView === "lista" || savedView === "screening_ia") {
+        setViewMode(savedView as "kanban" | "lista" | "screening_ia");
+      }
+      const savedDensity = localStorage.getItem("screening_ia_density_mode");
+      if (savedDensity === "compact" || savedDensity === "expanded") {
+        setDensityMode(savedDensity as DensityMode);
+      }
+      const savedSearch = localStorage.getItem("descubrimiento_selected_search");
+      if (savedSearch) {
+        setSelectedSearch(savedSearch);
+      }
+    }
+  }, []);
+
+  const handleViewModeChange = (mode: "kanban" | "lista" | "screening_ia") => {
+    setViewMode(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("descubrimiento_view_mode", mode);
+    }
+  };
+
+  const handleSelectedSearchChange = (searchId: string) => {
+    setSelectedSearch(searchId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("descubrimiento_selected_search", searchId);
+    }
+  };
+
+  const handleDensityChange = (newDensity: DensityMode) => {
+    setDensityMode(newDensity);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("screening_ia_density_mode", newDensity);
+    }
+  };
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -1770,7 +1811,7 @@ export default function DescubrimientoPage() {
               >
                 <Plus className="w-4.5 h-4.5" />
                 <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                <span>Parser Ingesta CV</span>
+                <span>Importar Postulante con IA</span>
               </button>
             </div>
 
@@ -2006,7 +2047,7 @@ export default function DescubrimientoPage() {
               <span className="text-xs text-[#879391] whitespace-nowrap">Búsqueda:</span>
               <select
                 value={selectedSearch}
-                onChange={(e) => setSelectedSearch(e.target.value)}
+                onChange={(e) => handleSelectedSearchChange(e.target.value)}
                 className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] cursor-pointer w-full md:w-auto"
               >
                 <option value="Todos" className="bg-[#15181a]">Todas las Búsquedas</option>
@@ -2046,7 +2087,7 @@ export default function DescubrimientoPage() {
           <div className="flex items-center flex-wrap gap-3 w-full 2xl:w-auto justify-center 2xl:justify-end shrink-0">
             <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 select-none">
               <button
-                onClick={() => setViewMode("kanban")}
+                onClick={() => handleViewModeChange("kanban")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewMode === "kanban"
                     ? "bg-[#6bd8cb] text-[#101415] shadow shadow-[#0d9488]/10"
@@ -2057,7 +2098,7 @@ export default function DescubrimientoPage() {
                 <span>Kanban</span>
               </button>
               <button
-                onClick={() => setViewMode("lista")}
+                onClick={() => handleViewModeChange("lista")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewMode === "lista"
                     ? "bg-[#6bd8cb] text-[#101415] shadow shadow-[#0d9488]/10"
@@ -2068,7 +2109,7 @@ export default function DescubrimientoPage() {
                 <span>Lista Detallada</span>
               </button>
               <button
-                onClick={() => setViewMode("screening_ia")}
+                onClick={() => handleViewModeChange("screening_ia")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewMode === "screening_ia"
                     ? "bg-[#6bd8cb] text-[#101415] shadow shadow-[#0d9488]/10"
@@ -2079,6 +2120,13 @@ export default function DescubrimientoPage() {
                 <span>Lista Screening IA</span>
               </button>
             </div>
+
+            {viewMode === "screening_ia" && (
+              <DensitySelector
+                density={densityMode}
+                onChange={handleDensityChange}
+              />
+            )}
 
             <button
               onClick={() => setIsFullScreen(!isFullScreen)}
@@ -2481,344 +2529,20 @@ export default function DescubrimientoPage() {
           </div>
         ) : (
           /* --- Screening Inteligente IA Premium Table View --- */
-          <div className="glass-panel rounded-3xl overflow-hidden border border-white/10 text-left animate-fadeIn">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-white/10 bg-[#161a1b]/60 text-[10px] uppercase font-bold tracking-wider text-[#c4c1fb]">
-                    <th 
-                      onClick={() => handleSort("name")}
-                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group"
-                    >
-                      <div className="flex items-center">
-                        <span>Candidato</span>
-                        {renderSortIcon("name")}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => handleSort("score")}
-                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[130px]"
-                    >
-                      <div className="flex items-center">
-                        <span>Fit Score IA</span>
-                        {renderSortIcon("score")}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => handleSort("knockout")}
-                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[200px] max-w-[260px]"
-                    >
-                      <div className="flex items-center">
-                        <span>Alerta Knockout</span>
-                        {renderSortIcon("knockout")}
-                      </div>
-                    </th>
-                    <th className="py-4 px-5 select-none min-w-[340px] max-w-[440px]">
-                      <span>Desglose Criterios & Semáforo</span>
-                    </th>
-                    <th 
-                      onClick={() => handleSort("notes")}
-                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[220px] max-w-[280px]"
-                    >
-                      <div className="flex items-center">
-                        <span>NOTAS DESCUBRIMIENTO</span>
-                        {renderSortIcon("notes")}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => handleSort("status")}
-                      className="py-4 px-5 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[180px]"
-                    >
-                      <div className="flex items-center">
-                        <span>Estado</span>
-                        {renderSortIcon("status")}
-                      </div>
-                    </th>
-                    <th className="py-4 px-5 text-center select-none text-[#c4c1fb]/50 min-w-[460px]">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-[11px] text-white">
-                  {sortedListCandidates.map((cad) => {
-                    let statusLabel = "";
-                    let statusColor = "";
-                    if (cad.phase1State === "01_nuevo") {
-                      statusLabel = "01 - Nuevo en Revisión";
-                      statusColor = "text-indigo-400 bg-indigo-500/10 border-indigo-500/20";
-                    } else if (cad.phase1State === "02_contactado") {
-                      statusLabel = "02 - Bloqueado / Pendiente";
-                      statusColor = "text-[#6bd8cb] bg-[#6bd8cb]/10 border-[#6bd8cb]/20";
-                    } else if (cad.phase1State === "03_bloqueado") {
-                      statusLabel = "03 - En Duda a Confirmar";
-                      statusColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
-                    } else if (cad.phase1State === "04_rechazado") {
-                      statusLabel = "04 - Rechazado en Fase Inicial";
-                      statusColor = "text-rose-400 bg-rose-500/10 border-rose-500/20";
-                    }
-
-                    const fitVal = cad.fitScoreScreening ?? cad.score;
-                    const isKnockoutActive = cad.tieneKnockout ?? false;
-
-                    return (
-                      <tr key={cad.id} className="hover:bg-white/[0.02] transition-colors">
-                        {/* Candidate Info */}
-                        <td className="py-4 px-5 font-bold text-white">
-                          <div className="flex flex-col">
-                            <Link 
-                              href={`/descubrimiento/${cad.pipeId || cad.id}`}
-                              className="text-white text-xs font-bold hover:text-[#6bd8cb] underline-offset-2 hover:underline transition-colors cursor-pointer"
-                              title="Ver expediente detallado del candidato"
-                            >
-                              {cad.name}
-                            </Link>
-                            <span className="text-[10px] text-[#879391] font-normal">{cad.role}</span>
-                            <span className="text-[9px] text-[#6bd8cb] font-normal mt-0.5">{cad.client} • {cad.location}</span>
-                          </div>
-                        </td>
-
-                        {/* Fit Score IA */}
-                        <td className="py-4 px-5">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`px-2.5 py-1 rounded-xl font-bold text-xs border ${
-                              fitVal >= 90 
-                                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
-                                : fitVal >= 75
-                                ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
-                                : "bg-rose-500/15 border-rose-500/30 text-rose-400"
-                            }`}>
-                              {fitVal > 0 ? `${fitVal} pts` : "0 pts"}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Alerta Knockout */}
-                        <td className="py-4 px-5 min-w-[200px] max-w-[260px]">
-                          {(() => {
-                            const hasProcessedScreening = cad.resultadoScreening && cad.resultadoScreening.length > 0;
-                            const failedKnockouts = cad.resultadoScreening?.filter(item => item.es_knockout && item.evaluacion === "NO") || [];
-                            const allKnockouts = cad.resultadoScreening?.filter(item => item.es_knockout) || [];
-                            
-                            if (isKnockoutActive) {
-                              return (
-                                <div className="flex flex-col gap-1 w-max max-w-[240px]">
-                                  <span className="px-2 py-1 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 font-bold text-[10px] flex items-center gap-1 w-max">
-                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                    <span>INCUMPLIDO</span>
-                                  </span>
-                                  {failedKnockouts.length > 0 ? (
-                                    failedKnockouts.map((kItem, kIdx) => {
-                                      const qName = getCriterionQuestion(kItem, cad, kIdx, activeBusquedas);
-                                      return (
-                                        <span key={kIdx} className="text-[10px] text-rose-300/90 leading-tight font-medium" title={qName}>
-                                          • {qName}
-                                        </span>
-                                      );
-                                    })
-                                  ) : (
-                                    <span className="text-[10px] text-rose-300/90 leading-tight italic">
-                                      • Regla excluyente no superada
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            } else if (hasProcessedScreening) {
-                              return (
-                                <div className="flex flex-col gap-1 w-max max-w-[240px]">
-                                  <span className="px-2 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] flex items-center gap-1 w-max">
-                                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                                    <span>CUMPLIDO</span>
-                                  </span>
-                                  {allKnockouts.map((kItem, kIdx) => {
-                                    const qName = getCriterionQuestion(kItem, cad, kIdx, activeBusquedas);
-                                    return (
-                                      <span key={kIdx} className="text-[9px] text-[#879391] leading-tight" title={`Cumplido: ${qName}`}>
-                                        • {qName}
-                                      </span>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="flex flex-col gap-1 w-max max-w-[240px]">
-                                  <span className="px-2 py-1 rounded-xl bg-slate-500/15 border border-slate-500/30 text-slate-400 font-bold text-[10px] flex items-center gap-1 w-max">
-                                    <Clock className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                                    <span>PENDIENTE</span>
-                                  </span>
-                                  <span className="text-[9px] text-[#879391] leading-tight italic">
-                                    • Screening no ejecutado
-                                  </span>
-                                </div>
-                              );
-                            }
-                          })()}
-                        </td>
-
-                        {/* Desglose Criterios & Semáforo */}
-                        <td className="py-4 px-5 min-w-[340px] max-w-[440px]">
-                          <div className="flex flex-col gap-2">
-                            {cad.resultadoScreening && cad.resultadoScreening.length > 0 ? (
-                              cad.resultadoScreening.map((item, idx) => {
-                                let semLabel = "SÍ";
-                                let semClass = "bg-emerald-500/20 border-emerald-500/30 text-emerald-300";
-                                if (item.evaluacion === "INFERIDO") {
-                                  semLabel = "INFERIDO";
-                                  semClass = "bg-sky-500/20 border-sky-500/30 text-sky-300";
-                                } else if (item.evaluacion === "NO") {
-                                  semLabel = "NO";
-                                  semClass = "bg-rose-500/20 border-rose-500/30 text-rose-300";
-                                }
-
-                                const qText = getCriterionQuestion(item, cad, idx, activeBusquedas);
-
-                                return (
-                                  <div key={idx} className="flex items-start gap-2 text-[10px]">
-                                    <span className={`px-1.5 py-0.5 rounded border font-bold text-[9px] shrink-0 mt-0.5 ${semClass}`}>
-                                      {semLabel}
-                                    </span>
-                                    <div className="flex flex-col">
-                                      <span className="text-[#c4c1fb]/90 font-medium leading-snug" title={qText}>
-                                        {qText}
-                                      </span>
-                                      <span className="text-[9px] text-[#879391] font-mono mt-0.5">
-                                        #{idx + 1} {item.es_knockout ? "(KNOCKOUT)" : `(+${item.puntaje_obtenido} pts)`}
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <span className="text-[10px] text-[#879391] italic">Sin criterios procesados</span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* NOTAS DESCUBRIMIENTO */}
-                        <td className="py-4 px-5 min-w-[220px] max-w-[280px]">
-                          {cad.recruiterNotes ? (
-                            <div className="bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 rounded-xl p-2.5 text-[#6bd8cb] text-[11px] font-normal leading-relaxed shadow-sm shadow-[#6bd8cb]/5">
-                              {cad.recruiterNotes}
-                            </div>
-                          ) : (
-                            <span className="text-[#879391] text-[10px] italic">Sin notas registradas</span>
-                          )}
-                        </td>
-
-                        {/* Estado */}
-                        <td className="py-4 px-5 min-w-[180px]">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusColor} inline-block`}>
-                            {statusLabel}
-                          </span>
-                        </td>
-
-                        {/* Acciones */}
-                        <td className="py-4 px-5 text-center min-w-[460px]">
-                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                            <Link
-                              href={`/descubrimiento/${cad.pipeId || cad.id}`}
-                              className="px-2.5 py-1 rounded bg-white/5 border border-white/10 hover:bg-white/15 text-white font-bold transition-all text-[10px] cursor-pointer flex items-center gap-1"
-                            >
-                              <Sparkles className="w-3.5 h-3.5 text-[#6bd8cb]" />
-                              <span>Detalles</span>
-                            </Link>
-
-                            {cad.url_cv && (
-                              <a
-                                href={cad.url_cv}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1"
-                                title="Ver Curriculum Vitae"
-                              >
-                                <FileText className="w-3.5 h-3.5" />
-                                <span>CV</span>
-                              </a>
-                            )}
-
-                            <button
-                              onClick={() => {
-                                setSemanticCandidate(cad);
-                                setIsSemanticOpen(true);
-                              }}
-                              className="px-2 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-[#101415] transition-all text-[10px] cursor-pointer flex items-center gap-1"
-                              title="Re-evaluar con IA"
-                            >
-                              <Cpu className="w-3.5 h-3.5" />
-                              <span>Re-evaluar IA</span>
-                            </button>
-
-                            {cad.phase1State === "01_nuevo" && (
-                              <button
-                                onClick={() => handleTransitionState(cad.id, "02_contactado")}
-                                title="A 02 - Bloqueado / Pendiente"
-                                className="px-2.5 py-1 rounded bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] font-bold hover:bg-[#6bd8cb] hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1"
-                              >
-                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
-                                <span>Avanzar estado</span>
-                              </button>
-                            )}
-
-                            {cad.phase1State === "02_contactado" && (
-                              <button
-                                onClick={() => handleTransitionState(cad.id, "03_bloqueado", { 
-                                  blockReason: "Esperando confirmación pretensiones de sueldo y CV",
-                                  missingField: "salario"
-                                })}
-                                title="A 03 - En Duda a Confirmar"
-                                className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold hover:bg-amber-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1"
-                              >
-                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
-                                <span>Avanzar estado</span>
-                              </button>
-                            )}
-
-                            {cad.phase1State === "03_bloqueado" && (
-                              <button
-                                onClick={() => handleTransitionState(cad.id, "04_rechazado", {
-                                  rejectionReason: "Falta de información en aclaración"
-                                })}
-                                title="A 04 - Rechazado en Fase Inicial"
-                                className="px-2.5 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold hover:bg-rose-500 hover:text-white transition-all text-[10px] cursor-pointer flex items-center gap-1"
-                              >
-                                <ChevronsRight className="w-3.5 h-3.5 shrink-0" />
-                                <span>Avanzar estado</span>
-                              </button>
-                            )}
-
-                            <button
-                              onClick={() => setCandidateToAdvance(cad)}
-                              className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold hover:bg-emerald-500 hover:text-stone-950 transition-all text-[10px] cursor-pointer flex items-center gap-1 whitespace-nowrap"
-                              title="Avanzar a Fase 2 Evaluación"
-                            >
-                              <UserCheck className="w-3.5 h-3.5 shrink-0" />
-                              <span>Avanzar Fase</span>
-                            </button>
-
-                            {cad.phase1State !== "04_rechazado" && (
-                              <button
-                                onClick={() => triggerRejectionFlow(cad.id)}
-                                className="px-2 py-1 rounded border border-white/5 bg-white/5 hover:border-red-500/30 hover:bg-red-500/10 text-[#879391] hover:text-red-400 font-bold transition-all text-[10px] cursor-pointer flex items-center gap-1"
-                                title="Rechazar Candidato"
-                              >
-                                <Ban className="w-3.5 h-3.5 shrink-0" />
-                                <span>Rechazar</span>
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {sortedListCandidates.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="py-12 text-center text-[#879391] font-bold text-xs uppercase tracking-wider">
-                        No hay perfiles que coincidan con los filtros seleccionados.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ScreeningIATable
+            candidates={sortedListCandidates}
+            activeBusquedas={activeBusquedas}
+            density={densityMode}
+            handleSort={handleSort}
+            renderSortIcon={renderSortIcon}
+            getCriterionQuestion={getCriterionQuestion}
+            handleViewCv={handleViewCv}
+            handleTransitionState={handleTransitionState}
+            setCandidateToAdvance={setCandidateToAdvance}
+            triggerRejectionFlow={triggerRejectionFlow}
+            setSemanticCandidate={setSemanticCandidate}
+            setIsSemanticOpen={setIsSemanticOpen}
+          />
         )}
 
       </div>
