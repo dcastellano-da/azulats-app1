@@ -65,7 +65,11 @@ interface ScreeningIATableProps {
     activeBusquedas: Busqueda[]
   ) => string;
   handleViewCv: (id: string, url_cv?: string) => void;
-  handleTransitionState: (id: string, state: string, extra?: Record<string, unknown>) => void;
+  handleTransitionState: (
+    id: string,
+    state: ScreeningCandidate['phase1State'],
+    extra?: Partial<ScreeningCandidate>
+  ) => void;
   setCandidateToAdvance: (cad: ScreeningCandidate) => void;
   triggerRejectionFlow: (id: string) => void;
   setSemanticCandidate: (cad: ScreeningCandidate) => void;
