@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { 
   Sparkles, 
   X, 
@@ -128,8 +129,14 @@ export default function EvaluarScreeningModal({
     }
   };
 
+  const router = useRouter();
+
   const handleFinish = () => {
+    const targetPipelineId = pipelineId;
     if (onSuccess) onSuccess();
+    if (targetPipelineId) {
+      router.push(`/descubrimiento/${targetPipelineId}`);
+    }
     onClose();
   };
 

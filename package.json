@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/*.test.js"
+    "test": "node --import ./tests/register.js --test tests/*.test.js"
   },
   "dependencies": {
     "firebase": "^12.16.0",

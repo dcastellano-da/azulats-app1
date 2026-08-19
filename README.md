@@ -194,7 +194,7 @@ El **F3 Cliente Evaluación** (`/presentacion`) administra la fase de presentaci
 ### Módulo J: Sistema de Identificadores Alfanuméricos Únicos (`ID: P-xxx` y `ID: M-xxx`)
 Para simplificar la interacción en los prompts de desarrollo y la localización exacta de vistas y ventanas emergentes:
 *   **Identificadores de Página (`P-xxx`)**: Insignia translúcida monospaciada en la cabecera de todas las rutas (`P-TAL-01`, `P-TAL-02`, `P-DIS-01`, `P-DIS-02`, `P-EVA-01`, `P-EVA-02`, `P-PRE-01`, `P-PRE-02`, `P-CIE-01`, `P-CIE-02`, `P-BUS-01`, `P-DSH-01`, `P-CFG-01`, `P-LGN-01`).
-*   **Identificadores de Ventanas Emergentes / Modales (`M-xxx`)**: Insignia de desarrollo en las modales principales: `M-IMP-01` (Modal Ingesta CV en Talento), `M-IMP-02` (Modal Parser Ingesta CV en Descubrimiento), `M-REJ-01` (Modal Motivo Rechazo), `M-ADV-01` (Modal Promoción a F2), `M-TRI-01` (Modal Triage Bot), `M-SEM-01` (Modal Match Semántico IA) y `M-BOL-01` (Modal Búsquedas Booleanas & X-Ray).
+*   **Identificadores de Ventanas Emergentes / Modales (`M-xxx`)**: Insignia de desarrollo en las modales principales: `M-IMP-01` (Modal Ingesta CV en Talento), `M-IMP-02` (Modal Parser Ingesta CV en Descubrimiento), `M-REJ-01` (Modal Motivo Rechazo), `M-ADV-01` (Modal Promoción a F2), `M-TRI-01` (Modal Triage Bot), `M-SEM-01` (Modal Match Semántico IA), `M-BOL-01` (Modal Búsquedas Booleanas & X-Ray) y `M-SEL-01` (Modal Asignación de Búsqueda al pasar a Seleccionado en Talento).
 *   **Usabilidad & Micro-interacciones**: Texto seleccionable (`select-all`) para fácil copiado en portapapeles y tooltip explicativo al pasar el cursor.
 
 ### Módulo K: Homologación Global del Botón "CV" y Canal de Ingreso Dinámico
@@ -698,6 +698,26 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     *   **Conector API REST & Mock Fallback:** Creación de Server Actions en `src/actions/candidatos.ts` para operaciones CRUD en Cloud Run con un sistema seguro de datos simulados en memoria (Mock database fallback), previniendo fallos en pruebas locales y forzando `acepta_privacidad: true` y control de inmutabilidad selectiva.
     *   **Navegación Coherente:** Integración del enlace universal y horizontal hacia `/talento` (Talent Mixer, representado con icono `Sliders`) en todas las barras superiores compartidas: Dashboard, Búsquedas, Reclutamiento y Ajustes.
 
+
+*   **19/08/2026:** Asignación de ID `ID: M-SEL-01`, Opción "Screening Inteligente IA", Persistencia en `localStorage` y Detección de Screening Previo en Asignación a Búsqueda Activa (`P-TAL-01`):
+    *   **Identificador Oficial `ID: M-SEL-01`:** Incorporada la insignia monospaciada `ID: M-SEL-01` en la cabecera del modal "Asignar a Búsqueda Activa" que se despliega al mover un postulante al estado "SELECCIONADO".
+    *   **Opción Configurable "Screening Inteligente IA":** Adición de la casilla de verificación *"Ejecutar proceso de Screening Inteligente IA al confirmar"*, con sincronización y persistencia automática de la preferencia del usuario en `localStorage` (`talento_auto_screening_enabled`).
+    *   **Persistencia de Búsqueda Seleccionada ("SELECCIONA LA BÚSQUEDA"):** Almacenamiento persistente del ID de búsqueda en `localStorage` (`talento_last_selected_search_id`) para seleccionarla automáticamente por defecto en futuras aperturas del modal.
+    *   **Aviso de Screening Previo en Postulante:** Incorporado un banner informativo dinámico en `M-SEL-01` que detecta si el candidato ya cuenta con una evaluación de Screening Inteligente IA realizada o si se encuentra pendiente.
+    *   **Disparo Automático de Inferencia (`ID: M-SCR-01`):** Al confirmar la asignación con la opción activa, se cierra `M-SEL-01` e inmediatamente se abre el modal de inferencia `EvaluarScreeningModal` (`ID: M-SCR-01`) pre-cargado con los criterios de screening de la búsqueda elegida.
+    *   **Navegación al Expediente (`ID: P-DIS-02`):** Tras completar la inferencia IA en `ID: M-SCR-01`, hacer clic en el botón *"Ver Expediente Actualizado"* redirige automáticamente a la pantalla del expediente del postulante `ID: P-DIS-02` (`/descubrimiento/[pipelineId]`).
+    *   **Extensión a Pantalla `ID: M-IMP-02` (Parser Ingesta CV en Descubrimiento):**
+        - Adición de la opción *"Ejecutar proceso de Screening Inteligente IA al confirmar"* visible desde el formulario inicial al abrir el modal y en el resumen de resultados, con persistencia en `localStorage` (`descubrimiento_auto_screening_enabled`).
+        - Almacenamiento persistente del selector *"BÚSQUEDA ACTIVA ASOCIADA"* en `localStorage` (`descubrimiento_last_selected_search_id`).
+        - Banner dinámico de aviso de screening previo ("Screening Previo Realizado" vs "Sin Screening Previo").
+        - Redirección final incondicional a `ID: P-DIS-02` (`/descubrimiento/[createdPipelineId]`) con o sin screening activado.
+        - **Resolución Automática de Criterios de Screening:** Garantizada la preservación y propagación de `criterios_screening` desde la vista del pipeline (`P-DIS-01`) hacia `M-IMP-02`, sumado a una resolución asíncrona de respaldo mediante `getBusquedasAPI()` para cargar automáticamente los criterios configurados en la búsqueda de la base de datos si la opción props viniese vacía.
+    *   **Pruebas Automatizadas:** Creadas/actualizadas las suites `tests/talento_screening_ia_assignment.test.js` (6/6 tests pasando) y `tests/importar_ia_screening.test.js` (5/5 tests pasando) para garantizar la solidez de ambas modales (`M-SEL-01` y `M-IMP-02`).
+
+*   **18/08/2026:** Mejora de UI/UX y Ordenamiento en Pantalla P-TAL-01 (Maestro de Postulantes):
+    *   **Nueva Columna "Origen del Perfil" en Lista Detallada:** Adición de la columna `Origen del Perfil` en la tabla de la vista "Lista Detallada" (`viewMode === "list"`), ubicada estratégicamente después de la columna `Creado` y antes de `Acciones`. Presenta badges distintivos (`bg-white/5 border border-white/10 text-[#6bd8cb]`) con el origen del postulante (ej. *Directo ATS*, *LinkedIn InMail*, *Referido*, *Headhunting*, *Portal Empleo*, *Manual*).
+    *   **Ordenamiento Interactivo por Origen:** Habilitado el ordenamiento ascendente y descendente al hacer clic en la cabecera "Origen del Perfil" (`handleSort("origen")`), integrado con el control de íconos direccionales (`renderSortIcon("origen")`).
+    *   **Pruebas Automatizadas:** Creación de la suite de pruebas `tests/talento_lista_detallada.test.js` para certificar el mapeo del campo `origen`, el ordenamiento ascendente/descendente y los casos de fallback con valores vacíos o nulos.
 
 *   **17/08/2026:** Implementación del Selector de Densidad de Vista (Vista Compacta Híbrida vs. Vista Expandida) y Persistencia Extendida en Pantalla P-DIS-01 ("Lista Screening IA"):
     *   **Selector de Densidad (`DensitySelector.tsx`):** Control segmentado (`Densidad: [ ☰ Compacta | ≡ Expandida ]`) integrado en la barra de herramientas cuando `viewMode === "screening_ia"`, claramente diferenciado del botón `[ ↗ Maximizar / Restaurar ]` y con persistencia de la preferencia del usuario en `localStorage` (`screening_ia_density_mode`).

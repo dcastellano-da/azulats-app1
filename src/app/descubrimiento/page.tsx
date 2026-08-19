@@ -558,7 +558,8 @@ export default function DescubrimientoPage() {
           id: b.id_busqueda || b.id,
           client: b.cliente,
           role: b.perfil_busqueda,
-          code: b.codigo_busqueda || b.id_busqueda || b.id
+          code: b.codigo_busqueda || b.id_busqueda || b.id,
+          criterios_screening: b.criterios_screening
         }))
       : ACTIVE_BUSQUEDAS;
   }, [activeBusquedas]);

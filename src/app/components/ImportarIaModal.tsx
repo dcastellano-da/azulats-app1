@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { 
   X, 
   Upload, 
@@ -22,6 +23,9 @@ import {
 } from "lucide-react";
 import { importarCandidatoIA_API, actualizarCandidatoAPI, getCandidatosAPI, Candidato } from "@/actions/candidatos";
 import { crearPipelineAPI, actualizarPipelineAPI } from "@/actions/pipeline";
+import { getBusquedasAPI } from "@/actions/busquedas";
+import EvaluarScreeningModal from "./EvaluarScreeningModal";
+import type { CriterioScreening } from "@/types/screening";
 
 export interface SearchOption {
   id: string;
@@ -31,6 +35,7 @@ export interface SearchOption {
   cliente?: string;
   codigo_busqueda?: string;
   code?: string;
+  criterios_screening?: CriterioScreening[];
 }
 
 export interface ImportarIaModalProps {
@@ -78,6 +83,7 @@ export default function ImportarIaModal({
   defaultSearchId,
   targetEstadoRevision
 }: ImportarIaModalProps) {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -100,20 +106,66 @@ export default function ImportarIaModal({
   const [progressPercent, setProgressPercent] = useState(0);
   const [extractedCandidato, setExtractedCandidato] = useState<Partial<Candidato> | null>(null);
 
+  // Auto-screening & created pipeline state
+  const [autoScreeningEnabled, setAutoScreeningEnabled] = useState(false);
+  const [createdPipelineId, setCreatedPipelineId] = useState<string>("");
+  const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
+  const [evalModalData, setEvalModalData] = useState<{
+    pipelineId: string;
+    candidateName: string;
+    busquedaName?: string;
+    criteriosBusqueda?: CriterioScreening[];
+    hasCv: boolean;
+  } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasLoadedChannelsRef = useRef(false);
 
-  // Initialize selected search ID when modal opens or searches change
+  // Initialize selected search ID & auto-screening preference when modal opens
   useEffect(() => {
     if (isOpen) {
-      if (defaultSearchId) {
+      const storageKeyAuto = mode === "descubrimiento" ? "descubrimiento_auto_screening_enabled" : "talento_auto_screening_enabled";
+      const savedAutoScreening = localStorage.getItem(storageKeyAuto);
+      if (savedAutoScreening !== null) {
+        setAutoScreeningEnabled(savedAutoScreening === "true");
+      }
+
+      const storageKeySearch = mode === "descubrimiento" ? "descubrimiento_last_selected_search_id" : "talento_last_selected_search_id";
+      const savedSearchId = localStorage.getItem(storageKeySearch);
+      if (savedSearchId && searches.some(s => (s.id || s.code) === savedSearchId)) {
+        setSelectedSearchId(savedSearchId);
+      } else if (defaultSearchId) {
         setSelectedSearchId(defaultSearchId);
       } else if (searches.length > 0) {
         setSelectedSearchId(searches[0].id);
       }
     }
-  }, [isOpen, defaultSearchId, searches]);
+  }, [isOpen, defaultSearchId, searches, mode]);
+
+  const handleSelectSearchId = (id: string) => {
+    setSelectedSearchId(id);
+    if (id) {
+      const storageKeySearch = mode === "descubrimiento" ? "descubrimiento_last_selected_search_id" : "talento_last_selected_search_id";
+      localStorage.setItem(storageKeySearch, id);
+    }
+  };
+
+  const handleToggleAutoScreening = (enabled: boolean) => {
+    setAutoScreeningEnabled(enabled);
+    const storageKeyAuto = mode === "descubrimiento" ? "descubrimiento_auto_screening_enabled" : "talento_auto_screening_enabled";
+    localStorage.setItem(storageKeyAuto, String(enabled));
+  };
+
+  const hasExistingScreening = (cand: Partial<Candidato> | null): boolean => {
+    if (!cand) return false;
+    const c = cand as any;
+    if (Array.isArray(c.resultado_screening) && c.resultado_screening.length > 0) return true;
+    if (typeof c.fit_score_screening === "number" || typeof c.fit_score === "number") return true;
+    if (c.tiene_screening === true || c.screening_completado === true) return true;
+    if (c.fecha_modificacion_screening) return true;
+    return false;
+  };
 
   // Load existing channels dynamically from DB ONCE when modal is opened
   useEffect(() => {
@@ -150,6 +202,7 @@ export default function ImportarIaModal({
     setCurrentStepIndex(0);
     setProgressPercent(0);
     setExtractedCandidato(null);
+    setCreatedPipelineId("");
     if (searches.length > 0) {
       setSelectedSearchId(defaultSearchId || searches[0].id);
     } else {
@@ -341,6 +394,14 @@ export default function ImportarIaModal({
         if (selectedSearchId && data.id) {
           try {
             const pipeRes = await crearPipelineAPI(selectedSearchId, data.id);
+            let pipeId = "";
+            if (pipeRes.success && pipeRes.data) {
+              pipeId = pipeRes.data.id || pipeRes.data._id || pipeRes.data.id_pipeline || pipeRes.data.claves_conexion?.id_candidato || (typeof pipeRes.data === "string" ? pipeRes.data : "");
+            }
+            if (!pipeId && data.id) {
+              pipeId = data.id;
+            }
+            setCreatedPipelineId(pipeId);
             
             // In descubrimiento mode, store notes directly in pipeline_entrevistas.f1_descubrimiento.notas_reclutador
             if (mode === "descubrimiento" && notasText.trim() && pipeRes.success && pipeRes.data?.id) {
@@ -352,7 +413,10 @@ export default function ImportarIaModal({
             }
           } catch (err) {
             console.warn("[ImportarIaModal] Warning linking to pipeline or updating recruiter notes:", err);
+            if (data.id) setCreatedPipelineId(data.id);
           }
+        } else if (data.id) {
+          setCreatedPipelineId(data.id);
         }
 
         stopStepProgressAnimation();
@@ -375,11 +439,59 @@ export default function ImportarIaModal({
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     const nombre = extractedCandidato?.nombre_completo || "Candidato";
-    resetState();
+    const pipeId = createdPipelineId;
+
+    if (autoScreeningEnabled && pipeId) {
+      const activeSearchObj = searches.find(s => 
+        s.id === selectedSearchId || 
+        (s as any).id_busqueda === selectedSearchId || 
+        (s as any).code === selectedSearchId ||
+        (s as any).codigo_busqueda === selectedSearchId
+      );
+
+      let searchCriterios: CriterioScreening[] | undefined = (activeSearchObj as any)?.criterios_screening;
+
+      // Fallback: If searchCriterios is missing, fetch real searches from getBusquedasAPI
+      if (!searchCriterios || searchCriterios.length === 0) {
+        try {
+          const allSearches = await getBusquedasAPI();
+          const matchBusq = allSearches.find(b => 
+            b.id === selectedSearchId || 
+            b.id_busqueda === selectedSearchId || 
+            b.codigo_busqueda === selectedSearchId
+          );
+          if (matchBusq && Array.isArray(matchBusq.criterios_screening) && matchBusq.criterios_screening.length > 0) {
+            searchCriterios = matchBusq.criterios_screening;
+          }
+        } catch (err) {
+          console.warn("[ImportarIaModal] Fallback fetching search criteria failed:", err);
+        }
+      }
+
+      const busqName = activeSearchObj 
+        ? `${activeSearchObj.role || activeSearchObj.perfil_busqueda || activeSearchObj.id} (${activeSearchObj.client || activeSearchObj.cliente || "Empresa"})`
+        : "Búsqueda activa";
+
+      setEvalModalData({
+        pipelineId: pipeId,
+        candidateName: nombre,
+        busquedaName: busqName,
+        criteriosBusqueda: searchCriterios || [],
+        hasCv: Boolean(extractedCandidato?.url_cv || file)
+      });
+      setIsEvalModalOpen(true);
+      return;
+    }
+
     onSuccess(nombre, extractedCandidato, selectedSearchId);
     onClose();
+    resetState();
+
+    if (mode === "descubrimiento" && pipeId) {
+      router.push(`/descubrimiento/${pipeId}`);
+    }
   };
 
   const handleImportAnother = () => {
@@ -485,7 +597,7 @@ export default function ImportarIaModal({
                 </label>
                 <select
                   value={selectedSearchId}
-                  onChange={(e) => setSelectedSearchId(e.target.value)}
+                  onChange={(e) => handleSelectSearchId(e.target.value)}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all cursor-pointer"
                 >
                   {searches.map((s) => {
@@ -631,6 +743,22 @@ export default function ImportarIaModal({
                 rows={2}
                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 text-xs text-white focus:border-[#6bd8cb] focus:ring-2 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all placeholder:text-white/30 resize-y min-h-[60px]"
               />
+            </div>
+
+            {/* Auto Screening Option Checkbox */}
+            <div className="pt-1 text-left">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-white/90 bg-white/5 border border-white/10 p-3 rounded-2xl hover:bg-white/[0.08] transition-colors select-none">
+                <input
+                  type="checkbox"
+                  checked={autoScreeningEnabled}
+                  onChange={(e) => handleToggleAutoScreening(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#6bd8cb] focus:ring-[#6bd8cb] bg-black/40 border-white/20 cursor-pointer"
+                />
+                <div className="flex items-center gap-1.5 font-medium">
+                  <Sparkles className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                  <span>Ejecutar proceso de Screening Inteligente IA al confirmar</span>
+                </div>
+              </label>
             </div>
 
             {/* Global errors */}
@@ -876,6 +1004,49 @@ export default function ImportarIaModal({
                   </div>
                 )
               )}
+
+              {/* Existing Screening Status Notice */}
+              {extractedCandidato && (
+                <div className={`p-3 rounded-2xl border text-xs flex items-start gap-2.5 ${
+                  hasExistingScreening(extractedCandidato)
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                    : "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
+                }`}>
+                  {hasExistingScreening(extractedCandidato) ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">Screening Previo Realizado</span>
+                        <span>Este postulante ya cuenta con una evaluación de Screening Inteligente IA previa.</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">Sin Screening Previo</span>
+                        <span>Este postulante aún no tiene realizado el proceso de Screening Inteligente IA.</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Auto Screening Option Checkbox */}
+              <div className="pt-1">
+                <label className="flex items-center gap-2.5 cursor-pointer text-xs text-white/90 bg-white/5 border border-white/10 p-3 rounded-2xl hover:bg-white/[0.08] transition-colors select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoScreeningEnabled}
+                    onChange={(e) => handleToggleAutoScreening(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#6bd8cb] focus:ring-[#6bd8cb] bg-black/40 border-white/20 cursor-pointer"
+                  />
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <Sparkles className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                    <span>Ejecutar proceso de Screening Inteligente IA al confirmar</span>
+                  </div>
+                </label>
+              </div>
             </div>
 
             {/* Result Actions */}
@@ -926,6 +1097,35 @@ export default function ImportarIaModal({
         )}
 
       </div>
+
+      {/* Modal de Inferencia IA de Screening desencadenado desde Ingesta (M-SCR-01) */}
+      {evalModalData && (
+        <EvaluarScreeningModal
+          isOpen={isEvalModalOpen}
+          onClose={() => {
+            const targetPipeId = evalModalData?.pipelineId || createdPipelineId || (extractedCandidato as any)?.id;
+            setIsEvalModalOpen(false);
+            setEvalModalData(null);
+            const nombre = extractedCandidato?.nombre_completo || "Candidato";
+            onSuccess(nombre, extractedCandidato, selectedSearchId);
+            onClose();
+            resetState();
+            if (mode === "descubrimiento" && targetPipeId) {
+              router.push(`/descubrimiento/${targetPipeId}`);
+            }
+          }}
+          pipelineId={evalModalData.pipelineId}
+          candidateName={evalModalData.candidateName}
+          busquedaName={evalModalData.busquedaName}
+          criteriosBusqueda={evalModalData.criteriosBusqueda}
+          hasCv={evalModalData.hasCv}
+          onSuccess={() => {
+            if (onCandidateCreated) {
+              onCandidateCreated(extractedCandidato?.nombre_completo || "Candidato", extractedCandidato, selectedSearchId);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

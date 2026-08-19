@@ -41,6 +41,8 @@ import {
 import SlideOver from "../components/SlideOver";
 import CandidatoForm from "../components/CandidatoForm";
 import ImportarIaModal from "../components/ImportarIaModal";
+import EvaluarScreeningModal from "../components/EvaluarScreeningModal";
+import type { CriterioScreening } from "@/types/screening";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { crearPipelineAPI } from "@/actions/pipeline";
@@ -125,13 +127,53 @@ export default function TalentoPage() {
     loadCandidatos();
   };
 
-  // Search assignment modal state
+  // Search assignment modal state & auto-screening option
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [activeSearches, setActiveSearches] = useState<Busqueda[]>([]);
   const [selectedSearchId, setSelectedSearchId] = useState<string>("");
   const [loadingSearches, setLoadingSearches] = useState(false);
   const [selectedCandidateForSearch, setSelectedCandidateForSearch] = useState<Candidato | null>(null);
   const [assigningSearch, setAssigningSearch] = useState(false);
+
+  // Auto-screening IA preference & modal state
+  const [autoScreeningEnabled, setAutoScreeningEnabled] = useState(false);
+  const [isEvalModalOpen, setIsEvalModalOpen] = useState(false);
+  const [evalModalData, setEvalModalData] = useState<{
+    pipelineId: string;
+    candidateName: string;
+    busquedaName?: string;
+    criteriosBusqueda?: CriterioScreening[];
+    hasCv: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    const savedAutoScreening = localStorage.getItem("talento_auto_screening_enabled");
+    if (savedAutoScreening !== null) {
+      setAutoScreeningEnabled(savedAutoScreening === "true");
+    }
+  }, []);
+
+  const handleToggleAutoScreening = (enabled: boolean) => {
+    setAutoScreeningEnabled(enabled);
+    localStorage.setItem("talento_auto_screening_enabled", String(enabled));
+  };
+
+  const handleSelectSearchId = (id: string) => {
+    setSelectedSearchId(id);
+    if (id) {
+      localStorage.setItem("talento_last_selected_search_id", id);
+    }
+  };
+
+  const hasExistingScreening = (cand: Candidato | null): boolean => {
+    if (!cand) return false;
+    const c = cand as any;
+    if (Array.isArray(c.resultado_screening) && c.resultado_screening.length > 0) return true;
+    if (typeof c.fit_score_screening === "number" || typeof c.fit_score === "number") return true;
+    if (c.tiene_screening === true || c.screening_completado === true) return true;
+    if (c.fecha_modificacion_screening) return true;
+    return false;
+  };
 
   const loadActiveSearchesForAssignment = async () => {
     try {
@@ -140,8 +182,14 @@ export default function TalentoPage() {
       const openSearches = data.filter(b => b.estado_fase !== "Cerrada");
       setActiveSearches(openSearches);
       if (openSearches.length > 0) {
-        // Fallback to id (standard) or id_busqueda
-        setSelectedSearchId(openSearches[0].id || openSearches[0].id_busqueda || "");
+        const savedSearchId = localStorage.getItem("talento_last_selected_search_id");
+        const existsSaved = savedSearchId && openSearches.some(b => (b.id || b.id_busqueda) === savedSearchId);
+        if (existsSaved) {
+          setSelectedSearchId(savedSearchId);
+        } else {
+          const fallbackId = openSearches[0].id || openSearches[0].id_busqueda || "";
+          setSelectedSearchId(fallbackId);
+        }
       }
     } catch (err) {
       console.error("Error al cargar búsquedas activas:", err);
@@ -175,14 +223,30 @@ export default function TalentoPage() {
         return;
       }
 
+      const createdPipelineId = resPipe.data?.id || resPipe.data?._id || (typeof resPipe.data === "string" ? resPipe.data : "");
+      const matchedBusqueda = activeSearches.find(b => (b.id || b.id_busqueda) === selectedSearchId);
+
       setToast({
         type: "success",
         message: `Postulante ${selectedCandidateForSearch.nombre_completo} transicionado e ingresado al pipeline.`
       });
       setTimeout(() => setToast(null), 5000);
       
-      // Close modal and reset
+      // Close M-SEL-01 modal
       setShowSearchModal(false);
+
+      // Check if auto-screening is enabled
+      if (autoScreeningEnabled && createdPipelineId) {
+        setEvalModalData({
+          pipelineId: createdPipelineId,
+          candidateName: selectedCandidateForSearch.nombre_completo,
+          busquedaName: matchedBusqueda ? `${matchedBusqueda.perfil_busqueda} (${matchedBusqueda.cliente})` : "Búsqueda activa",
+          criteriosBusqueda: matchedBusqueda?.criterios_screening || [],
+          hasCv: Boolean(selectedCandidateForSearch.url_cv)
+        });
+        setIsEvalModalOpen(true);
+      }
+
       setSelectedCandidateForSearch(null);
       setSelectedSearchId("");
       
@@ -374,6 +438,10 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
       case "createdAt":
         aVal = new Date(a.createdAt).getTime();
         bVal = new Date(b.createdAt).getTime();
+        break;
+      case "origen":
+        aVal = a.origen || "";
+        bVal = b.origen || "";
         break;
       default:
         return 0;
@@ -1058,6 +1126,15 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                         {renderSortIcon("createdAt")}
                       </div>
                     </th>
+                    <th 
+                      onClick={() => handleSort("origen")}
+                      className="py-4 px-6 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group text-left"
+                    >
+                      <div className="flex items-center">
+                        <span>Origen del Perfil</span>
+                        {renderSortIcon("origen")}
+                      </div>
+                    </th>
                     <th className="py-4 px-6 text-center select-none text-[#c4c1fb]/60">Acciones</th>
                   </tr>
                 </thead>
@@ -1101,6 +1178,11 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                       </td>
                       <td className="py-4 px-6 text-right text-[#879391] font-mono whitespace-nowrap">
                         {new Date(cand.createdAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="py-4 px-6 text-left whitespace-nowrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/5 border border-white/10 text-[#6bd8cb]">
+                          {cand.origen || "No especificado"}
+                        </span>
                       </td>
                       <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-2">
@@ -1241,11 +1323,43 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-md bg-[#161a1b]/95 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-md text-left flex flex-col space-y-4">
             <div>
-              <h3 className="text-base font-bold text-white">Asignar a Búsqueda Activa</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-white">Asignar a Búsqueda Activa</h3>
+                <span title="ID de componente emergente para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                  ID: M-SEL-01
+                </span>
+              </div>
               <p className="text-xs text-[#879391] mt-1.5 leading-relaxed">
                 El postulante <span className="text-[#6bd8cb] font-semibold">{selectedCandidateForSearch?.nombre_completo}</span> pasará a &quot;SELECCIONADO&quot; e ingresará al pipeline de reclutamiento.
               </p>
             </div>
+
+            {/* Existing Screening Status Notice */}
+            {selectedCandidateForSearch && (
+              <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
+                hasExistingScreening(selectedCandidateForSearch)
+                  ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                  : "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
+              }`}>
+                {hasExistingScreening(selectedCandidateForSearch) ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Screening Previo Realizado</span>
+                      <span>Este postulante ya cuenta con una evaluación de Screening Inteligente IA previa.</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Sin Screening Previo</span>
+                      <span>Este postulante aún no tiene realizado el proceso de Screening Inteligente IA.</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="block text-xs font-bold text-white/70 uppercase tracking-wider">
@@ -1263,8 +1377,8 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
               ) : (
                 <select
                   value={selectedSearchId}
-                  onChange={(e) => setSelectedSearchId(e.target.value)}
-                  className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] transition-colors"
+                  onChange={(e) => handleSelectSearchId(e.target.value)}
+                  className="w-full bg-[#101415] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] transition-colors cursor-pointer"
                 >
                   {activeSearches.map((busqueda) => {
                     const searchId = busqueda.id || busqueda.id_busqueda || "";
@@ -1276,6 +1390,22 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                   })}
                 </select>
               )}
+            </div>
+
+            {/* Auto Screening Option Checkbox */}
+            <div className="pt-1">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-white/90 bg-white/5 border border-white/10 p-3 rounded-xl hover:bg-white/[0.08] transition-colors select-none">
+                <input
+                  type="checkbox"
+                  checked={autoScreeningEnabled}
+                  onChange={(e) => handleToggleAutoScreening(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#6bd8cb] focus:ring-[#6bd8cb] bg-black/40 border-white/20 cursor-pointer"
+                />
+                <div className="flex items-center gap-1.5 font-medium">
+                  <Sparkles className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                  <span>Ejecutar proceso de Screening Inteligente IA al confirmar</span>
+                </div>
+              </label>
             </div>
 
             <div className="flex justify-end gap-3 pt-3 border-t border-white/5">
@@ -1312,6 +1442,25 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Inferencia IA de Screening desencadenado desde asignación (M-SCR-01) */}
+      {evalModalData && (
+        <EvaluarScreeningModal
+          isOpen={isEvalModalOpen}
+          onClose={() => {
+            setIsEvalModalOpen(false);
+            setEvalModalData(null);
+          }}
+          pipelineId={evalModalData.pipelineId}
+          candidateName={evalModalData.candidateName}
+          busquedaName={evalModalData.busquedaName}
+          criteriosBusqueda={evalModalData.criteriosBusqueda}
+          hasCv={evalModalData.hasCv}
+          onSuccess={() => {
+            loadCandidatos();
+          }}
+        />
       )}
 
       {/* Floating success toast notification */}
