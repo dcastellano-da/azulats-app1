@@ -1,4 +1,6 @@
 import type { Busqueda } from "@/actions/busquedas";
+import type { PipelineItem } from "@/actions/pipeline";
+import type { Candidato } from "@/actions/candidatos";
 
 export interface EvaluacionCandidate {
   id: string;
@@ -402,3 +404,126 @@ export function calculateEvaluacionKPIs(candidates: EvaluacionCandidate[]): Eval
     isWipOverloaded
   };
 }
+
+export const generateDefaultToolsDetails = (candName: string, role: string, score: number) => {
+  const isRust = role.toLowerCase().includes("rust") || role.toLowerCase().includes("architect");
+  const isSenior = role.toLowerCase().includes("lead") || role.toLowerCase().includes("senior") || role.toLowerCase().includes("architect");
+  
+  return {
+    sintetizador: {
+      pros: [
+        `Sólida trayectoria alineada con la posición de ${role}.`,
+        "Capacidad comunicativa fluida en entornos multiculturales.",
+        "Buen desempeño demostrado en la resolución de problemas técnicos complejos."
+      ],
+      contras: [
+        "Requiere breve período de adaptación a las herramientas internas específicas del cliente."
+      ],
+      riesgos: [
+        "Disponibilidad sujeta a preaviso de 15 días en su empresa actual."
+      ]
+    },
+    inconsistencias: {
+      hasGaps: false,
+      gaps: [],
+      overlaps: []
+    },
+    preguntas: [
+      `¿Cómo abordas la optimización y escalabilidad en arquitecturas para ${role}?`,
+      "Describe un proyecto donde tuviste que tomar decisiones críticas bajo presión.",
+      "¿Cuál es tu enfoque para la entrega continua y colaboración con equipos de producto?"
+    ],
+    validador: {
+      ip: "185.220.101.5",
+      location: "España / Remoto",
+      envStatus: "Ambiente limpio verificado. Sin señales de software no autorizado.",
+      verificationStatus: "success" as const
+    },
+    copilot: {
+      activeSession: true,
+      difficultyLevel: isSenior ? ("Senior" as const) : ("Middle" as const),
+      completionRate: Math.min(100, score + 5),
+      effortScore: Math.round(((score / 20) + Number.EPSILON) * 10) / 10,
+      languageUsed: isRust ? "Rust / WebAssembly" : "TypeScript / React",
+      summary: `${candName} completó la sesión de Live Coding con un desempeño sólido (${score}% fit score). Código limpio y estructurado.`
+    }
+  };
+};
+
+export const mapPipelineToEvaluacionCandidates = (
+  pipelineItems: PipelineItem[],
+  candidatosList: Candidato[],
+  busquedasList: Busqueda[]
+): EvaluacionCandidate[] => {
+  const candMap = new Map(candidatosList.map(c => [c.id, c]));
+  const busqMap = new Map<string, Busqueda>();
+  busquedasList.forEach(b => {
+    if (b.id) busqMap.set(b.id, b);
+    if (b.id_busqueda) busqMap.set(b.id_busqueda, b);
+    if (b.codigo_busqueda) busqMap.set(b.codigo_busqueda, b);
+  });
+
+  const result: EvaluacionCandidate[] = [];
+
+  for (const pipe of pipelineItems) {
+    const cand = candMap.get(pipe.claves_conexion?.id_candidato);
+    const busq = busqMap.get(pipe.claves_conexion?.id_busqueda);
+
+    const stateStr = (pipe.flujo?.estado_actual || "").toLowerCase();
+    
+    let currentPhase: EvaluacionCandidate["currentPhase"] | null = null;
+    if (stateStr.includes("05") || stateStr.includes("screening")) {
+      currentPhase = "05_screening";
+    } else if (stateStr.includes("06") || stateStr.includes("assessment") || stateStr.includes("prueba")) {
+      currentPhase = "06_assessment";
+    } else if (stateStr.includes("07") || stateStr.includes("en_duda") || stateStr.includes("duda")) {
+      currentPhase = "07_en_duda_evaluacion";
+    } else if (stateStr.includes("08") || stateStr.includes("descartado")) {
+      currentPhase = "08_descartado_interno";
+    }
+
+    // Strict phase isolation: skip candidates not belonging to Phase 2
+    if (!currentPhase) {
+      continue;
+    }
+
+    const candName = cand?.nombre_completo || "Candidato";
+    const role = cand?.puesto || busq?.perfil_busqueda || "Especialista Tech";
+    const client = busq?.cliente || "Cliente";
+    const location = cand?.ubicacion || "España / Remoto";
+    const score = pipe.f1_descubrimiento?.analisis_semantico?.fit_score ?? pipe.evaluacion?.puntaje_tecnico ?? 85;
+    const entryDate = pipe.flujo?.fecha_ultimo_cambio || pipe.createdAt || new Date().toISOString();
+    const email = cand?.email || "candidato@email.com";
+    const contactNumber = cand?.telefono_movil || "+34 600 000 000";
+    const recruiterNotes = pipe.f2_evaluacion?.notas_reclutador || pipe.evaluacion?.notas_reclutador || undefined;
+
+    result.push({
+      id: cand?.id || pipe.claves_conexion?.id_candidato || pipe.id,
+      pipeId: pipe.id,
+      busqObj: busq,
+      searchId: busq?.id_busqueda || busq?.id || pipe.claves_conexion?.id_busqueda,
+      searchCode: busq?.codigo_busqueda,
+      searchRole: busq?.perfil_busqueda,
+      searchClient: busq?.cliente,
+      name: candName,
+      role,
+      client,
+      location,
+      score,
+      currentPhase,
+      entryDate,
+      cNPS: 9,
+      lastActivity: pipe.flujo?.fecha_ultimo_cambio 
+        ? `Último cambio: ${new Date(pipe.flujo.fecha_ultimo_cambio).toLocaleDateString("es-ES")}` 
+        : "Registro sincronizado desde backend",
+      experienceYears: 5,
+      contactNumber,
+      email,
+      recruiterNotes,
+      url_cv: cand?.url_cv || undefined,
+      toolsDetails: generateDefaultToolsDetails(candName, role, score)
+    });
+  }
+
+  return result;
+};

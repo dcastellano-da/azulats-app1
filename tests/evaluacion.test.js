@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { calculateEvaluacionKPIs, INITIAL_EVALUACION_CANDIDATES } from '../src/lib/evaluacion.ts';
+import { calculateEvaluacionKPIs, INITIAL_EVALUACION_CANDIDATES, mapPipelineToEvaluacionCandidates } from '../src/lib/evaluacion.ts';
 
 describe('Módulo de Evaluación - Capa de Lógica y Datos', () => {
   
@@ -124,5 +124,64 @@ describe('Módulo de Evaluación - Capa de Lógica y Datos', () => {
     assert.strictEqual(kpis.avgCNPS, 0);
     assert.strictEqual(kpis.wipCycleTimeHours, 0);
     assert.strictEqual(kpis.passThroughRate, 0);
+  });
+
+  test('mapPipelineToEvaluacionCandidates - Debería excluir candidatos en estado "01 - Nuevo (Para Revisión)" de Fase 1', () => {
+    const samplePipeline = [
+      {
+        id: 'pipe-01-nuevo',
+        claves_conexion: { id_busqueda: 'BUSQ-01', id_candidato: 'CAND-01' },
+        flujo: {
+          estado_actual: '01 - Nuevo (Para Revisión)',
+          fecha_ultimo_cambio: new Date().toISOString()
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'pipe-05-screening',
+        claves_conexion: { id_busqueda: 'BUSQ-01', id_candidato: 'CAND-02' },
+        flujo: {
+          estado_actual: '05 - Screening (Entrevista Inicial)',
+          fecha_ultimo_cambio: new Date().toISOString()
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    const candidatos = [
+      { id: 'CAND-01', nombre_completo: 'Candidato Fase 1', puesto: 'Dev' },
+      { id: 'CAND-02', nombre_completo: 'Candidato Fase 2', puesto: 'Dev' }
+    ];
+
+    const busquedas = [
+      { id: 'BUSQ-01', id_busqueda: 'BUSQ-01', perfil_busqueda: 'Frontend Dev', cliente: 'Cliente A' }
+    ];
+
+    const result = mapPipelineToEvaluacionCandidates(samplePipeline, candidatos, busquedas);
+
+    // Debe retornar únicamente 1 candidato (el que está en Fase 2)
+    assert.strictEqual(result.length, 1, 'Debe haber exactamente 1 candidato mapeado para Fase 2');
+    assert.strictEqual(result[0].id, 'CAND-02');
+    assert.strictEqual(result[0].currentPhase, '05_screening');
+  });
+
+  test('mapPipelineToEvaluacionCandidates - Debería incluir únicamente estados pertenecientes a Fase 2 (05, 06, 07, 08)', () => {
+    const multiPhasePipeline = [
+      { id: 'p1', claves_conexion: { id_busqueda: 'B1', id_candidato: 'C1' }, flujo: { estado_actual: '01_nuevo' } },
+      { id: 'p2', claves_conexion: { id_busqueda: 'B1', id_candidato: 'C2' }, flujo: { estado_actual: '02_contactado' } },
+      { id: 'p3', claves_conexion: { id_busqueda: 'B1', id_candidato: 'C3' }, flujo: { estado_actual: '05 - Screening' } },
+      { id: 'p4', claves_conexion: { id_busqueda: 'B1', id_candidato: 'C4' }, flujo: { estado_actual: '06_assessment' } },
+      { id: 'p5', claves_conexion: { id_busqueda: 'B1', id_candidato: 'C5' }, flujo: { estado_actual: '07_en_duda_evaluacion' } },
+      { id: 'p6', claves_conexion: { id_busqueda: 'B1', id_candidato: 'C6' }, flujo: { estado_actual: '08_descartado_interno' } },
+      { id: 'p7', claves_conexion: { id_busqueda: 'B1', id_candidato: 'C7' }, flujo: { estado_actual: '09_presentado_cliente' } }
+    ];
+
+    const result = mapPipelineToEvaluacionCandidates(multiPhasePipeline, [], []);
+
+    assert.strictEqual(result.length, 4, 'Debe incluir únicamente los 4 estados pertenecientes a Fase 2');
+    const phases = result.map(c => c.currentPhase);
+    assert.deepStrictEqual(phases, ['05_screening', '06_assessment', '07_en_duda_evaluacion', '08_descartado_interno']);
   });
 });
