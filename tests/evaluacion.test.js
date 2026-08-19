@@ -184,4 +184,45 @@ describe('Módulo de Evaluación - Capa de Lógica y Datos', () => {
     const phases = result.map(c => c.currentPhase);
     assert.deepStrictEqual(phases, ['05_screening', '06_assessment', '07_en_duda_evaluacion', '08_descartado_interno']);
   });
+
+  test('P-EVA-01: Guardado y recuperación del filtro "Búsqueda" en localStorage (evaluacion_selected_search)', () => {
+    let memoryStorage = {};
+    const mockLocalStorage = {
+      getItem: (key) => memoryStorage[key] || null,
+      setItem: (key, val) => { memoryStorage[key] = String(val); }
+    };
+
+    let selectedSearch = "Todos";
+
+    const handleSelectSearchChange = (value) => {
+      selectedSearch = value;
+      mockLocalStorage.setItem("evaluacion_selected_search", value);
+    };
+
+    // Estado inicial por defecto
+    assert.strictEqual(selectedSearch, "Todos");
+    assert.strictEqual(mockLocalStorage.getItem("evaluacion_selected_search"), null);
+
+    // Selección de una búsqueda específica
+    handleSelectSearchChange("REQ-002");
+    assert.strictEqual(selectedSearch, "REQ-002");
+    assert.strictEqual(mockLocalStorage.getItem("evaluacion_selected_search"), "REQ-002");
+
+    // Simulación de recarga/re-ingreso recuperando desde localStorage
+    const saved = mockLocalStorage.getItem("evaluacion_selected_search");
+    if (saved) {
+      selectedSearch = saved;
+    }
+    assert.strictEqual(selectedSearch, "REQ-002");
+  });
+
+  test('P-EVA-01 (src/app/evaluacion/page.tsx) integra la persistencia de evaluacion_selected_search en localStorage', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const pagePath = path.resolve('src/app/evaluacion/page.tsx');
+    const content = await fs.readFile(pagePath, 'utf-8');
+
+    assert.ok(content.includes('evaluacion_selected_search'), 'La página P-EVA-01 debe gestionar localStorage con evaluacion_selected_search');
+    assert.ok(content.includes('handleSelectSearchChange'), 'La página P-EVA-01 debe utilizar handleSelectSearchChange para mutar y persistir la búsqueda');
+  });
 });

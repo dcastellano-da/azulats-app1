@@ -11,6 +11,12 @@ export async function resolve(specifier, context, nextResolve) {
       url: 'data:text/javascript,export async function cookies(){ return { get: () => ({ value: "mock-auth-token-stage-1" }) }; }'
     };
   }
+  if (specifier === 'next/cache') {
+    return {
+      shortCircuit: true,
+      url: 'data:text/javascript,export function revalidatePath(){}; export function revalidateTag(){};'
+    };
+  }
   if (specifier.startsWith('next/')) {
     const subpath = specifier.slice(5);
     const targetFile = path.join(projectRoot, `node_modules/next/${subpath}.js`);

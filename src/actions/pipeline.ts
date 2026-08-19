@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { ResultadoScreeningItem } from "@/types/screening";
+import type { ResultadoScreeningItem, InformeEntrevistaIA } from "@/types/screening";
 import { getApiEndpoint } from "@/utils/api";
 
 export interface Reunion {
@@ -49,12 +49,14 @@ export interface PipelineItem {
     puntaje_tecnico?: number | null;
     feedback_cliente?: string | null;
     reuniones?: Reunion[] | null;
+    informe_entrevista_ia?: InformeEntrevistaIA | null;
   } | null;
   evaluacion?: {
     notas_reclutador?: string | null;
     puntaje_tecnico?: number | null;
     feedback_cliente?: string | null;
     reuniones?: Reunion[] | null;
+    informe_entrevista_ia?: InformeEntrevistaIA | null;
   } | null;
   f3_presentacion?: {
     notas_reclutador?: string | null;
@@ -571,5 +573,132 @@ export async function getPipelineItemAPI(id: string): Promise<APIResponse> {
     };
   }
 }
+
+/**
+ * Server Action: Inicia el análisis de la transcripción de la entrevista de screening mediante IA.
+ * POST /api/v1/pipeline/:id/analizar-transcripcion
+ * Recibe FormData con el archivo en la clave 'transcripcion'.
+ */
+export async function analizarTranscripcionAction(
+  pipelineId: string,
+  formData: FormData
+): Promise<APIResponse> {
+  try {
+    const token = await getServerAuthToken();
+    const url = getApiEndpoint(`pipeline/${pipelineId}/analizar-transcripcion`);
+    console.log(`[Pipeline Action] Enviando transcripción para análisis IA a: ${url}`);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+        // Nota: al enviar FormData, No se debe establecer Content-Type para permitir multipart boundary
+      },
+      body: formData
+    });
+
+    const status = response.status;
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch (_) {}
+
+    if (status === 200) {
+      revalidatePath(`/evaluacion/${pipelineId}`);
+      revalidatePath("/evaluacion");
+      return {
+        status,
+        success: true,
+        message: "Análisis de transcripción generado con éxito por la IA.",
+        data: data.data || data
+      };
+    }
+
+    if (status === 400) {
+      return {
+        status,
+        success: false,
+        message: data?.message || data?.error || "Archivo o datos de solicitud no válidos para el análisis.",
+        data
+      };
+    }
+
+    return {
+      status,
+      success: false,
+      message: data?.message || data?.error || `Error del servidor backend al procesar la transcripción (${status}).`,
+      data
+    };
+  } catch (error: any) {
+    console.error("[Pipeline Action] Error en analizarTranscripcionAction:", error);
+    return {
+      status: 500,
+      success: false,
+      message: `Error de red o timeout al procesar la transcripción: ${error.message || error}`
+    };
+  }
+}
+
+/**
+ * Server Action: Actualiza manualmente el informe_entrevista_ia (Human-in-the-Loop).
+ * PATCH /api/v1/pipeline/:id
+ */
+export async function actualizarInformeEntrevistaAction(
+  pipelineId: string,
+  informeEntrevistaIA: InformeEntrevistaIA
+): Promise<APIResponse> {
+  try {
+    const token = await getServerAuthToken();
+    const url = getApiEndpoint(`pipeline/${pipelineId}`);
+
+    const payload = {
+      f2_evaluacion: {
+        informe_entrevista_ia: informeEntrevistaIA
+      }
+    };
+
+    console.log(`[Pipeline Action] Actualizando informe_entrevista_ia Human-in-the-Loop en: ${url}`);
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const status = response.status;
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch (_) {}
+
+    if (status === 200) {
+      revalidatePath(`/evaluacion/${pipelineId}`);
+      revalidatePath("/evaluacion");
+      return {
+        status,
+        success: true,
+        message: "Informe de entrevista de screening actualizado correctamente.",
+        data: data.data || data
+      };
+    }
+
+    return {
+      status,
+      success: false,
+      message: data?.message || data?.error || `Error al actualizar el informe (${status}).`,
+      data
+    };
+  } catch (error: any) {
+    console.error("[Pipeline Action] Error en actualizarInformeEntrevistaAction:", error);
+    return {
+      status: 500,
+      success: false,
+      message: `Error de red al conectar con el backend: ${error.message || error}`
+    };
+  }
+}
+
 
 

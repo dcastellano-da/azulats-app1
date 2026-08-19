@@ -193,4 +193,42 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
     assert.strictEqual(nextPhaseMap['10_entrevista_cliente'], '11_standby');
     assert.strictEqual(nextPhaseMap['11_standby'], '10_entrevista_cliente');
   });
+
+  test('P-PRE-01: Guardado y recuperación del filtro "Búsqueda" en localStorage (presentacion_selected_search)', () => {
+    let memoryStorage = {};
+    const mockLocalStorage = {
+      getItem: (key) => memoryStorage[key] || null,
+      setItem: (key, val) => { memoryStorage[key] = String(val); }
+    };
+
+    let selectedSearch = "Todos";
+
+    const handleSelectSearchChange = (value) => {
+      selectedSearch = value;
+      mockLocalStorage.setItem("presentacion_selected_search", value);
+    };
+
+    assert.strictEqual(selectedSearch, "Todos");
+    assert.strictEqual(mockLocalStorage.getItem("presentacion_selected_search"), null);
+
+    handleSelectSearchChange("REQ-003");
+    assert.strictEqual(selectedSearch, "REQ-003");
+    assert.strictEqual(mockLocalStorage.getItem("presentacion_selected_search"), "REQ-003");
+
+    const saved = mockLocalStorage.getItem("presentacion_selected_search");
+    if (saved) {
+      selectedSearch = saved;
+    }
+    assert.strictEqual(selectedSearch, "REQ-003");
+  });
+
+  test('P-PRE-01 (src/app/presentacion/page.tsx) integra la persistencia de presentacion_selected_search en localStorage', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const pagePath = path.resolve('src/app/presentacion/page.tsx');
+    const content = await fs.readFile(pagePath, 'utf-8');
+
+    assert.ok(content.includes('presentacion_selected_search'), 'La página P-PRE-01 debe gestionar localStorage con presentacion_selected_search');
+    assert.ok(content.includes('handleSelectSearchChange'), 'La página P-PRE-01 debe utilizar handleSelectSearchChange para mutar y persistir la búsqueda');
+  });
 });

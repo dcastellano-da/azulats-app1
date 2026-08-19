@@ -206,4 +206,42 @@ describe('Módulo de Cierre (F4 Cierre) - Capa de Lógica y Datos', () => {
     assert.strictEqual(nextPhaseMap['14_rechazado_cliente'], '12_oferta_extendida');
     assert.strictEqual(nextPhaseMap['15_candidato_se_baja'], '12_oferta_extendida');
   });
+
+  test('P-CIE-01: Guardado y recuperación del filtro "Búsqueda" en localStorage (cierre_selected_search)', () => {
+    let memoryStorage = {};
+    const mockLocalStorage = {
+      getItem: (key) => memoryStorage[key] || null,
+      setItem: (key, val) => { memoryStorage[key] = String(val); }
+    };
+
+    let selectedSearch = "Todos";
+
+    const handleSelectSearchChange = (value) => {
+      selectedSearch = value;
+      mockLocalStorage.setItem("cierre_selected_search", value);
+    };
+
+    assert.strictEqual(selectedSearch, "Todos");
+    assert.strictEqual(mockLocalStorage.getItem("cierre_selected_search"), null);
+
+    handleSelectSearchChange("REQ-004");
+    assert.strictEqual(selectedSearch, "REQ-004");
+    assert.strictEqual(mockLocalStorage.getItem("cierre_selected_search"), "REQ-004");
+
+    const saved = mockLocalStorage.getItem("cierre_selected_search");
+    if (saved) {
+      selectedSearch = saved;
+    }
+    assert.strictEqual(selectedSearch, "REQ-004");
+  });
+
+  test('P-CIE-01 (src/app/cierre/page.tsx) integra la persistencia de cierre_selected_search en localStorage', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const pagePath = path.resolve('src/app/cierre/page.tsx');
+    const content = await fs.readFile(pagePath, 'utf-8');
+
+    assert.ok(content.includes('cierre_selected_search'), 'La página P-CIE-01 debe gestionar localStorage con cierre_selected_search');
+    assert.ok(content.includes('handleSelectSearchChange'), 'La página P-CIE-01 debe utilizar handleSelectSearchChange para mutar y persistir la búsqueda');
+  });
 });

@@ -1,6 +1,6 @@
-import { PipelineItem } from "@/actions/pipeline";
-import { Candidato } from "@/actions/candidatos";
-import { Busqueda } from "@/actions/busquedas";
+import type { PipelineItem } from "@/actions/pipeline";
+import type { Candidato } from "@/actions/candidatos";
+import type { Busqueda } from "@/actions/busquedas";
 
 export interface CierreCandidate {
   id: string;

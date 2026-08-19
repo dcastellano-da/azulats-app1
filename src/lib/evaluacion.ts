@@ -29,6 +29,7 @@ export interface EvaluacionCandidate {
   url_cv?: string;
   canal_ingreso?: string | null;
   reuniones?: any[] | null;
+  informe_entrevista_ia?: any | null;
   toolsDetails: {
     sintetizador: {
       pros: string[];
@@ -521,6 +522,7 @@ export const mapPipelineToEvaluacionCandidates = (
       email,
       recruiterNotes,
       url_cv: cand?.url_cv || undefined,
+      informe_entrevista_ia: pipe.f2_evaluacion?.informe_entrevista_ia || (pipe.evaluacion as any)?.informe_entrevista_ia || null,
       toolsDetails: generateDefaultToolsDetails(candName, role, score)
     });
   }

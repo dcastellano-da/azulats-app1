@@ -177,6 +177,23 @@ export default function PresentacionPage() {
     }
   };
 
+  // Restore saved search filter from localStorage on initial mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedSearch = localStorage.getItem("presentacion_selected_search");
+      if (savedSearch) {
+        setSelectedSearch(savedSearch);
+      }
+    }
+  }, []);
+
+  const handleSelectSearchChange = (value: string) => {
+    setSelectedSearch(value);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("presentacion_selected_search", value);
+    }
+  };
+
   useEffect(() => {
     fetchBackendData();
   }, [selectedSearch]);
@@ -899,7 +916,7 @@ export default function PresentacionPage() {
               <span className="text-xs text-[#879391] whitespace-nowrap font-medium">Búsqueda activa:</span>
               <select
                 value={selectedSearch}
-                onChange={(e) => setSelectedSearch(e.target.value)}
+                onChange={(e) => handleSelectSearchChange(e.target.value)}
                 className="bg-[#101415]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer w-full md:w-auto font-bold"
               >
                 <option value="Todos" className="bg-[#15181a]">Todas las Búsquedas</option>

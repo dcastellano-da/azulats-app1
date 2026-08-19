@@ -45,6 +45,9 @@ import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, actualizarPipelineAPI, Reunion } from "@/actions/pipeline";
 import { EvaluacionCandidate } from "@/lib/evaluacion";
+import type { InformeEntrevistaIA } from "@/types/screening";
+import AnalizarTranscripcionModal from "@/app/components/AnalizarTranscripcionModal";
+import InformeScreeningCard from "@/app/components/InformeScreeningCard";
 
 const generateDefaultToolsDetails = (candName: string, role: string, score: number) => {
   const isRust = role.toLowerCase().includes("rust") || role.toLowerCase().includes("architect");
@@ -107,6 +110,10 @@ export default function EvaluacionDetallePage() {
 
   // Active Tab for AI Diagnostic Tools
   const [activeTab, setActiveTab] = useState<DiagTab>("sintetizador");
+
+  // Transcripción de Screening IA State
+  const [isTranscripcionModalOpen, setIsTranscripcionModalOpen] = useState(false);
+  const [informeEntrevistaIA, setInformeEntrevistaIA] = useState<InformeEntrevistaIA | null>(null);
 
   // Editing state for Recruiter Notes across all phases
   const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -243,6 +250,7 @@ export default function EvaluacionDetallePage() {
 
         setCand(item);
         setActivePipelineItem(targetPipe || null);
+        setInformeEntrevistaIA(targetPipe?.f2_evaluacion?.informe_entrevista_ia || (targetPipe?.evaluacion as any)?.informe_entrevista_ia || null);
         setEditInitialNotes(initialNotes);
         setEditF1Notes(f1Notes);
         setEditF2Notes(f2Notes);
@@ -606,6 +614,16 @@ export default function EvaluacionDetallePage() {
               <span>CV</span>
             </button>
 
+            {/* Analizar Transcripción Button */}
+            <button
+              onClick={() => setIsTranscripcionModalOpen(true)}
+              title="Analizar Transcripción de Screening con IA (ID: M-TRN-01)"
+              className="px-3.5 py-1.5 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/15 hover:bg-[#6bd8cb] hover:text-stone-950 text-[#6bd8cb] transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs shadow-sm shadow-[#6bd8cb]/10"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>Analizar Transcripción</span>
+            </button>
+
             <span className="text-[10px] font-bold text-[#c4c1fb] bg-[#c4c1fb]/10 px-3 py-1 rounded-full uppercase tracking-wider border border-[#c4c1fb]/20">
               Fase 2: Evaluación Interna
             </span>
@@ -752,6 +770,13 @@ export default function EvaluacionDetallePage() {
                 </div>
               </div>
             </div>
+
+            {/* Smart Scorecard de Transcripción de Screening IA */}
+            <InformeScreeningCard
+              informe={informeEntrevistaIA}
+              onEditClick={() => setIsTranscripcionModalOpen(true)}
+              onReanalyzeClick={() => setIsTranscripcionModalOpen(true)}
+            />
 
             {/* Sección de Agendamiento Dinámico de Reuniones */}
             <div className="glass-panel rounded-3xl p-6 border border-white/10 text-left space-y-5">
@@ -1618,6 +1643,27 @@ export default function EvaluacionDetallePage() {
           </div>
         </div>
       )}
+      {/* Modal: Analizar Transcripción de Screening IA */}
+      <AnalizarTranscripcionModal
+        isOpen={isTranscripcionModalOpen}
+        onClose={() => setIsTranscripcionModalOpen(false)}
+        pipelineId={cand.pipeId || id}
+        candidateName={cand.name}
+        currentState={cand.currentPhase}
+        initialInforme={informeEntrevistaIA}
+        onSuccess={(nuevoInforme) => {
+          setInformeEntrevistaIA(nuevoInforme);
+          if (activePipelineItem) {
+            setActivePipelineItem({
+              ...activePipelineItem,
+              f2_evaluacion: {
+                ...activePipelineItem.f2_evaluacion,
+                informe_entrevista_ia: nuevoInforme
+              }
+            });
+          }
+        }}
+      />
     </main>
   );
 }

@@ -179,6 +179,23 @@ export default function EvaluacionPage() {
     }
   };
 
+  // Restore saved search filter from localStorage on initial mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedSearch = localStorage.getItem("evaluacion_selected_search");
+      if (savedSearch) {
+        setSelectedSearch(savedSearch);
+      }
+    }
+  }, []);
+
+  const handleSelectSearchChange = (value: string) => {
+    setSelectedSearch(value);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("evaluacion_selected_search", value);
+    }
+  };
+
   useEffect(() => {
     fetchBackendData();
   }, [selectedSearch]);
@@ -747,7 +764,7 @@ export default function EvaluacionPage() {
               <span className="text-xs text-[#879391] whitespace-nowrap">Búsqueda:</span>
               <select
                 value={selectedSearch}
-                onChange={(e) => setSelectedSearch(e.target.value)}
+                onChange={(e) => handleSelectSearchChange(e.target.value)}
                 className="bg-[#101415]/60 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#6bd8cb] cursor-pointer w-full md:w-auto"
               >
                 <option value="Todos" className="bg-[#15181a]">Todas las Búsquedas</option>
@@ -974,8 +991,11 @@ export default function EvaluacionPage() {
                   <th className="px-5 py-4 cursor-pointer hover:text-white" onClick={() => toggleSort("phase")}>
                     Estado actual {renderSortIcon("phase")}
                   </th>
-                  <th className="px-5 py-4">
+                  <th className="px-5 py-4 min-w-[200px]">
                     Notas Reclutador
+                  </th>
+                  <th className="px-5 py-4 min-w-[320px]">
+                    Scorecard Entrevista IA
                   </th>
                   <th className="px-5 py-4 cursor-pointer hover:text-white text-center" onClick={() => toggleSort("cnps")}>
                     cNPS {renderSortIcon("cnps")}
@@ -989,7 +1009,7 @@ export default function EvaluacionPage() {
               <tbody className="divide-y divide-white/5 font-medium">
                 {sortedListCandidates.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-8 text-center text-[#879391] bg-white/5">
+                    <td colSpan={8} className="px-5 py-8 text-center text-[#879391] bg-white/5">
                       No se encontraron candidatos evaluados que coincidan con los criterios establecidos.
                     </td>
                   </tr>
@@ -1025,14 +1045,161 @@ export default function EvaluacionPage() {
                           {getPhaseLabel(cad.currentPhase).substring(5)}
                         </span>
                       </td>
-                      <td className="py-4 px-5 min-w-[240px] max-w-[300px]">
+                      {/* 1. Notas Reclutador (Humano) */}
+                      <td className="py-4 px-5 min-w-[200px] max-w-[250px]">
                         {cad.recruiterNotes ? (
                           <div className="p-2 rounded-lg bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] text-[10px] leading-snug font-medium shadow-sm flex items-start gap-1.5">
                             <FileText className="w-3.5 h-3.5 text-[#6bd8cb] shrink-0 mt-0.5" />
                             <span className="text-white font-medium line-clamp-3">{cad.recruiterNotes}</span>
                           </div>
                         ) : (
-                          <span className="text-[#879391]/50 text-[10px] italic">Sin notas de evaluación</span>
+                          <span className="text-[#879391]/50 text-[10px] italic block">Sin notas de evaluación</span>
+                        )}
+                      </td>
+
+                      {/* 2. Scorecard Entrevista IA (Columna Dedicada + Hover Tooltip) */}
+                      <td className="py-4 px-5 min-w-[320px] max-w-[400px]">
+                        {cad.informe_entrevista_ia ? (() => {
+                          const inf = cad.informe_entrevista_ia;
+                          const pret = inf.pretension_economica_condiciones || {};
+                          const aud = inf.auditoria_veracidad || {};
+                          const incs = aud.inconsistencias_detectadas || [];
+                          const forts = aud.confirmaciones_fortalezas || [];
+                          const expText = typeof inf.experiencia_consolidada === "string" 
+                            ? inf.experiencia_consolidada 
+                            : (inf.experiencia_consolidada?.resumen_trayectoria || "");
+                          const aligText = typeof inf.alineacion_motivadores === "string" 
+                            ? inf.alineacion_motivadores 
+                            : (inf.alineacion_motivadores?.encaje_cultural || "");
+
+                          return (
+                            <div className="relative group cursor-help">
+                              {/* Tarjeta Sintetizada Visible en la Celda */}
+                              <div className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-[#6bd8cb]/20 transition-all space-y-1.5">
+                                {/* Fila 1: Micro-chips de Condiciones */}
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#6bd8cb]/15 border border-[#6bd8cb]/30 text-[9.5px] font-bold text-[#6bd8cb]">
+                                    <Sparkles className="w-3 h-3 text-[#6bd8cb]" />
+                                    <span>{pret.pretension_salarial || "Salario N/E"}</span>
+                                  </span>
+
+                                  {pret.modalidad_preferida && (
+                                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] font-medium text-[#c4c1fb]">
+                                      {pret.modalidad_preferida}
+                                    </span>
+                                  )}
+
+                                  {pret.disponibilidad && (
+                                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] font-medium text-white/70">
+                                      {pret.disponibilidad}
+                                    </span>
+                                  )}
+
+                                  {/* Badge Auditoría de Veracidad */}
+                                  {incs.length > 0 ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-[9px] font-bold text-rose-300">
+                                      <AlertTriangle className="w-3 h-3 text-rose-400" />
+                                      <span>{incs.length} Inconsistencia{incs.length > 1 ? "s" : ""}</span>
+                                    </span>
+                                  ) : forts.length > 0 ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-[9px] font-bold text-emerald-300">
+                                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                      <span>Verificado</span>
+                                    </span>
+                                  ) : null}
+                                </div>
+
+                                {/* Fila 2: Snippet de Motivación o Trayectoria (1 línea) */}
+                                {(expText || aligText) && (
+                                  <p className="text-[10px] text-[#879391] line-clamp-1 italic">
+                                    "{aligText || expText}"
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* HOVER TOOLTIP / POPOVER DESPLEGABLE CON DETALLES COMPLETOS */}
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 w-96 p-4 rounded-2xl glass-panel border border-[#6bd8cb]/40 bg-[#101415]/95 shadow-2xl space-y-3 pointer-events-none animate-fadeIn text-left backdrop-blur-md">
+                                {/* Top Header */}
+                                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                                  <div className="flex items-center gap-2">
+                                    <div className="p-1.5 rounded-lg bg-[#6bd8cb]/20 text-[#6bd8cb]">
+                                      <Sparkles className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                                        Smart Scorecard — Entrevista IA
+                                      </h4>
+                                      <p className="text-[9px] text-[#879391]">Inspección rápida al pasar el cursor</p>
+                                    </div>
+                                  </div>
+                                  <span className="text-[8px] font-mono text-[#6bd8cb] bg-[#6bd8cb]/10 px-1.5 py-0.5 rounded border border-[#6bd8cb]/20 uppercase font-bold">
+                                    f2_evaluacion
+                                  </span>
+                                </div>
+
+                                {/* Experiencia Consolidada */}
+                                {expText && (
+                                  <div className="space-y-1">
+                                    <span className="text-[9px] uppercase font-bold text-[#6bd8cb] tracking-wider block">
+                                      Experiencia Consolidada
+                                    </span>
+                                    <p className="text-[10px] text-white/90 leading-relaxed line-clamp-3">
+                                      {expText}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Pretensión y Condiciones Grid */}
+                                <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-black/40 border border-white/5 text-[9.5px]">
+                                  <div>
+                                    <span className="text-[8px] uppercase text-[#879391] block font-bold">Pretensión</span>
+                                    <span className="font-bold text-[#6bd8cb]">{pret.pretension_salarial || "N/E"}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[8px] uppercase text-[#879391] block font-bold">Disponibilidad</span>
+                                    <span className="font-bold text-white">{pret.disponibilidad || "N/E"}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[8px] uppercase text-[#879391] block font-bold">Modalidad</span>
+                                    <span className="font-bold text-[#c4c1fb]">{pret.modalidad_preferida || "N/E"}</span>
+                                  </div>
+                                </div>
+
+                                {/* Auditoría de Veracidad */}
+                                {(incs.length > 0 || forts.length > 0) && (
+                                  <div className="space-y-1.5 pt-1 border-t border-white/5">
+                                    <span className="text-[9px] uppercase font-bold text-amber-400 block flex items-center gap-1">
+                                      <ShieldCheck className="w-3 h-3 text-amber-400" />
+                                      Auditoría de Veracidad
+                                    </span>
+                                    {incs.length > 0 && (
+                                      <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-200 text-[9.5px] space-y-1">
+                                        <span className="font-bold text-rose-400 block">Inconsistencias:</span>
+                                        <ul className="list-disc pl-3 space-y-0.5">
+                                          {incs.map((inc: string, idx: number) => (
+                                            <li key={idx}>{inc}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {forts.length > 0 && (
+                                      <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 text-[9.5px] space-y-1">
+                                        <span className="font-bold text-emerald-400 block">Fortalezas Validadas:</span>
+                                        <ul className="list-disc pl-3 space-y-0.5">
+                                          {forts.map((fort: string, idx: number) => (
+                                            <li key={idx}>{fort}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                              </div>
+                            </div>
+                          );
+                        })() : (
+                          <span className="text-[#879391]/40 text-[10px] italic block">Sin entrevista de screening IA</span>
                         )}
                       </td>
                       <td className="px-5 py-4 text-center font-mono font-bold text-sm text-[#c4c1fb]">
@@ -1329,6 +1496,27 @@ function KanbanCard({
             <span>NOTAS RECLUTADOR:</span>
           </div>
           <p className="font-semibold text-white/90">{cad.recruiterNotes}</p>
+        </div>
+      )}
+
+      {/* Transcripción de Entrevista IA summary badge */}
+      {cad.informe_entrevista_ia && (
+        <div className="p-2 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[10px] space-y-1 text-left">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-[#6bd8cb] flex items-center gap-1">
+              <Sparkles className="w-3 h-3" /> Transcripción IA
+            </span>
+            {cad.informe_entrevista_ia.pretension_economica_condiciones?.pretension_salarial && (
+              <span className="text-[9px] font-mono text-emerald-300 font-bold">
+                {cad.informe_entrevista_ia.pretension_economica_condiciones.pretension_salarial}
+              </span>
+            )}
+          </div>
+          {cad.informe_entrevista_ia.pretension_economica_condiciones?.modalidad_preferida && (
+            <div className="text-[9px] text-[#c4c1fb]">
+              Modalidad: {cad.informe_entrevista_ia.pretension_economica_condiciones.modalidad_preferida}
+            </div>
+          )}
         </div>
       )}
 

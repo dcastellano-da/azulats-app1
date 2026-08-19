@@ -177,7 +177,7 @@ El **F2 Evaluación** gestiona la fase interna de validación técnica, entrevis
 *   **Estado Intermedio "En Duda":** Nuevo estado `07_en_duda_evaluacion` (color ámbar) para candidatos que requieren revisión adicional antes de ser descartados. Botón de acción "En Duda" disponible en tarjetas Kanban y vista Lista Detallada.
 *   **Renumeración de Estado Descartado:** El estado anterior `07_descartado_interno` pasó a `08_descartado_interno` para acomodar el nuevo estado intermedio. Las transiciones de avance a F3 apuntan a `09_presentado_cliente`.
 *   **Métricas e Indicadores de Rendimiento de Evaluación:** Tarjetas analíticas de control para *WIP Cycle Time* promedio (horas activas acumuladas en evaluación), *cNPS* general de candidatos, e índice de aprobación *Pass-through Rate*. Adicionalmente, incluye alerta de sobrecarga operativa en color amarillo ámbar cuando el WIP supera los 10 candidatos activos.
-*   **Filtros de Búsqueda y Multi-Cliente:** Barra de filtrado dinámico para acotar y aislar candidatos por rol y cliente corporativo clave (ej. Telefónica, Santander, SEAT).
+*   **Filtros de Búsqueda, Multi-Cliente y Persistencia en `localStorage`:** Barra de filtrado dinámico para acotar y aislar candidatos por rol y cliente corporativo clave (ej. Telefónica, Santander, SEAT), provista de almacenamiento persistente en `localStorage` (`evaluacion_selected_search`) para restaurar automáticamente la última búsqueda seleccionada al navegar o recargar la pantalla `ID: P-EVA-01`.
 *   **Slide-over Contenedor de Diagnóstico IA:** Cajón lateral deslizable e interactivo enfocado en herramientas cognitivas avanzadas libres de sesgos:
   - *Sintetizador de Entrevistas*: Cruce inteligente de notas de llamadas y descripciones de puestos clasificando en Puntos Fuertes (Pros), Brechas Técnicas (Cons) y Señales de Alerta (Riesgos).
   - *Detector de Inconsistencias Cronológicas*: Escaneo automático de la trayectoria laboral del candidato para alertar sobre solapamientos sospechosos u holguras (gaps) de tiempo.
@@ -190,6 +190,7 @@ El **F3 Cliente Evaluación** (`/presentacion`) administra la fase de presentaci
 *   **Pipeline de Presentación Kanban y Lista:** Tablero de control clasificado en 3 columnas: `09 - Shortlist / Enviado a Cliente`, `10 - Entrevista con Cliente` y `11 - Stand-by / Back-up`, con soporte Drag & Drop, conmutador Kanban/Lista y pantalla completa.
 *   **Integración REST Backend Directa:** Conectado a Server Actions (`getBusquedasAPI`, `getCandidatosAPI`, `getPipelineAPI` y `actualizarPipelineAPI`) para consultar y actualizar en tiempo real el pipeline y los candidatos reales en la nube.
 *   **KPIs de Negocio:** Tarjetas de métricas de *Stakeholder Blockage Time*, *Calibration Accuracy*, *cNPS del Cliente* y alerta de saturación de cola (WIP > 10).
+*   **Persistencia de Búsqueda Seleccionada en `localStorage`:** Almacenamiento persistente de la búsqueda activa elegida (`presentacion_selected_search`) para restaurarla automáticamente al recargar o regresar a la pantalla `ID: P-PRE-01`.
 *   **Consola de Herramientas de IA para Calibración (Slide-over):** Analítica de Entrevistas Zoom/Meet, Traductor y Estandarizador de Perfiles ATS, Generador de Executive Candidate Briefings por IA, Orquestador de Agendas Condicional y Bot Rastreador de SLA.
 
 ### Módulo J: Sistema de Identificadores Alfanuméricos Únicos (`ID: P-xxx` y `ID: M-xxx`)
@@ -202,6 +203,38 @@ Para simplificar la interacción en los prompts de desarrollo y la localización
 *   **Botonera Unificada "CV" en Todo el Pipeline**: Botón del documento PDF con ícono `<FileText />` y etiqueta visible `"CV"` presente uniformemente en Kanban, Lista Detallada (columna ACCIONES) y cabeceras de expediente en todas las etapas (`/talento`, `/descubrimiento`, `/evaluacion`, `/presentacion`, `/cierre` y sus vistas de detalle `/[id]`).
 *   **Canal de Ingreso Dinámico (`canal_ingreso`)**: Campo que consulta en tiempo real todos los canales únicos existentes en la base de datos backend (`getCandidatosAPI`), agregando la opción `+ Escribir nuevo canal personalizado...` para crear vías de sourcing al vuelo. Sincronizado en la ficha del candidato (`/talento/[id]`) y en las modales de ingesta con IA (`M-IMP-01` y `M-IMP-02`), mostrando el estado real `No especificado` cuando el canal es nulo.
 *   **Gestión Global de Motivo de Rechazo**: Traslado de los campos de motivo de descarte y fecha de resolución desde Cierre a la raíz de `PipelineItem` (`motivo_rechazo`, `resolucion.estado_final`, `resolucion.fecha_resolucion`), permitiendo su consulta y edición interactiva en `/descubrimiento/[id]`.
+
+### Módulo L: Catálogo y Tabla Maestra de Estados del Pipeline (Fases 1 a 4)
+El pipeline de selección de **Azul ATS** se organiza en 4 fases progresivas. A continuación se documentan los 15 estados posibles por los que puede transitar un candidato, así como los 4 estados previos de la bandeja general del Talent Pool:
+
+#### Tabla de Estados del Pipeline (Fases 1 a 4)
+
+| Fase | Estado | Descripción del estado |
+| :--- | :--- | :--- |
+| **F1 Descubrimiento** | `01 - NUEVO EN REVISION` | Sourced backlog inicial / Candidato recién ingresado al pipeline para revisión. |
+| **F1 Descubrimiento** | `02 - CONTACTADO` | Outreach A/B enviado / Primer contacto exploratorio iniciado por el reclutador. |
+| **F1 Descubrimiento** | `03 - BLOQUEADO / PENDIENTE` | Candidato con información clave faltante (CV, pretendido, inglés) o pendiente de respuesta. |
+| **F1 Descubrimiento** | `04 - RECHAZADO EN FASE INICIAL` | Postulante descartado tempranamente durante la etapa inicial de atracción/sourcing. |
+| **F2 Evaluación** | `05 - SCREENING / ENTREVISTA INICIAL` | Entrevista exploratoria inicial y validación técnica previa por parte del reclutador. |
+| **F2 Evaluación** | `06 - PRUEBA / ASSESSMENT TÉCNICO` | Evaluación técnica en vivo (Live coding Co-Pilot / compilador sandbox) o desafío práctico. |
+| **F2 Evaluación** | `07 - EN DUDA EVALUACIÓN` | Estado intermedio para perfiles que requieren segunda opinión o calibración interna. |
+| **F2 Evaluación** | `08 - DESCARTADO (INTERNO)` | Postulante descartado internamente por no superar los criterios técnicos de la agencia. |
+| **F3 Cliente** | `09 - SHORTLIST / ENVIADO A CLIENTE` | Expediente validado por la agencia y enviado a la terna/shortlist del cliente corporativo. |
+| **F3 Cliente** | `10 - ENTREVISTA CON CLIENTE` | Entrevista agendada o realizada con los Hiring Managers y líderes técnicos del cliente. |
+| **F3 Cliente** | `11 - STAND-BY / BACK-UP` | Postulante en reserva/retén mientras el cliente evalúa al resto de candidatos de la terna. |
+| **F4 Cierre** | `12 - OFERTA EXTENDIDA` | Carta oferta económica/laboral emitida al candidato; en negociación o firma pre-onboarding. |
+| **F4 Cierre** | `13 - CONTRATADO` | Oferta aceptada y firmada exitosamente (Cierre Ganador / Won). Candidato contratado. |
+| **F4 Cierre** | `14 - RECHAZADO CLIENTE` | Postulante no seleccionado por los evaluadores o gerencia del cliente corporativo. |
+| **F4 Cierre** | `15 - CANDIDATO SE BAJA` | Postulante retira voluntariamente su candidatura o declina la oferta final (Drop-out). |
+
+#### Estados Previos al Pipeline: Talent Pool (`ID: P-TAL-01`)
+
+| Módulo | Estado | Descripción del estado |
+| :--- | :--- | :--- |
+| **Talent Mixer** | `PENDIENTE` | Postulación recién recibida o subida por ingesta CV en la bandeja general. |
+| **Talent Mixer** | `REVISADO` | Perfil inspeccionado por el equipo de selección. |
+| **Talent Mixer** | `SELECCIONADO` | Candidato asignado a una búsqueda activa (se crea el registro en pipeline en estado `01`). |
+| **Talent Mixer** | `DESCARTADO` | Postulante no seleccionado para el pool general de talento. |
 
 ---
 
@@ -329,6 +362,14 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
 
 --------------------------------------------------------------------------------------------------------
 # Historico de Cambios (ordenados por los recientes cambios primeros, formato de fecha "AAAA/MM/DD")
+
+*   **2026/08/19:** Módulo de Entrevista de Screening (Origen Transcripción de Reunión con IA Gemini 2.5 Flash):
+    *   **Análisis Inteligente de Transcripción:** Integración del componente modal glassmorphic `AnalizarTranscripcionModal` (`ID: M-TRN-01`) para la carga de transcripciones (.pdf, .doc, .docx, .txt <5MB) procesadas en RAM con Gemini 2.5 Flash.
+    *   **Tipado Estricto y Persistencia Exclusiva:** Estructuración de datos bajo `f2_evaluacion.informe_entrevista_ia` (`experiencia_consolidada`, `alineacion_motivadores`, `pretension_economica_condiciones`, `proximos_pasos` y `auditoria_veracidad`), omitiendo colisiones con el screening de CV de la Fase 1.
+    *   **Advertencias de Estado de Pipeline:** Control reactivo que permite la carga desde cualquier estado pero despliega una advertencia informativa (`AlertTriangle`) si el postulante no está en `"05 - Screening"`.
+    *   **Human-in-the-Loop & UI Optimista:** Edición manual pre-llenada en el modal pre-guardado y mutación asíncrona vía `actualizarInformeEntrevistaAction` (`PATCH /api/v1/pipeline/:id`).
+    *   **Smart Scorecard en Detalle y Resúmenes en Kanban (`ID: P-EVA-02` & `ID: P-EVA-01`):** Renderizado de la tarjeta `InformeScreeningCard` con el bloque destacado de **Auditoría de Veracidad** (inconsistencias vs fortalezas) y chips resumen en el Kanban y Lista Detallada.
+    *   **Pruebas Automatizadas:** Creación de `tests/analizar_transcripcion.test.js` con 100% de éxito en 4/4 pruebas unitarias.
 
 *   **2026/08/14:** Actualización de UI/UX en Pantalla P-DIS-01 (Descubrimiento):
     *   **Cambio de Etiqueta en Botón de Ingesta Inteligente:** Se actualizó el texto del botón principal de ingesta en la cabecera de la pantalla `P-DIS-01` de **`Parser Ingesta CV`** a **`Importar Postulante con IA`**.
@@ -699,6 +740,14 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     *   **Conector API REST & Mock Fallback:** Creación de Server Actions en `src/actions/candidatos.ts` para operaciones CRUD en Cloud Run con un sistema seguro de datos simulados en memoria (Mock database fallback), previniendo fallos en pruebas locales y forzando `acepta_privacidad: true` y control de inmutabilidad selectiva.
     *   **Navegación Coherente:** Integración del enlace universal y horizontal hacia `/talento` (Talent Mixer, representado con icono `Sliders`) en todas las barras superiores compartidas: Dashboard, Búsquedas, Reclutamiento y Ajustes.
 
+
+*   **19/08/2026:** Persistencia en `localStorage` del Filtro "Búsqueda" en Pantallas `ID: P-PRE-01` (Presentación) y `ID: P-CIE-01` (Cierre):
+    *   **Persistencia y Restauración Automática (`presentacion_selected_search` y `cierre_selected_search`):** Implementado el almacenamiento persistente en `localStorage` de la opción seleccionada en el desplegable *"Búsqueda"* de las pantallas `ID: P-PRE-01` (`/presentacion`) y `ID: P-CIE-01` (`/cierre`). Al modificar la búsqueda en cualquiera de ambas vistas, el filtro elegido se guarda automáticamente y se restaura al volver o recargar la página.
+    *   **Pruebas Automatizadas:** Actualización de las suites de pruebas `tests/presentacion.test.js` y `tests/cierre.test.js` con unit tests que verifican la sincronización con `localStorage` y la integración en `src/app/presentacion/page.tsx` y `src/app/cierre/page.tsx`.
+
+*   **19/08/2026:** Persistencia en `localStorage` del Filtro "Búsqueda" en Pantalla `ID: P-EVA-01` (Pipeline de Evaluación):
+    *   **Persistencia y Restauración Automática (`evaluacion_selected_search`):** Implementado el almacenamiento persistente en `localStorage` de la opción seleccionada en el desplegable *"Búsqueda"* de la pantalla `ID: P-EVA-01` (`/evaluacion`). Al cambiar la búsqueda, la selección se guarda automáticamente y se restaura al reingresar a la pantalla.
+    *   **Pruebas Automatizadas:** Actualización de la suite de pruebas `tests/evaluacion.test.js` con unit tests para verificar el guardado/recuperado en `localStorage` y la verificación de la integración en `src/app/evaluacion/page.tsx`.
 
 *   **19/08/2026:** Asignación de ID `ID: M-SEL-01`, Opción "Screening Inteligente IA", Persistencia en `localStorage` y Detección de Screening Previo en Asignación a Búsqueda Activa (`P-TAL-01`):
     *   **Identificador Oficial `ID: M-SEL-01`:** Incorporada la insignia monospaciada `ID: M-SEL-01` en la cabecera del modal "Asignar a Búsqueda Activa" que se despliega al mover un postulante al estado "SELECCIONADO".
