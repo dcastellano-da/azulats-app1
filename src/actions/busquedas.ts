@@ -56,6 +56,16 @@ export interface Busqueda {
   prioridad?: string;
   link_job_description?: string;
   criterios_screening?: CriterioScreening[];
+
+  // Campos jerárquicos y de ubicación
+  estado_sla?: {
+    estado_busqueda?: string;
+    prioridad?: string;
+    presupuesto_max?: string;
+    link_job_description?: string;
+    [key: string]: any;
+  };
+  ubicacion?: string;
 }
 
 /**
@@ -414,7 +424,14 @@ export async function getBusquedasAPI(): Promise<Busqueda[]> {
         presupuesto_max,
         prioridad,
         link_job_description,
-        criterios_screening
+        criterios_screening,
+        estado_sla: item.estado_sla || {
+          estado_busqueda: estado_fase,
+          prioridad,
+          presupuesto_max,
+          link_job_description
+        },
+        ubicacion: item.condiciones?.zona_horaria_ubicacion || item.ubicacion || ""
       };
     });
 

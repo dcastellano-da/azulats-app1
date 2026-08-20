@@ -1434,9 +1434,9 @@ export default function SourcedCandidateDetailPage() {
                           {activeBusquedaObj.codigo_busqueda}
                         </span>
                       )}
-                      {activeBusquedaObj?.estado && (
+                      {activeBusquedaObj?.estado_sla?.estado_busqueda && (
                         <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold">
-                          {activeBusquedaObj.estado}
+                          {activeBusquedaObj.estado_sla.estado_busqueda}
                         </span>
                       )}
                     </div>
