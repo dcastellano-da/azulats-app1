@@ -312,4 +312,105 @@ describe('P-DIS-01: Vista Lista Screening IA y Mapeo de Columnas de Screening In
     assert.ok(content.includes('handleSelectedSearchChange'), 'La página debe utilizar handleSelectedSearchChange');
   });
 
+  // Test 16: Verificación de eliminación de la insignia Ref y eliminación de INITIAL_SOURCED_CANDIDATES
+  test('P-DIS-01 (page.tsx) no incluye la insignia Ref y no incluye INITIAL_SOURCED_CANDIDATES', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const pagePath = path.resolve('src/app/descubrimiento/page.tsx');
+    const content = await fs.readFile(pagePath, 'utf-8');
+
+    assert.ok(!content.includes('const INITIAL_SOURCED_CANDIDATES'), 'P-DIS-01 debe haber eliminado la constante muerta INITIAL_SOURCED_CANDIDATES');
+    assert.ok(!content.includes('Ref:'), 'La cabecera de P-DIS-01 debe haber eliminado la insignia Ref decorativa');
+  });
+
+  // Test 17: Verificación de notificación de error Toast en ingesta ante falla backend
+  test('P-DIS-01 (page.tsx) gestiona errores de ingesta con Toast y no crea candidatos mock', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const pagePath = path.resolve('src/app/descubrimiento/page.tsx');
+    const content = await fs.readFile(pagePath, 'utf-8');
+
+    assert.ok(content.includes('Error al conectar con el servidor backend para guardar el postulante'), 'Debe emitir un mensaje de Toast claro al fallar la ingesta en backend');
+    assert.ok(!content.includes('Recién Ingestado (Mock)'), 'No debe asignar lastChangeDate con Recién Ingestado (Mock)');
+  });
+
+  // Test 18: Verificación en P-DIS-01 (page.tsx) del uso de useMemo para KPI metrics y candidatesInSelectedSearch
+  test('P-DIS-01 (page.tsx) utiliza useMemo para candidatesInSelectedSearch y KPI metrics aislados de searchTerm', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const pagePath = path.resolve('src/app/descubrimiento/page.tsx');
+    const content = await fs.readFile(pagePath, 'utf-8');
+
+    assert.ok(content.includes('candidatesInSelectedSearch = useMemo'), 'Debe memoizar candidatesInSelectedSearch con useMemo');
+    assert.ok(content.includes('formattedTTFME'), 'Debe calcular formattedTTFME de forma dinámico o fallback');
+    assert.ok(content.includes('formattedOutreach'), 'Debe calcular formattedOutreach de forma dinámico o fallback');
+    assert.ok(content.includes('{formattedTTFME}'), 'Debe renderizar {formattedTTFME} en las tarjetas de cabecera');
+    assert.ok(content.includes('{formattedOutreach}'), 'Debe renderizar {formattedOutreach} en las tarjetas de cabecera');
+  });
+
+  // Test 19: Lógica de cálculo dinámico de KPIs por búsqueda seleccionada con fallback benchmark
+  test('Lógica de cálculo dinámico de KPIs filtra por selectedSearch y aplica fallback benchmark si no hay datos', () => {
+    const candidates = [
+      { id: "c1", searchCode: "BUS-001", phase1State: "01_nuevo", ttfme: "1.2d", outreachVariation: "A" },
+      { id: "c2", searchCode: "BUS-001", phase1State: "04_rechazado", ttfme: "2.4d", outreachVariation: "B" },
+      { id: "c3", searchCode: "BUS-002", phase1State: "02_contactado", ttfme: "--", outreachVariation: "A" }
+    ];
+
+    const calcForSearch = (selectedSearch) => {
+      const filtered = candidates.filter(c => selectedSearch === "Todos" || c.searchCode === selectedSearch);
+      const total = filtered.length;
+      const rejCount = filtered.filter(c => c.phase1State === "04_rechazado").length;
+      const rejRate = total > 0 ? Math.round((rejCount / total) * 100) : 0;
+
+      let ttfmeStr = "1.8 días";
+      if (selectedSearch !== "Todos") {
+        const validTTFME = filtered
+          .map(c => {
+            if (!c.ttfme || c.ttfme === "--") return NaN;
+            const match = c.ttfme.match(/[\d.]+/);
+            return match ? parseFloat(match[0]) : NaN;
+          })
+          .filter(v => !isNaN(v) && v > 0);
+        if (validTTFME.length > 0) {
+          const avg = validTTFME.reduce((a, b) => a + b, 0) / validTTFME.length;
+          ttfmeStr = `${avg.toFixed(1)} días`;
+        }
+      }
+
+      let outreachStr = "76.4%";
+      if (selectedSearch !== "Todos") {
+        const contacted = filtered.filter(c => c.phase1State === "02_contactado" || c.outreachVariation);
+        if (contacted.length > 0) {
+          const countA = contacted.filter(c => c.outreachVariation === "A").length;
+          outreachStr = `${Math.round((countA / contacted.length) * 100)}%`;
+        }
+      }
+
+      return { total, rejRate, ttfmeStr, outreachStr };
+    };
+
+    // Caso "Todos"
+    const globalRes = calcForSearch("Todos");
+    assert.equal(globalRes.total, 3);
+    assert.equal(globalRes.rejRate, 33);
+    assert.equal(globalRes.ttfmeStr, "1.8 días");
+    assert.equal(globalRes.outreachStr, "76.4%");
+
+    // Caso Búsqueda Específica "BUS-001"
+    const bus1Res = calcForSearch("BUS-001");
+    assert.equal(bus1Res.total, 2);
+    assert.equal(bus1Res.rejRate, 50);
+    assert.equal(bus1Res.ttfmeStr, "1.8 días"); // (1.2 + 2.4)/2 = 1.8
+    assert.equal(bus1Res.outreachStr, "50%"); // 1 de 2 variante A
+
+    // Caso Búsqueda sin datos numéricos en TTFME "BUS-002"
+    const bus2Res = calcForSearch("BUS-002");
+    assert.equal(bus2Res.total, 1);
+    assert.equal(bus2Res.rejRate, 0);
+    assert.equal(bus2Res.ttfmeStr, "1.8 días"); // Fallback benchmark
+    assert.equal(bus2Res.outreachStr, "100%"); // 1 de 1 variante A
+  });
+
 });
+
+

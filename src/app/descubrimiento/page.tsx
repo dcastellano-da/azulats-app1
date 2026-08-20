@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -363,153 +363,7 @@ const ACTIVE_BUSQUEDAS = [
   { id: "REQ-006", client: "Amadeus España", role: "Frontend React Native Developer" }
 ];
 
-const INITIAL_SOURCED_CANDIDATES: SourcedCandidate[] = [
-  {
-    id: "C-301",
-    name: "Diego Lozano",
-    role: "Software Architect Rust",
-    client: "SEAT S.A.",
-    location: "Barcelona / Remoto",
-    phase1State: "01_nuevo",
-    score: 94,
-    fitScoreScreening: 94,
-    tieneKnockout: false,
-    resultadoScreening: [
-      { id_criterio: "crit-1", pregunta: "¿Tiene al menos 3 años de experiencia en desarrollo de sistemas con Rust?", evaluacion: "SI", es_knockout: true, puntaje_obtenido: 50, evidencia_cv: "5+ años en Rust y WebAssembly en repositorios activos de SEAT" },
-      { id_criterio: "crit-2", pregunta: "¿Experiencia previa en sectores automotriz o de sistemas embebidos?", evaluacion: "SI", es_knockout: false, puntaje_obtenido: 44, evidencia_cv: "Arquitectura edge cloud comprobada en Linux Foundation" }
-    ],
-    lastChangeDate: "Hace 2 horas",
-    ttfme: "--",
-    outreachVariation: "A",
-    customOutreachA: "Hola Diego, vi tu excelente trabajo en el repositorio de WebAssembly para sistemas embebidos de SEAT. Nos entusiasma tu perfil para liderar la arquitectura en...",
-    customOutreachB: "Hola Diego, estamos buscando un Arquitecto Rust para SEAT. ¿Te interesaría conocer los detalles del puesto?",
-    motivationNote: "Interesado en metodologías ágiles y arquitecturas edge de baja latencia.",
-    recruiterNotes: "Candidato con perfil sobresaliente. Muy buena disposición para entrevista técnica."
-  },
-  {
-    id: "C-302",
-    name: "María Belmonte",
-    role: "UX Research Lead",
-    client: "Inditex S.A.",
-    location: "La Coruña / Híbrido",
-    phase1State: "02_contactado",
-    score: 91,
-    fitScoreScreening: 91,
-    tieneKnockout: false,
-    resultadoScreening: [
-      { id_criterio: "crit-1", pregunta: "¿Manejo avanzado de Figma y creación de Design Systems escalables?", evaluacion: "SI", es_knockout: true, puntaje_obtenido: 50, evidencia_cv: "Liderazgo de User Research en Inditex y testeos A/B a gran escala" },
-      { id_criterio: "crit-2", pregunta: "¿Experiencia previa diseñando interfaces para e-commerce de alto tráfico?", evaluacion: "INFERIDO", es_knockout: false, puntaje_obtenido: 41, evidencia_cv: "Experiencia cualitativa en diseño de interacción y prototipado" }
-    ],
-    lastChangeDate: "Hace 1 día",
-    ttfme: "1.2d",
-    outreachVariation: "A",
-    customOutreachA: "Hola María, tu investigación sobre diseño centrado en el usuario de retail digital es asombrosa. En Inditex queremos invitarte a liderar el... ",
-    customOutreachB: "Hola María, hay una posición abierta de UX Research Lead en Inditex. ¿Hablamos esta semana?",
-    motivationNote: "Especialista en e-commerce y testeos A/B a gran escala.",
-    recruiterNotes: "Respuesta rápida al contacto inicial. Solicita modalidad 100% remota.",
-    socialLinks: {
-      portfolio: "https://mariabelmonte.design"
-    }
-  },
-  {
-    id: "C-303",
-    name: "Carlos Tejera",
-    role: "Principal Data Engineer",
-    client: "Telefónica S.A.",
-    location: "Madrid / Remoto España",
-    phase1State: "03_bloqueado",
-    score: 87,
-    fitScoreScreening: 87,
-    tieneKnockout: false,
-    resultadoScreening: [
-      { id_criterio: "crit-1", pregunta: "¿Tiene al menos 4 años de experiencia sólida en React y TypeScript?", evaluacion: "SI", es_knockout: true, puntaje_obtenido: 50, evidencia_cv: "Principal Data Engineer en Telefónica con Apache Spark y Cassandra" },
-      { id_criterio: "crit-2", pregunta: "¿Posee nivel de inglés B2 o C1 conversacional?", evaluacion: "INFERIDO", es_knockout: false, puntaje_obtenido: 37, evidencia_cv: "Nivel de inglés intermedio (B2 lectura), requiere validación hablada" }
-    ],
-    lastChangeDate: "Hace 3 días",
-    ttfme: "2.1d",
-    outreachVariation: "A",
-    customOutreachA: "Hola Carlos, tus aportes en Spark y lagos de datos híbridos son notables en la comunidad de BigData España. En Telefónica buscamos tu expertise para...",
-    customOutreachB: "Hola Carlos, ¿cómo estás? Te contacto por una vacante de Data Engineer para Telefónica. Avísame si estás disponible.",
-    blockReason: "Falta pretensión salarial",
-    missingField: "salario",
-    motivationNote: "Lidera comunidades locales de Cassandra y Kafka.",
-    recruiterNotes: "Falta pretensión salarial exacta. Pendiente de llamada de triage.",
-    socialLinks: {
-      github: "https://github.com/ctejera-data",
-      stackoverflow: "https://stackoverflow.com/users/ctejera"
-    }
-  },
-  {
-    id: "C-304",
-    name: "Marta Galiano",
-    role: "DevOps / SRE Lead",
-    client: "Banco Santander",
-    location: "Madrid / Presencial",
-    phase1State: "03_bloqueado",
-    score: 96,
-    fitScoreScreening: 96,
-    tieneKnockout: false,
-    resultadoScreening: [
-      { id_criterio: "crit-1", pregunta: "¿Posee certificaciones vigentes de Seguridad Cloud (ej. AWS Security, GCP Security)?", evaluacion: "SI", es_knockout: true, puntaje_obtenido: 50, evidencia_cv: "Certificaciones GCP Cloud Security Professional y CKA activas" },
-      { id_criterio: "crit-2", pregunta: "¿Demuestra experiencia en diseño de políticas IAM y hardening de Kubernetes?", evaluacion: "SI", es_knockout: false, puntaje_obtenido: 46, evidencia_cv: "Liderazgo de infraestructura Kubernetes en Banco Santander" }
-    ],
-    lastChangeDate: "Hace 12 horas",
-    ttfme: "1.8d",
-    outreachVariation: "B",
-    customOutreachA: "Hola Marta, sigo tus artículos sobre Kubernetes y seguridad multinube. En Santander estamos construyendo la nueva división sandbox de Cloud Sec...",
-    customOutreachB: "Hola Marta, ¿qué tal? Vimos tu experiencia como DevOps en finanzas. Nos gustaría ver si encajas en el equipo de Cloud de Santander. ¿Revisamos?",
-    blockReason: "Falta CV PDF actualizado",
-    missingField: "cv",
-    motivationNote: "Certificada en GCP Cloud Security Professional y CKA.",
-    recruiterNotes: "Experiencia en DevOps comprobada. Solicitado CV actualizado."
-  },
-  {
-    id: "C-305",
-    name: "Alberto Ruiz",
-    role: "Backend Python Developer",
-    client: "Mercadona S.A.",
-    location: "Valencia / Híbrido",
-    phase1State: "04_rechazado",
-    score: 79,
-    fitScoreScreening: 0,
-    tieneKnockout: true,
-    resultadoScreening: [
-      { id_criterio: "crit-1", pregunta: "¿Pretensión salarial dentro del presupuesto máximo de la vacante (52.000€)?", evaluacion: "NO", es_knockout: true, puntaje_obtenido: 0, evidencia_cv: "Pretensión salarial de 65.000€ supera el límite máximo de 52.000€" },
-      { id_criterio: "crit-2", pregunta: "¿Experiencia previa en desarrollo Backend Python Django en logística?", evaluacion: "SI", es_knockout: false, puntaje_obtenido: 40, evidencia_cv: "Desarrollador Backend Python Django en logística" }
-    ],
-    lastChangeDate: "Hace 4 días",
-    ttfme: "1.0d",
-    outreachVariation: "B",
-    customOutreachA: "Hola Alberto, tu perfil en microservicios Django encaja excelente con el backend de logística de Mercadona. Te gustaría...",
-    customOutreachB: "Hola Alberto, buscamos desarrollador backend Django para Mercadona. ¿Tienes interés en escuchar la oferta?",
-    rejectionReason: "Presupuesto",
-    motivationNote: "Pretensiones salariales fuera de rango (65.000€ vs tope de 52.000€).",
-    recruiterNotes: "Expectativa salarial (65k) supera presupuesto máximo de la vacante (52k)."
-  },
-  {
-    id: "C-306",
-    name: "Lucía Pousa",
-    role: "Frontend React Native Developer",
-    client: "Amadeus España",
-    location: "Madrid / Remoto",
-    phase1State: "04_rechazado",
-    score: 82,
-    fitScoreScreening: 0,
-    tieneKnockout: true,
-    resultadoScreening: [
-      { id_criterio: "crit-1", pregunta: "¿Nivel de inglés C1 conversacional fluido para proyectos internacionales?", evaluacion: "NO", es_knockout: true, puntaje_obtenido: 0, evidencia_cv: "Nivel de Inglés B1/B2 incumple requerimiento excluyente C1" },
-      { id_criterio: "crit-2", pregunta: "¿Experiencia previa en desarrollo React Native para apps móviles de alto tráfico?", evaluacion: "SI", es_knockout: false, puntaje_obtenido: 42, evidencia_cv: "Desarrolladora React Native para app móvil de reservas" }
-    ],
-    lastChangeDate: "Hace 2 días",
-    ttfme: "1.5d",
-    outreachVariation: "A",
-    customOutreachA: "Hola Lucía, vi tu app móvil open-source de reserva de billetes. En Amadeus estamos estructurando el equipo NextGen Mobile y...",
-    customOutreachB: "Hola Lucía, ¿te interesa un cambio? Buscamos desarrollador React Native en Amadeus España. Avísame si comentamos.",
-    rejectionReason: "Nivel de Inglés",
-    motivationNote: "El puesto exige nivel C1 fluido conversación. Candidata cuenta con B1/B2.",
-    recruiterNotes: "Nivel de inglés intermedio (B1/B2), no alcanza requerimiento C1."
-  }
-];
+
 
 const getCriterionQuestion = (
   item: ResultadoScreeningItem,
@@ -758,6 +612,79 @@ export default function DescubrimientoPage() {
 
   // Rejection Reason Prompt State
   const [pendingRejectionCand, setPendingRejectionCand] = useState<{ id: string } | null>(null);
+
+  // Candidates in selected search context (independent of free-text searchTerm)
+  const candidatesInSelectedSearch = useMemo(() => {
+    return candidates.filter((c) => {
+      if (selectedSearch === "Todos") return true;
+      const searchRoleCombined = `${c.searchClient || c.client} - ${c.searchRole || c.role}`;
+      return (
+        c.searchId === selectedSearch ||
+        c.searchCode === selectedSearch ||
+        searchRoleCombined === selectedSearch ||
+        `${c.client} - ${c.role}` === selectedSearch
+      );
+    });
+  }, [candidates, selectedSearch]);
+
+  // Header KPI Metrics calculation memoized to prevent recalculations on searchTerm input changes
+  const {
+    countNuevo,
+    countContactado,
+    countBloqueado,
+    countRechazado,
+    totalSourced,
+    rejectionRate,
+    formattedTTFME,
+    formattedOutreach
+  } = useMemo(() => {
+    const cNuevo = candidatesInSelectedSearch.filter(c => c.phase1State === "01_nuevo").length;
+    const cContactado = candidatesInSelectedSearch.filter(c => c.phase1State === "02_contactado").length;
+    const cBloqueado = candidatesInSelectedSearch.filter(c => c.phase1State === "03_bloqueado").length;
+    const cRechazado = candidatesInSelectedSearch.filter(c => c.phase1State === "04_rechazado").length;
+    const total = candidatesInSelectedSearch.length;
+    const rejRate = total > 0 ? Math.round((cRechazado / total) * 100) : 0;
+
+    // TTFME calculation: parse numeric values if available for selected search
+    let ttfmeStr = "1.8 días";
+    if (selectedSearch !== "Todos") {
+      const validTTFMEValues = candidatesInSelectedSearch
+        .map(c => {
+          if (!c.ttfme || c.ttfme === "--") return NaN;
+          const match = c.ttfme.match(/[\d.]+/);
+          return match ? parseFloat(match[0]) : NaN;
+        })
+        .filter(val => !isNaN(val) && val > 0);
+
+      if (validTTFMEValues.length > 0) {
+        const avg = validTTFMEValues.reduce((acc, curr) => acc + curr, 0) / validTTFMEValues.length;
+        ttfmeStr = `${avg.toFixed(1)} días`;
+      }
+    }
+
+    // Outreach Personalization calculation
+    let outreachStr = "76.4%";
+    if (selectedSearch !== "Todos") {
+      const contactedCandidates = candidatesInSelectedSearch.filter(
+        c => c.phase1State === "02_contactado" || c.outreachVariation
+      );
+      if (contactedCandidates.length > 0) {
+        const countVarA = contactedCandidates.filter(c => c.outreachVariation === "A").length;
+        outreachStr = `${Math.round((countVarA / contactedCandidates.length) * 100)}%`;
+      }
+    }
+
+    return {
+      countNuevo: cNuevo,
+      countContactado: cContactado,
+      countBloqueado: cBloqueado,
+      countRechazado: cRechazado,
+      totalSourced: total,
+      rejectionRate: rejRate,
+      formattedTTFME: ttfmeStr,
+      formattedOutreach: outreachStr
+    };
+  }, [candidatesInSelectedSearch, selectedSearch]);
 
   // Client-side authentication protection
   useEffect(() => {
@@ -1075,24 +1002,11 @@ export default function DescubrimientoPage() {
       setCandidates((prev) => [newCand, ...prev]);
     } catch (err: any) {
       console.error("Error durando ingestión del backend:", err);
-      // Fallback safe to mock local state so the recruiter is not blocked
-      const localId = `C-${300 + candidates.length + 1}`;
-      const newCand: SourcedCandidate = {
-        id: localId,
-        name,
-        role,
-        client,
-        location: "Madrid / Remoto",
-        phase1State: "01_nuevo",
-        score,
-        lastChangeDate: "Recién Ingestado (Mock)",
-        ttfme: "--",
-        outreachVariation: "A",
-        customOutreachA: `Hola ${name.split(" ")[0]}, analicé tu CV mediante nuestro parser avanzado LLM. Tu experiencia se alinea perfectamente con la posición en ${client}...`,
-        customOutreachB: `Estimado/a ${name.split(" ")[0]}, ¿te gustaría comentar la vacante de ${role} en ${client}?`,
-        motivationNote: `Ingestión simulada (${err.message || err})`
-      };
-      setCandidates((prev) => [newCand, ...prev]);
+      setToast({
+        type: "error",
+        message: `Error al conectar con el servidor backend para guardar el postulante: ${err.message || err}`
+      });
+      setTimeout(() => setToast(null), 5000);
     } finally {
       setParsingCv(false);
       setIsIngestOpen(false);
@@ -1352,14 +1266,7 @@ export default function DescubrimientoPage() {
     return 0;
   });
 
-  // Calculate Metrics
-  const countNuevo = candidates.filter(c => c.phase1State === "01_nuevo").length;
-  const countContactado = candidates.filter(c => c.phase1State === "02_contactado").length;
-  const countBloqueado = candidates.filter(c => c.phase1State === "03_bloqueado").length;
-  const countRechazado = candidates.filter(c => c.phase1State === "04_rechazado").length;
-  const totalSourced = candidates.length;
 
-  const rejectionRate = totalSourced > 0 ? Math.round((countRechazado / totalSourced) * 100) : 0;
   
   // Custom Drag & Drop Handlers
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -1701,7 +1608,6 @@ export default function DescubrimientoPage() {
                   <span className="text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
                     Fase 1: Atracción & Sourcing
                   </span>
-                  <span className="text-[10px] font-bold text-white/40">Ref: Descubrimiento Inicial</span>
                   <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
                     ID: P-DIS-01
                   </span>
@@ -1850,7 +1756,7 @@ export default function DescubrimientoPage() {
               </button>
             </div>
             <div className="flex justify-between items-end">
-              <span className="text-2xl font-black text-white">1.8 días</span>
+              <span className="text-2xl font-black text-white">{formattedTTFME}</span>
               <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                 -4.2h vs Sprint ant.
               </span>
@@ -1897,7 +1803,7 @@ export default function DescubrimientoPage() {
               </button>
             </div>
             <div className="flex justify-between items-end">
-              <span className="text-2xl font-black text-[#c4c1fb]">76.4%</span>
+              <span className="text-2xl font-black text-[#c4c1fb]">{formattedOutreach}</span>
               <span className="text-[10px] text-[#6bd8cb] bg-[#6bd8cb]/10 px-2 py-0.5 rounded border border-[#6bd8cb]/20">
                 Variante A (Ef: 88%)
               </span>

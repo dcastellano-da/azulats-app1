@@ -113,7 +113,7 @@ El **Maestro de Búsquedas** centraliza todas las solicitudes de personal y vaca
 *   **Búsqueda y Filtros en Tiempo Real (`ID: P-BUS-01`):** Barra de búsqueda fluida (búsqueda por cargo, cliente y responsable operativo) y filtrado selectivo según el estado de la búsqueda (`preparacion_previa`, `evaluacion_tecnica`, `revision_cliente`, `oferta_cierre`).
 *   **Conexión API REST:** Carga de registros en tiempo real consumiendo el endpoint `GET /api/v1/busquedas` con cabeceras `Authorization: Bearer <token>` inyectadas automáticamente.
 *   **Estados de Carga y Error:** Inserción de un spinner de carga en el centro de la tabla durante solicitudes de red y manejo de reintentos manuales ante caídas de enlace.
-*   **Slide-over Contenedor de Alta ("Nueva Búsqueda"):** Panel lateral interactivo y deslizable (Slide-over) para la creación de nuevas búsquedas.
+*   **Alta de Búsquedas a Pantalla Completa ("Nueva Búsqueda" - `ID: P-BUS-01` / `P-BUS-02`):** Vista / modal a pantalla completa para la creación de nuevas búsquedas, sustituyendo el antiguo panel lateral (Slide-over). Presenta cabecera con navegación Breadcrumb (`Volver a Búsquedas`), insignias `ID: P-BUS-02` / `P-BUS-01-ALTA`, y formulario en layout de 2 columnas.
 *   **Pantalla Completa de Edición (`ID: P-BUS-02` - `/busquedas/[id]`):** Vista dedicada a pantalla completa con navegación Breadcrumb (`Búsquedas / Editar Búsqueda`), insignia `ID: P-BUS-02` y botón de regreso a la lista. Reemplaza el modal lateral al pulsar el botón "Editar" o hacer clic en una fila de la tabla en `ID: P-BUS-01`.
 *   **Formulario de Búsquedas (Cédula de Identidad & Criterios de Screening):** Formulario de alta y edición a pantalla completa con validación previa en cliente. Incluye el constructor dinámico **Criterios de Screening (Máximo 5)** para configurar reglas de descarte excluyentes (`Knockout` con peso 0) o evaluativas ponderadas (`Deseable`).
 *   **Inmutabilidad y Preservación de UUIDs:** Al editar búsquedas activas en `SearchForm.tsx`, las preguntas existentes preservan su UUID v4 (`id`) original para evitar desalineaciones con los resultados previamente evaluados en los pipelines de candidatos.
@@ -135,9 +135,10 @@ El **Módulo de Configuración** provee el control de personalización y operabi
 
 ### Módulo F: Talent Mixer (Postulantes)
 El **Talent Mixer** proporciona la bandeja de entrada inteligente para centralizar todo el padrón de postulantes ingresantes.
-*   **Bandeja Principal (/talento) en Formato Kanban:** Tablero Kanban responsive organizado en 4 columnas de progresión: `PENDIENTE`, `REVISADO`, `SELECCIONADO` y `DESCARTADO (NO SELECCIONAR)`, con soporte para interacciones Drag & Drop e indicadores de estado reactivos.
+*   **Bandeja Principal (/talento) en Formato Kanban y Lista Detallada (`ID: P-TAL-01`):** Tablero Kanban responsive organizado en 4 columnas de progresión (`PENDIENTE`, `REVISADO`, `SELECCIONADO` y `DESCARTADO`) y modo de vista **Lista Detallada** con la columna **"Habilidades clave"** renderizada tras las notas iniciales (desplegando los micro-chips de `cand.skills_principales`).
+*   **Búsqueda Multicriterio en Tiempo Real (`ID: P-TAL-01`):** Filtro de búsqueda textual reactivo que evalúa coincidencias insensibles a mayúsculas y minúsculas sobre 5 criterios clave: **Nombre Completo** (`nombre_completo`), **Puesto / Rol** (`puesto`), **Email** (`email`), **Habilidades Clave** (`skills_principales`) y **Notas Iniciales** (`notas_iniciales`).
 *   **Asignación de Búsquedas Activas al SELECCIONAR:** Al mover a un candidato a la columna `SELECCIONADO`, el subtítulo cambia a "Candidatos en búsquedas" y se despliega un modal glassmorphic de asignación de vacantes. El modal permite asociar el candidato a un proceso de búsqueda activo, actualizando su estatus y creando de forma física la postulación dentro del pipeline de Descubrimiento en el estado inicial `01 - NUEVO EN REVISION`.
-*   **Consola DAW (Faders de Calificación IA):** Faders de ecualización analógicos simulados e interactivos dentro de la ficha de detalle (`/talento/[id]`) para calificar en caliente los scores de *Hard Skills*, *Soft Skills*, *Fit Cultural* y *Seniority Index*.
+*   **Ficha de Detalle Simplificada (`/talento/[id]` - `ID: P-TAL-02`):** Perfil del postulante enfocado en datos reales de la base de datos (Habilidades clave, Nivel de inglés, Otros idiomas, Resumen e Historial de notas iniciales) habiendo removido los faders mock y la etiqueta de la antigua consola DAW.
 *   **Slide-over de Alta de Candidato:** Formulario con etiquetas flotantes dinámicas, Drag-and-drop de archivos PDF, control estricto de consentimiento legal y captura inteligente para alertas de error `400 Bad Request` del servidor.
 *   **Importación Asistida por IA:** Popup glassmórfico de importación con zona Drag & Drop compatible con formatos `.pdf`, `.doc` y `.docx` (máx 5MB). Realiza la llamada asíncrona a `POST /api/v1/candidatos/importar-ia` del backend, bloquea la interfaz durante la inferencia y muestra una notificación de éxito reactiva con autorefresco de la base de candidatos tras su creación (201).
 
@@ -288,11 +289,15 @@ El pipeline de selección de **Azul ATS** se organiza en 4 fases progresivas. A 
     ```bash
     export PATH="/Users/dcastellano/.local/node-v20.12.2-darwin-arm64/bin:$PATH" && npx tsx --test tests/busquedas_pantallas.test.js tests/busquedas_migracion.test.js
     ```
-13. **Verificación de Tipos TypeScript:**
+13. **Ejecutar pruebas de Ficha y Lista de Talento (P-TAL-01 y P-TAL-02):**
+    ```bash
+    node --test tests/talento_detalle.test.js
+    ```
+14. **Verificación de Tipos TypeScript:**
     ```bash
     npx tsc --noEmit
     ```
-14. Abre [http://localhost:3000](http://localhost:3000) en el navegador.
+15. Abre [http://localhost:3000](http://localhost:3000) en el navegador.
 
 
 --------------------------------------------------------------------------------------------------------
@@ -349,6 +354,8 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     # Volver a la rama desarrollo para continuar desarrollando
     git checkout develop
     ```
+    Controles:
+    Verificar en Firebase, proyecto prueba, Hosting, el ok en el despliegue.
 
 3.  **Promoción a Producción:**
     Tras la validación funcional satisfactoria en el entorno de Staging, la promoción a Producción se ejecuta mediante el Merge validado desde `develop` hacia `main`:
@@ -363,6 +370,21 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
 --------------------------------------------------------------------------------------------------------
 # Historico de Cambios (ordenados por los recientes cambios primeros, formato de fecha "AAAA/MM/DD")
 
+*   **2026/08/20:** Búsqueda por Habilidades Clave en Talent Mixer (`ID: P-TAL-01`):
+    *   **Ampliación del Filtro de Búsqueda:** Incorporación del campo `skills_principales` a la funcionalidad de búsqueda en tiempo real del panel de filtros de candidatos (`src/app/talento/page.tsx`), permitiendo localizar postulantes por coincidencia textual en Nombre Completo, Rol, Email, Habilidades Clave o Notas Iniciales.
+    *   **Actualización de UI:** Modificación del texto `placeholder` del input a `"Buscar candidato por nombre, rol, email, habilidades o notas..."`.
+    *   **Suite de Pruebas Automatizadas:** Actualización de `tests/talento_filtro_busqueda.test.js` agregando 4 nuevos casos de prueba (11/11 pasadas con 100% éxito) bajo `node:test`.
+
+*   **2026/08/20:** Columna Habilidades Clave en Lista Detallada (`ID: P-TAL-01`) y Simplificación Ficha Detalle (`ID: P-TAL-02`):
+    *   **Columna Habilidades Clave en P-TAL-01:** Adición de la columna "Habilidades clave" en la tabla del modo de vista "Lista Detallada" (`src/app/talento/page.tsx`), renderizando micro-chips dinámicos con el contenido de `cand.skills_principales`.
+    *   **Remoción de Consola DAW y Badge en P-TAL-02:** Eliminación de la etiqueta `DAW Console Active` en la cabecera y de la sección completa `IA Analysis Equalizer Console` con sus 4 faders simulados en `src/app/talento/[id]/page.tsx`.
+    *   **Suite de Pruebas Automatizadas:** Creación de `tests/talento_detalle.test.js` con 100% de éxito en 6/6 pruebas unitarias bajo `node:test`.
+
+*   **2026/08/20:** Búsqueda Avanzada por Notas Iniciales en Talent Mixer (`ID: P-TAL-01`):
+    *   **Ampliación de Criterios de Filtrado:** Incorporación del campo `notas_iniciales` a la funcionalidad de búsqueda en tiempo real del panel de filtros de candidatos (`src/app/talento/page.tsx`), permitiendo localizar postulantes por coincidencia textual en su Nombre, Rol, Email o Notas Iniciales.
+    *   **Actualización de UI:** Modificación del texto `placeholder` del input a `"Buscar candidato por nombre, rol, email o notas..."`.
+    *   **Suite de Pruebas Automatizadas:** Creación del archivo `tests/talento_filtro_busqueda.test.js` con 7/7 pruebas unitarias aprobadas bajo `node:test`.
+
 *   **2026/08/19:** Módulo de Entrevista de Screening (Origen Transcripción de Reunión con IA Gemini 2.5 Flash):
     *   **Análisis Inteligente de Transcripción:** Integración del componente modal glassmorphic `AnalizarTranscripcionModal` (`ID: M-TRN-01`) para la carga de transcripciones (.pdf, .doc, .docx, .txt <5MB) procesadas en RAM con Gemini 2.5 Flash.
     *   **Tipado Estricto y Persistencia Exclusiva:** Estructuración de datos bajo `f2_evaluacion.informe_entrevista_ia` (`experiencia_consolidada`, `alineacion_motivadores`, `pretension_economica_condiciones`, `proximos_pasos` y `auditoria_veracidad`), omitiendo colisiones con el screening de CV de la Fase 1.
@@ -370,6 +392,19 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     *   **Human-in-the-Loop & UI Optimista:** Edición manual pre-llenada en el modal pre-guardado y mutación asíncrona vía `actualizarInformeEntrevistaAction` (`PATCH /api/v1/pipeline/:id`).
     *   **Smart Scorecard en Detalle y Resúmenes en Kanban (`ID: P-EVA-02` & `ID: P-EVA-01`):** Renderizado de la tarjeta `InformeScreeningCard` con el bloque destacado de **Auditoría de Veracidad** (inconsistencias vs fortalezas) y chips resumen en el Kanban y Lista Detallada.
     *   **Pruebas Automatizadas:** Creación de `tests/analizar_transcripcion.test.js` con 100% de éxito en 4/4 pruebas unitarias.
+
+*   **2026/08/20:** Dinamización de Indicadores KPI por Filtro de Búsqueda y Optimización con `useMemo` en Cabecera `P-DIS-01` (`src/app/descubrimiento/page.tsx`):
+    *   **Filtrado de KPIs por Búsqueda (`selectedSearch`):** Dinamización de los 4 indicadores del encabezado (*TTFME Promedio*, *Outreach Personalization*, *Tasa de Rechazo Inicial* y *Total Sourced Backlog*). Al seleccionar una búsqueda concreta en el desplegable `"Búsqueda:"`, las 4 tarjetas recalculan sus métricas considerando únicamente los candidatos pertenecientes a esa búsqueda. Cuando está seleccionada `"Todas las búsquedas"`, se mantienen los valores acumulados de la base de datos completa.
+    *   **Aislamiento del Buscador Libre (`searchTerm`):** Garantizado que el buscador por texto de tarjetas no altere las métricas analíticas de la cabecera, preservando la estabilidad de la vacante activa.
+    *   **Optimización y Cero Regresiones con `useMemo`:** Implementación del hook `useMemo` en React para derivar `candidatesInSelectedSearch` y la estructura de KPIs de la cabecera, evitando recálculos innecesarios de renderizado al tipear en el input de texto libre.
+    *   **Cálculo Dinámico de TTFME y Outreach con Fallback Benchmark:** Los indicadores *TTFME Promedio* y *Outreach Personalization* procesan datos reales si existen en los candidatos de la búsqueda seleccionada, utilizando como fallback el benchmark de referencia (`1.8 días` / `76.4%`) si la búsqueda es nueva o no tiene suficientes datos.
+    *   **Pruebas Automatizadas:** Ampliación de la suite en `tests/descubrimiento_screening_ia_view.test.js` (Tests 18 y 19) validando la memoización, el aislamiento de `searchTerm`, los cálculos por búsqueda y los fallbacks benchmark (**19/19 pruebas superadas de forma limpia**).
+
+*   **2026/08/20:** Optimización de Datos Backend, Depuración de Mocks y Dinamización de Cabecera en Pantalla P-DIS-01 (`src/app/descubrimiento/page.tsx`):
+    *   **Depuración de Código Muerto Mock:** Eliminación de la constante `INITIAL_SOURCED_CANDIDATES` (6 candidatos hardcodeados) en `page.tsx`, la cual no era utilizada en el flujo activo de la página (el estado se puebla exclusivamente vía `fetchBackEndData()`).
+    *   **Eliminación de Insignia de Cabecera Ref:** Remoción completa del elemento de insignia `Ref:` de la cabecera de `P-DIS-01`, evitando la visualización redundante de identificadores o hashes técnicos en la interfaz.
+    *   **Notificación Estricta de Errores de Ingesta:** Reemplazo de la creación de candidatos mock locales ficticios (`Recién Ingestado (Mock)`) en el bloque `catch` de ingesta por notificaciones Toast descriptivas (`setToast(...)`), evitando datos fantasma en el frontend ante fallas de backend.
+    *   **Pruebas Automatizadas:** Ampliación de la suite en `tests/descubrimiento_screening_ia_view.test.js` (Tests 16 y 17) validando la ausencia de constante muerta, la dinamización del badge Ref y el manejo de errores con Toast (**17/17 pruebas superadas de forma limpia**).
 
 *   **2026/08/14:** Actualización de UI/UX en Pantalla P-DIS-01 (Descubrimiento):
     *   **Cambio de Etiqueta en Botón de Ingesta Inteligente:** Se actualizó el texto del botón principal de ingesta en la cabecera de la pantalla `P-DIS-01` de **`Parser Ingesta CV`** a **`Importar Postulante con IA`**.
@@ -784,6 +819,16 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     *   **Inclusión de Propiedades de Vacante en Candidato:** Inyección de `searchId`, `searchCode`, `searchRole` y `searchClient` en los modelos de candidato (`SourcedCandidate`, `EvaluacionCandidate`, `PresentacionCandidate`, `CierreCandidate`) y en los utilitarios de mapeo (`src/lib/presentacion.ts`, `src/lib/cierre.ts`).
     *   **Regla de Filtrado Multicapa Resiliente (`matchesSearchFilter`):** Se actualizó el filtrado en las 4 páginas del pipeline (`descubrimiento`, `evaluacion`, `presentacion`, `cierre`) para evaluar la coincidencia del candidato por ID técnico (`searchId`), por código legible (`searchCode`), por título compuesto de vacante (`searchRoleCombined`) o por puesto individual. Esto soluciona la divergencia cuando `cand.puesto` ("No especificado") difiere de `busq.perfil_busqueda` y garantiza que los candidatos se muestren correctamente en el tablero al filtrar por una búsqueda.
     *   **Identificadores Técnicos en Valores `<option>`:** Estandarización de `value={b.id_busqueda || b.id}` en los elementos `<select>` manteniendo las etiquetas legibles `[codigo_busqueda] Cliente - Perfil`.
+
+*   **20/08/2026:** Destacado de Búsqueda Relacionada e Integración No Invasiva de Expediente P-TAL-02 en Pantalla `ID: P-DIS-02` (`/descubrimiento/[id]`):
+    *   **Tarjeta Banner Glassmorphic de Búsqueda Relacionada:** Inserción de una tarjeta banner de alta visibilidad ubicada justo encima de la Ficha del Candidato en `P-DIS-02`, mostrando `codigo_busqueda` (ej. `[BUS-001]`), perfil del puesto, cliente y acceso rápido a `/busquedas`.
+    *   **Acordeón Glassmorphic P-TAL-02 con Badges de Resumen:** Adición de la sección desplegable `"Ficha Completa del Postulante (P-TAL-02)"`. En estado colapsado muestra una tira de vista rápida con badges de Habilidades Clave (`skills_principales`), Nivel de Inglés (`nivel_ingles`) y botones de contacto (Email / Teléfono). Al desplegarse en 1 clic, expone la totalidad del expediente del postulante (Email, Teléfono, Skills, Nivel de Inglés, Otros Idiomas, Resumen Profesional IA, Rubros, Origen del Perfil, Estado de Revisión y Fecha de Registro) con soporte para edición y guardado sincrónico en el backend.
+    *   **Análisis Documentado de Datos Mocks:** Auditoría y documentación de los 6 objetos/mecanismos simulados existentes en `P-DIS-02` (`SEMANTIC_MATCH_DB` & `getDynamicMatchResult`, `ttfme`, plantillas outreach A/B, chat triage WhatsApp, `defaults` de canales y `score: 80` por defecto), manteniéndolos intactos según indicación del usuario.
+    *   **Pruebas Automatizadas:** Creación de la suite de pruebas unitarias/integración `tests/descubrimiento_busqueda_talento.test.js` (4/4 tests pasando) verificando la presencia del banner destacado de búsqueda, el estado del acordeón `isTalentoAccordionOpen` y la renderización de todos los atributos de `P-TAL-02`.
+
+*   **20/08/2026:** Migración del Modal de Alta a Pantalla Completa en Maestro de Búsquedas (`ID: P-BUS-01` / `P-BUS-02`):
+    *   **Alta a Pantalla Completa ("+ Nueva Búsqueda"):** Sustituido el panel lateral (Slide-over) de 512px por un modal/vista a pantalla completa homologado a la pantalla de edición `ID: P-BUS-02`. Incorpora cabecera con botón de retorno ("Volver a Búsquedas"), insígnias `ID: P-BUS-02` / `P-BUS-01-ALTA`, fondo ambiental `ambient-blur` y formulario de 2 columnas con botones de guardado directos.
+    *   **Pruebas Automatizadas:** Creación del archivo de pruebas unitarias/integración `tests/busquedas_crear_fullscreen.test.js` verificando el contrato de datos del formulario y la interacción con la Server Action `crearBusquedaAPI`.
 
 *   **13/08/2026:** Requerimiento Funcional en Pantalla P-DIS-01 (Descubrimiento): Incorporación de la vista "Lista Screening IA":
     *   **3er Modo de Vista en Sección de Filtros:** Expansión del selector de vistas (`Kanban`, `Lista Detallada`, `Lista Screening IA`) con ícono `Sparkles` y resplandor esmeralda. El filtro por estado `Estado Cand.` se encuentra disponible dinámicamente para ambos modos de lista.

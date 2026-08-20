@@ -33,7 +33,9 @@ import {
   Calendar,
   Video,
   Plus,
-  Share2
+  Share2,
+  Mail,
+  Phone
 } from "lucide-react";
 import { analyzeSemanticMatchLive, generateOutreachMessageLive, SemanticMatchResult } from "@/lib/gemini";
 
@@ -75,6 +77,16 @@ interface SourcedCandidate {
   reuniones?: Reunion[];
   url_cv?: string;
   canal_ingreso?: string | null;
+  email?: string;
+  telefono_movil?: string;
+  skills_principales?: string;
+  nivel_ingles?: string;
+  otros_idiomas?: string;
+  resumen?: string;
+  rubros?: string;
+  origen?: string;
+  estado_revision?: string;
+  createdAt?: string;
 }
 
 const SEMANTIC_MATCH_DB: Record<string, SemanticMatchResult> = {
@@ -263,7 +275,17 @@ const mapSinglePipelineToSourcedCandidate = (
     rejectionReason,
     reuniones: pipe?.f1_descubrimiento?.reuniones || [],
     url_cv: cand.url_cv || undefined,
-    canal_ingreso: cand.canal_ingreso || null
+    canal_ingreso: cand.canal_ingreso || null,
+    email: cand.email || undefined,
+    telefono_movil: cand.telefono_movil || undefined,
+    skills_principales: cand.skills_principales || undefined,
+    nivel_ingles: cand.nivel_ingles || undefined,
+    otros_idiomas: cand.otros_idiomas || undefined,
+    resumen: cand.resumen || undefined,
+    rubros: cand.rubros || undefined,
+    origen: cand.origen || undefined,
+    estado_revision: cand.estado_revision || undefined,
+    createdAt: cand.createdAt || undefined
   };
 };
 
@@ -303,6 +325,16 @@ export default function SourcedCandidateDetailPage() {
   const [editPortfolio, setEditPortfolio] = useState("");
   const [editBlockReason, setEditBlockReason] = useState("");
   const [editRejectionReason, setEditRejectionReason] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editTelefono, setEditTelefono] = useState("");
+  const [editSkills, setEditSkills] = useState("");
+  const [editNivelIngles, setEditNivelIngles] = useState("");
+  const [editOtrosIdiomas, setEditOtrosIdiomas] = useState("");
+  const [editResumen, setEditResumen] = useState("");
+  const [editRubros, setEditRubros] = useState("");
+
+  // P-TAL-02 Collapsible Accordion State
+  const [isTalentoAccordionOpen, setIsTalentoAccordionOpen] = useState(false);
 
   // Simulated integrations states
   const [enriching, setEnriching] = useState(false);
@@ -737,6 +769,13 @@ export default function SourcedCandidateDetailPage() {
     setEditPortfolio(c.socialLinks?.portfolio || "");
     setEditBlockReason(c.blockReason || "");
     setEditRejectionReason(c.rejectionReason || "");
+    setEditEmail(c.email || "");
+    setEditTelefono(c.telefono_movil || "");
+    setEditSkills(c.skills_principales || "");
+    setEditNivelIngles(c.nivel_ingles || "");
+    setEditOtrosIdiomas(c.otros_idiomas || "");
+    setEditResumen(c.resumen || "");
+    setEditRubros(c.rubros || "");
   };
 
   const handleUpdateCandidatesList = (updatedList: SourcedCandidate[]) => {
@@ -765,6 +804,13 @@ export default function SourcedCandidateDetailPage() {
       if (editMotivation.trim() !== cand?.motivationNote) candPayload.notas_iniciales = editMotivation.trim();
       if (editPortfolio.trim() !== cand?.socialLinks?.portfolio) candPayload.linkedin_url = editPortfolio.trim();
       if (editCanalIngreso.trim() !== (cand?.canal_ingreso || "")) candPayload.canal_ingreso = editCanalIngreso.trim();
+      if (editEmail.trim() !== (cand?.email || "")) candPayload.email = editEmail.trim();
+      if (editTelefono.trim() !== (cand?.telefono_movil || "")) candPayload.telefono_movil = editTelefono.trim();
+      if (editSkills.trim() !== (cand?.skills_principales || "")) candPayload.skills_principales = editSkills.trim();
+      if (editNivelIngles.trim() !== (cand?.nivel_ingles || "")) candPayload.nivel_ingles = editNivelIngles.trim();
+      if (editOtrosIdiomas.trim() !== (cand?.otros_idiomas || "")) candPayload.otros_idiomas = editOtrosIdiomas.trim();
+      if (editResumen.trim() !== (cand?.resumen || "")) candPayload.resumen = editResumen.trim();
+      if (editRubros.trim() !== (cand?.rubros || "")) candPayload.rubros = editRubros.trim();
 
       if (cand && Object.keys(candPayload).length > 0) {
         const res = await actualizarCandidatoAPI(cand.id, candPayload);
@@ -1370,6 +1416,62 @@ export default function SourcedCandidateDetailPage() {
           
           {/* Main Area: F1 Discovery Card */}
           <div className="lg:col-span-2 space-y-6">
+
+            {/* Tarjeta Banner Glassmorphic de Búsqueda Relacionada (Destacado) */}
+            <div className="glass-panel rounded-3xl p-5 border border-[#6bd8cb]/30 bg-gradient-to-r from-[#6bd8cb]/10 via-[#15181a] to-[#15181a] relative overflow-hidden shadow-lg shadow-[#6bd8cb]/5">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-[#6bd8cb]/15 border border-[#6bd8cb]/30 text-[#6bd8cb] shrink-0">
+                    <Building2 className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] uppercase tracking-wider text-[#6bd8cb] font-bold block">
+                        Búsqueda Relacionada al Pipeline
+                      </span>
+                      {activeBusquedaObj?.codigo_busqueda && (
+                        <span className="px-2 py-0.5 rounded-md bg-[#6bd8cb]/20 border border-[#6bd8cb]/30 text-[#6bd8cb] font-mono text-[10px] font-bold select-all">
+                          {activeBusquedaObj.codigo_busqueda}
+                        </span>
+                      )}
+                      {activeBusquedaObj?.estado && (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                          {activeBusquedaObj.estado}
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="text-base font-extrabold text-white tracking-tight">
+                      {activeBusquedaObj?.perfil_busqueda || cand.role}
+                    </h2>
+                    <p className="text-xs text-[#c4c1fb] font-medium flex items-center gap-2 flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5 text-[#c4c1fb]/70" />
+                        Cliente: <strong className="text-white">{activeBusquedaObj?.cliente || cand.client}</strong>
+                      </span>
+                      {activeBusquedaObj?.ubicacion && (
+                        <>
+                          <span className="text-white/20">•</span>
+                          <span className="flex items-center gap-1 text-[#879391]">
+                            <MapPin className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                            {activeBusquedaObj.ubicacion}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <Link
+                  href="/busquedas"
+                  className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-[#6bd8cb]/15 hover:border-[#6bd8cb]/40 hover:text-[#6bd8cb] text-xs font-bold text-white transition-all flex items-center gap-1.5 shrink-0 self-start sm:self-auto cursor-pointer"
+                  title="Ver todas las búsquedas o expediente de búsqueda"
+                >
+                  <span>Ver Búsquedas</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
             <div className="glass-panel rounded-3xl p-6 border border-white/10 relative overflow-hidden space-y-6">
               
               {/* Header Info */}
@@ -1751,6 +1853,223 @@ export default function SourcedCandidateDetailPage() {
                         <span>{enriching ? "Escaneando..." : "Descubrir Huella Digital"}</span>
                       </button>
                     )}
+                  </div>
+                )}
+              </div>
+
+              {/* Acordeón Glassmorphic de Expediente Postulante (P-TAL-02) */}
+              <div className="border-t border-white/10 pt-5 space-y-3 text-left">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <button
+                    onClick={() => setIsTalentoAccordionOpen(!isTalentoAccordionOpen)}
+                    className="flex items-center gap-2 text-left cursor-pointer group focus:outline-none"
+                  >
+                    <div className="p-1.5 rounded-lg bg-[#6bd8cb]/10 border border-[#6bd8cb]/20 text-[#6bd8cb] group-hover:bg-[#6bd8cb] group-hover:text-stone-950 transition-all">
+                      <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isTalentoAccordionOpen ? "rotate-90" : ""}`} />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-white uppercase tracking-wider group-hover:text-[#6bd8cb] transition-colors flex items-center gap-2 flex-wrap">
+                        <span>Ficha Completa del Postulante (P-TAL-02)</span>
+                        <span className="text-[9px] font-mono bg-white/5 text-[#879391] px-2 py-0.5 rounded-full border border-white/10">
+                          {isTalentoAccordionOpen ? "Ocultar" : "Ver Expediente"}
+                        </span>
+                      </h3>
+                      <p className="text-[10px] text-[#879391]">
+                        Perfil del postulante (Skills, Inglés, Contacto, Resumen y Rubros)
+                      </p>
+                    </div>
+                  </button>
+
+                  {!isTalentoAccordionOpen && (
+                    <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto">
+                      {cand.nivel_ingles && (
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+                          Inglés: {cand.nivel_ingles}
+                        </span>
+                      )}
+                      {cand.email && (
+                        <a
+                          href={`mailto:${cand.email}`}
+                          className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white transition-all text-xs"
+                          title={`Email: ${cand.email}`}
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      {cand.telefono_movil && (
+                        <span
+                          className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-white/70 text-xs"
+                          title={`Teléfono: ${cand.telefono_movil}`}
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Vista previa reducida de Habilidades Clave en modo colapsado */}
+                {!isTalentoAccordionOpen && cand.skills_principales && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {cand.skills_principales.split(",").map((skill, idx) => (
+                      <span
+                        key={idx}
+                        className="text-[10px] font-medium text-[#6bd8cb] bg-[#6bd8cb]/10 px-2.5 py-0.5 rounded-lg border border-[#6bd8cb]/20"
+                      >
+                        {skill.trim()}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Panel Completo Desplegado P-TAL-02 */}
+                {isTalentoAccordionOpen && (
+                  <div className="p-4 rounded-2xl bg-stone-950/40 border border-white/10 space-y-4 text-left">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      
+                      {/* Email */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-white/40 block">Correo Electrónico</span>
+                        {isEditing ? (
+                          <input
+                            type="email"
+                            value={editEmail}
+                            onChange={(e) => setEditEmail(e.target.value)}
+                            className="bg-white/5 border border-white/10 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-2 text-white font-medium">
+                            <Mail className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                            {cand.email ? (
+                              <a href={`mailto:${cand.email}`} className="hover:underline">{cand.email}</a>
+                            ) : (
+                              <span className="text-white/40 italic">No especificado</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Teléfono Móvil */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-white/40 block">Teléfono Móvil</span>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editTelefono}
+                            onChange={(e) => setEditTelefono(e.target.value)}
+                            className="bg-white/5 border border-white/10 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-2 text-white font-medium">
+                            <Phone className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                            <span>{cand.telefono_movil || "No especificado"}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Nivel de Inglés */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-white/40 block">Nivel de Inglés</span>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editNivelIngles}
+                            onChange={(e) => setEditNivelIngles(e.target.value)}
+                            placeholder="Ej: B2, C1, Nativo"
+                            className="bg-white/5 border border-white/10 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none"
+                          />
+                        ) : (
+                          <span className="text-white font-medium">{cand.nivel_ingles || "No especificado"}</span>
+                        )}
+                      </div>
+
+                      {/* Otros Idiomas */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-white/40 block">Otros Idiomas</span>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editOtrosIdiomas}
+                            onChange={(e) => setEditOtrosIdiomas(e.target.value)}
+                            placeholder="Ej: Francés, Alemán"
+                            className="bg-white/5 border border-white/10 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none"
+                          />
+                        ) : (
+                          <span className="text-white font-medium">{cand.otros_idiomas || "No especificados"}</span>
+                        )}
+                      </div>
+
+                      {/* Origen del candidato & Estado Revisión */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-white/40 block">Origen del Perfil</span>
+                        <span className="text-white font-medium">{cand.origen || "Postulación Directa"}</span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-white/40 block">Estado Revisión General</span>
+                        <span className="text-indigo-300 font-medium">{cand.estado_revision || "Pendiente"}</span>
+                      </div>
+                    </div>
+
+                    {/* Habilidades Clave */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-[#6bd8cb] block">Habilidades Clave</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editSkills}
+                          onChange={(e) => setEditSkills(e.target.value)}
+                          placeholder="Etiquetas separadas por comas (ej: React, TypeScript, Node.js)"
+                          className="bg-white/5 border border-white/10 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none"
+                        />
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {cand.skills_principales ? (
+                            cand.skills_principales.split(",").map((s, idx) => (
+                              <span key={idx} className="text-xs font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2.5 py-1 rounded-xl border border-[#6bd8cb]/20">
+                                {s.trim()}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-white/40 italic">Sin habilidades clave registradas</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Resumen Profesional */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-white/40 block">Resumen Profesional (IA / Extraído)</span>
+                      {isEditing ? (
+                        <textarea
+                          value={editResumen}
+                          onChange={(e) => setEditResumen(e.target.value)}
+                          rows={3}
+                          placeholder="Resumen del candidato..."
+                          className="bg-white/5 border border-white/10 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none resize-none"
+                        />
+                      ) : (
+                        <p className="text-xs text-white/80 leading-relaxed font-medium bg-white/5 p-3 rounded-xl border border-white/5">
+                          {cand.resumen || "Sin resumen profesional disponible."}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Rubros / Sectores */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-white/40 block">Rubros y Sectores Clave</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editRubros}
+                          onChange={(e) => setEditRubros(e.target.value)}
+                          placeholder="Ej: Banca, Telecom, Seguros"
+                          className="bg-white/5 border border-white/10 p-2 text-xs rounded-lg text-white w-full focus:border-[#6bd8cb] focus:outline-none"
+                        />
+                      ) : (
+                        <span className="text-xs text-white font-medium">{cand.rubros || "Sin especificar"}</span>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

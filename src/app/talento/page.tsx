@@ -393,10 +393,13 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
 
   // Filter candidates list
   const filteredCandidatos = candidatos.filter(c => {
+    const term = searchTerm.toLowerCase();
     const matchesSearch = 
-      c.nombre_completo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.puesto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchTerm.toLowerCase());
+      (c.nombre_completo || "").toLowerCase().includes(term) ||
+      (c.puesto || "").toLowerCase().includes(term) ||
+      (c.email || "").toLowerCase().includes(term) ||
+      (c.skills_principales || "").toLowerCase().includes(term) ||
+      (c.notas_iniciales || "").toLowerCase().includes(term);
 
     const matchesEstado = 
       selectedEstado === "Todos" || c.estado_revision === selectedEstado;
@@ -430,6 +433,10 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
       case "notas":
         aVal = a.notas_iniciales || "";
         bVal = b.notas_iniciales || "";
+        break;
+      case "skills":
+        aVal = a.skills_principales || "";
+        bVal = b.skills_principales || "";
         break;
       case "estado":
         aVal = a.estado_revision || "";
@@ -831,7 +838,7 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar candidato por nombre, rol o email..."
+              placeholder="Buscar candidato por nombre, rol, email, habilidades o notas..."
               className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-[#879391] focus:border-[#6bd8cb] focus:ring-1 focus:ring-[#6bd8cb]/20 focus:outline-none transition-all"
             />
           </div>
@@ -1109,6 +1116,15 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                       </div>
                     </th>
                     <th 
+                      onClick={() => handleSort("skills")}
+                      className="py-4 px-6 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group min-w-[200px] max-w-[320px]"
+                    >
+                      <div className="flex items-center">
+                        <span>Habilidades clave</span>
+                        {renderSortIcon("skills")}
+                      </div>
+                    </th>
+                    <th 
                       onClick={() => handleSort("estado")}
                       className="py-4 px-6 cursor-pointer hover:bg-white/[0.03] hover:text-white select-none transition-colors group text-center"
                     >
@@ -1163,6 +1179,22 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
                             `"${cand.notas_iniciales}"`
                           ) : (
                             <span className="opacity-30">Sin notas iniciales</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 min-w-[200px] max-w-[320px]">
+                        <div className="flex flex-wrap gap-1">
+                          {cand.skills_principales && cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).length > 0 ? (
+                            cand.skills_principales.split(",").map(t => t.trim()).filter(Boolean).map((tag, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2 py-0.5 rounded-lg border border-[#6bd8cb]/20"
+                              >
+                                {tag}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[11px] text-[#879391] italic opacity-30">Sin habilidades registradas</span>
                           )}
                         </div>
                       </td>

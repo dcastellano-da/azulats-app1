@@ -18,9 +18,10 @@ import {
   AlertCircle,
   Contact,
   Settings,
-  Compass
+  Compass,
+  ArrowLeft,
+  Sparkles
 } from "lucide-react";
-import SlideOver from "../components/SlideOver";
 import SearchForm from "../components/SearchForm";
 import MockModeBadge from "../components/MockModeBadge";
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
@@ -42,6 +43,18 @@ export default function BusquedasPage() {
     const technicalId = item.id_busqueda || item.id;
     router.push(`/busquedas/${technicalId}`);
   };
+
+  // Prevent background scroll when full-screen creation view is open
+  useEffect(() => {
+    if (isSlideOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isSlideOpen]);
 
   // Client-side authentication redirection guard
   useEffect(() => {
@@ -105,31 +118,96 @@ export default function BusquedasPage() {
       <div className="ambient-blur-1 top-20 right-20 pointer-events-none"></div>
       <div className="ambient-blur-2 bottom-20 left-20 pointer-events-none"></div>
 
-      {/* Slide-over creation/edit panel */}
-      <SlideOver
-        isOpen={isSlideOpen}
-        onClose={() => {
-          setIsSlideOpen(false);
-          setSelectedSearch(undefined);
-        }}
-        title={selectedSearch ? "Editar Búsqueda" : "Crear Nueva Búsqueda"}
-        submitLabel={selectedSearch ? "Actualizar Búsqueda" : "Guardar Búsqueda"}
-        isSubmitting={isSubmitting}
-      >
-        <SearchForm
-          initialData={selectedSearch}
-          onSuccess={() => {
-            setIsSlideOpen(false);
-            setSelectedSearch(undefined);
-            fetchSearches(); // Refresh table automatically
-          }}
-          onClose={() => {
-            setIsSlideOpen(false);
-            setSelectedSearch(undefined);
-          }}
-          onSubmittingChange={setIsSubmitting}
-        />
-      </SlideOver>
+      {/* Full-Screen Creation View Overlay (P-BUS-02 Style) */}
+      {isSlideOpen && (
+        <div className="fixed inset-0 z-50 bg-[#101415] text-white p-6 md:p-8 overflow-y-auto">
+          {/* Ambient background glows */}
+          <div className="ambient-blur-1 top-20 right-20 pointer-events-none"></div>
+          <div className="ambient-blur-2 bottom-20 left-20 pointer-events-none"></div>
+
+          <div className="relative z-10 max-w-6xl mx-auto space-y-8">
+            
+            {/* Navigation Breadcrumb Header */}
+            <header className="flex flex-col md:flex-row justify-between md:items-center gap-6 pb-6 border-b border-white/10">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setIsSlideOpen(false);
+                      setSelectedSearch(undefined);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs text-[#c4c1fb] hover:bg-white/10 hover:border-white/20 transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Volver a Búsquedas</span>
+                  </button>
+
+                  <span className="text-white/20">/</span>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold text-[#c4c1fb] tracking-widest">Maestro de Búsquedas</span>
+                    <span title="ID de vista para prompts de desarrollo" className="text-[9px] font-mono text-[#6bd8cb]/80 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full select-all cursor-help uppercase tracking-wider font-semibold">
+                      ID: P-BUS-02
+                    </span>
+                    <MockModeBadge />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#0d9488] to-[#6bd8cb] flex items-center justify-center shadow-lg shadow-[#0d9488]/20 shrink-0">
+                    <Plus className="w-5 h-5 text-[#101415]" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-extrabold tracking-tight text-white">
+                      Crear Nueva Búsqueda
+                    </h1>
+                    <p className="text-xs text-[#879391]">
+                      Formulario completo de alta para nuevos procesos de selección
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            {/* Main card container matching P-BUS-02 */}
+            <div className="p-6 md:p-8 rounded-3xl border border-white/10 bg-[#16191b] backdrop-blur-md shadow-2xl space-y-8">
+              
+              {/* Header info banner */}
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="w-5 h-5 text-[#6bd8cb]" />
+                  <div>
+                    <h3 className="text-xs font-extrabold uppercase text-[#6bd8cb] tracking-wider">
+                      Alta a Pantalla Completa
+                    </h3>
+                    <p className="text-[11px] text-[#879391]">
+                      Estructure la ficha técnica del proceso. Al guardar, se creará el registro jerárquico correspondiente en la plataforma ATS.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Full width SearchForm with submit buttons */}
+              <SearchForm
+                initialData={selectedSearch}
+                onSuccess={() => {
+                  setIsSlideOpen(false);
+                  setSelectedSearch(undefined);
+                  fetchSearches(); // Refresh table automatically
+                }}
+                onClose={() => {
+                  setIsSlideOpen(false);
+                  setSelectedSearch(undefined);
+                }}
+                onSubmittingChange={setIsSubmitting}
+                showSubmitButton={true}
+                submitButtonText="Guardar Nueva Búsqueda"
+              />
+            </div>
+
+          </div>
+        </div>
+      )}
 
       <div className="relative z-10 max-w-7xl mx-auto space-y-8">
         
