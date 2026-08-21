@@ -37,7 +37,8 @@ import {
   Trash2,
   Video,
   ExternalLink,
-  Calendar
+  Calendar,
+  Brain
 } from "lucide-react";
 
 // Backend API Actions
@@ -45,9 +46,11 @@ import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, actualizarPipelineAPI, Reunion } from "@/actions/pipeline";
 import { EvaluacionCandidate } from "@/lib/evaluacion";
-import type { InformeEntrevistaIA } from "@/types/screening";
+import type { InformeEntrevistaIA, TestPersonalidad } from "@/types/screening";
 import AnalizarTranscripcionModal from "@/app/components/AnalizarTranscripcionModal";
 import InformeScreeningCard from "@/app/components/InformeScreeningCard";
+import AnalizarTestPersonalidadModal from "@/app/components/AnalizarTestPersonalidadModal";
+import TestPersonalidadCard from "@/app/components/TestPersonalidadCard";
 
 const generateDefaultToolsDetails = (candName: string, role: string, score: number) => {
   const isRust = role.toLowerCase().includes("rust") || role.toLowerCase().includes("architect");
@@ -114,6 +117,10 @@ export default function EvaluacionDetallePage() {
   // Transcripción de Screening IA State
   const [isTranscripcionModalOpen, setIsTranscripcionModalOpen] = useState(false);
   const [informeEntrevistaIA, setInformeEntrevistaIA] = useState<InformeEntrevistaIA | null>(null);
+
+  // Test de Personalidad CFV-V3 State
+  const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+  const [testPersonalidad, setTestPersonalidad] = useState<TestPersonalidad | null>(null);
 
   // Editing state for Recruiter Notes across all phases
   const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -251,6 +258,7 @@ export default function EvaluacionDetallePage() {
         setCand(item);
         setActivePipelineItem(targetPipe || null);
         setInformeEntrevistaIA(targetPipe?.f2_evaluacion?.informe_entrevista_ia || (targetPipe?.evaluacion as any)?.informe_entrevista_ia || null);
+        setTestPersonalidad(targetPipe?.f2_evaluacion?.test_personalidad || (targetPipe?.evaluacion as any)?.test_personalidad || null);
         setEditInitialNotes(initialNotes);
         setEditF1Notes(f1Notes);
         setEditF2Notes(f2Notes);
@@ -624,6 +632,16 @@ export default function EvaluacionDetallePage() {
               <span>Analizar Transcripción</span>
             </button>
 
+            {/* Analizar Test Personalidad Button (CFV-V3) */}
+            <button
+              onClick={() => setIsTestModalOpen(true)}
+              title="Analizar Test de Personalidad con IA (CFV-V3)"
+              className="px-3.5 py-1.5 rounded-xl border border-[#9b5de5]/30 bg-[#9b5de5]/15 hover:bg-[#9b5de5] hover:text-stone-950 text-[#c4c1fb] hover:text-stone-950 transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs shadow-sm shadow-[#9b5de5]/10"
+            >
+              <Brain className="w-3.5 h-3.5" />
+              <span>Analizar Test Personalidad</span>
+            </button>
+
             <span className="text-[10px] font-bold text-[#c4c1fb] bg-[#c4c1fb]/10 px-3 py-1 rounded-full uppercase tracking-wider border border-[#c4c1fb]/20">
               Fase 2: Evaluación Interna
             </span>
@@ -776,6 +794,17 @@ export default function EvaluacionDetallePage() {
               informe={informeEntrevistaIA}
               onEditClick={() => setIsTranscripcionModalOpen(true)}
               onReanalyzeClick={() => setIsTranscripcionModalOpen(true)}
+            />
+
+            {/* Smart Scorecard de Test de Personalidad IA (Cognitive Fit Vision - V3) */}
+            <TestPersonalidadCard
+              pipelineId={cand.pipeId || cand.id}
+              testPersonalidad={testPersonalidad}
+              onReanalyzeClick={() => setIsTestModalOpen(true)}
+              onSaveComplete={(updated) => {
+                setTestPersonalidad(updated);
+                loadCandidateData();
+              }}
             />
 
             {/* Sección de Agendamiento Dinámico de Reuniones */}
@@ -1662,6 +1691,18 @@ export default function EvaluacionDetallePage() {
               }
             });
           }
+        }}
+      />
+
+      {/* Modal: Analizar Test de Personalidad IA (Cognitive Fit Vision - V3) */}
+      <AnalizarTestPersonalidadModal
+        isOpen={isTestModalOpen}
+        onClose={() => setIsTestModalOpen(false)}
+        pipelineId={cand.pipeId || id}
+        candidateName={cand.name}
+        onAnalysisComplete={(nuevoTestData) => {
+          setTestPersonalidad(nuevoTestData);
+          loadCandidateData();
         }}
       />
     </main>

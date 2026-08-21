@@ -54,3 +54,20 @@ export interface InformeEntrevistaIA {
   fecha_analisis?: string;
 }
 
+export interface DimensionesPsicometricas {
+  dim_mente: number;       // Extravertido (0) vs Introvertido (100)
+  dim_energia: number;     // Intuitivo (0) vs Observador (100)
+  dim_naturaleza: number;  // Racional (0) vs Emocional (100)
+  dim_tactica: number;     // Planificador (0) vs Prospectivo (100)
+  dim_identidad: number;   // Asertivo (0) vs Turbulento (100)
+}
+
+export interface TestPersonalidad {
+  arquetipo_codigo: string; // ej. "ENTJ-A", "INFP-T"
+  arquetipo_nombre: string; // ej. "Comandante", "Mediador"
+  dimensiones: DimensionesPsicometricas;
+  analisis_encaje: string;  // Párrafo breve generado por la IA
+  fecha_analisis: string;   // Timestamp ISO 8601 del backend
+}
+
+

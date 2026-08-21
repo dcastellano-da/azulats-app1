@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import type { ResultadoScreeningItem, InformeEntrevistaIA } from "@/types/screening";
+import type { ResultadoScreeningItem, InformeEntrevistaIA, TestPersonalidad } from "@/types/screening";
 import { getApiEndpoint } from "@/utils/api";
 
 export interface Reunion {
@@ -50,6 +50,7 @@ export interface PipelineItem {
     feedback_cliente?: string | null;
     reuniones?: Reunion[] | null;
     informe_entrevista_ia?: InformeEntrevistaIA | null;
+    test_personalidad?: TestPersonalidad | null;
   } | null;
   evaluacion?: {
     notas_reclutador?: string | null;
@@ -57,6 +58,7 @@ export interface PipelineItem {
     feedback_cliente?: string | null;
     reuniones?: Reunion[] | null;
     informe_entrevista_ia?: InformeEntrevistaIA | null;
+    test_personalidad?: TestPersonalidad | null;
   } | null;
   f3_presentacion?: {
     notas_reclutador?: string | null;
@@ -699,6 +701,177 @@ export async function actualizarInformeEntrevistaAction(
     };
   }
 }
+
+/**
+ * Server Action: Inicia la ingesta e inferencia de IA para el Test de Personalidad / Cognitive Fit Vision (CFV) - V3.
+ * POST /api/v1/pipeline/:id/analizar-personalidad
+ * Recibe FormData con la captura en la clave 'imagen'.
+ */
+export async function analizarTestPersonalidadAction(
+  pipelineId: string,
+  formData: FormData
+): Promise<APIResponse> {
+  try {
+    const isMock = process.env.NEXT_PUBLIC_USE_MOCKS === "true";
+    if (isMock) {
+      console.log(`[Pipeline Action] Modo Mocks activo (NEXT_PUBLIC_USE_MOCKS=true). Retornando resultado simulado para test de personalidad.`);
+      const mockTest: TestPersonalidad = {
+        arquetipo_codigo: "ENTJ-A",
+        arquetipo_nombre: "Comandante",
+        dimensiones: {
+          dim_mente: 35,
+          dim_energia: 78,
+          dim_naturaleza: 82,
+          dim_tactica: 90,
+          dim_identidad: 85
+        },
+        analisis_encaje: "Perfil ENTJ-A analizado en Modo Demo/Mock. Demuestra fuerte orientación al logro, alta capacidad de planificación estructurada (90%) y pensamiento racional (82%), ideal para posiciones de liderazgo técnico.",
+        fecha_analisis: new Date().toISOString()
+      };
+      return {
+        status: 200,
+        success: true,
+        message: "Test de personalidad analizado en modo mock.",
+        data: {
+          test_personalidad: mockTest
+        }
+      };
+    }
+
+    const token = await getServerAuthToken();
+    const url = getApiEndpoint(`pipeline/${encodeURIComponent(pipelineId)}/analizar-personalidad`);
+    console.log(`[Pipeline Action] Enviando captura de test de personalidad a: ${url}`);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+        // Multipart FormData no lleva Content-Type explícito para preservar el boundary
+      },
+      body: formData
+    });
+
+    const status = response.status;
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch (_) {}
+
+    if (status === 200) {
+      revalidatePath(`/evaluacion/${pipelineId}`);
+      revalidatePath("/evaluacion");
+      return {
+        status,
+        success: true,
+        message: "Test de personalidad analizado e inyectado correctamente por la IA.",
+        data: data?.data || data
+      };
+    }
+
+    if (status === 404) {
+      return {
+        status,
+        success: false,
+        message: data?.message || data?.error || `Ruta no encontrada en el backend (HTTP 404). Por favor verifica que el microservicio Express local o remoto esté ejecutando la versión actualizada que incluye la ruta POST /api/v1/pipeline/${pipelineId}/analizar-personalidad.`,
+        data
+      };
+    }
+
+    if (status === 400) {
+      return {
+        status,
+        success: false,
+        message: data?.message || data?.error || "La imagen enviada no posee un formato válido (solo PNG, JPG, JPEG, WEBP <5MB).",
+        data
+      };
+    }
+
+    if (status === 429) {
+      return {
+        status,
+        success: false,
+        message: data?.message || data?.error || "Límite de cuota excedido en el motor de IA (Resource Exhausted - 429). Por favor reintenta en unos instantes.",
+        data
+      };
+    }
+
+    return {
+      status,
+      success: false,
+      message: data?.message || data?.error || `Error en el servidor backend al procesar la imagen (Código HTTP ${status}).`,
+      data
+    };
+  } catch (error: any) {
+    console.error("[Pipeline Action] Error en analizarTestPersonalidadAction:", error);
+    return {
+      status: 500,
+      success: false,
+      message: `Error de red al conectar con el servicio de IA: ${error.message || error}`
+    };
+  }
+}
+
+/**
+ * Server Action: Actualiza manualmente f2_evaluacion.test_personalidad (Human-in-the-Loop).
+ * PATCH /api/v1/pipeline/:id
+ */
+export async function actualizarTestPersonalidadAction(
+  pipelineId: string,
+  testPersonalidad: TestPersonalidad
+): Promise<APIResponse> {
+  try {
+    const token = await getServerAuthToken();
+    const url = getApiEndpoint(`pipeline/${encodeURIComponent(pipelineId)}`);
+
+    const payload = {
+      f2_evaluacion: {
+        test_personalidad: testPersonalidad
+      }
+    };
+
+    console.log(`[Pipeline Action] Actualizando test_personalidad Human-in-the-Loop en: ${url}`);
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const status = response.status;
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch (_) {}
+
+    if (status === 200) {
+      revalidatePath(`/evaluacion/${pipelineId}`);
+      revalidatePath("/evaluacion");
+      return {
+        status,
+        success: true,
+        message: "Test de personalidad actualizado correctamente.",
+        data: data?.data || data
+      };
+    }
+
+    return {
+      status,
+      success: false,
+      message: data?.message || data?.error || `Error al actualizar el test de personalidad (Código HTTP ${status}).`,
+      data
+    };
+  } catch (error: any) {
+    console.error("[Pipeline Action] Error en actualizarTestPersonalidadAction:", error);
+    return {
+      status: 500,
+      success: false,
+      message: `Error de red al conectar con el servidor: ${error.message || error}`
+    };
+  }
+}
+
 
 
 

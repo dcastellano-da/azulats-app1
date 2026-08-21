@@ -45,7 +45,8 @@ import {
   Eye,
   Camera,
   ChevronsRight,
-  HelpCircle
+  HelpCircle,
+  Brain
 } from "lucide-react";
 import { 
   EvaluacionCandidate, 
@@ -57,6 +58,9 @@ import {
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, Candidato } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, actualizarPipelineAPI } from "@/actions/pipeline";
+import DensitySelector, { DensityMode } from "@/components/screening/DensitySelector";
+import TestPersonalidadTable from "@/components/evaluacion/TestPersonalidadTable";
+import AnalizarTestPersonalidadModal from "@/app/components/AnalizarTestPersonalidadModal";
 
 export default function EvaluacionPage() {
   const router = useRouter();
@@ -71,7 +75,10 @@ export default function EvaluacionPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSearch, setSelectedSearch] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
-  const [viewMode, setViewMode] = useState<"kanban" | "lista">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "lista" | "test_personalidad">("kanban");
+  const [density, setDensity] = useState<DensityMode>("compact");
+  const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+  const [selectedCandidateForTest, setSelectedCandidateForTest] = useState<EvaluacionCandidate | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   
   // Toast notification state
@@ -798,6 +805,11 @@ export default function EvaluacionPage() {
                 </select>
               </div>
             )}
+
+            {/* Density Selector - Test Personalidad View exclusive */}
+            {viewMode === "test_personalidad" && (
+              <DensitySelector density={density} onChange={setDensity} />
+            )}
           </div>
 
           {/* Toggle buttons for viewMode and Fullscreen */}
@@ -824,6 +836,18 @@ export default function EvaluacionPage() {
               >
                 <List className="w-3.5 h-3.5" />
                 <span>Lista detallada</span>
+              </button>
+              <button
+                onClick={() => setViewMode("test_personalidad")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === "test_personalidad"
+                    ? "bg-[#6bd8cb] text-[#101415] shadow shadow-[#0d9488]/10"
+                    : "text-[#879391] hover:text-white"
+                }`}
+                title="Nueva Vista: Lista Test Personalidad (ID: P-EVA-01)"
+              >
+                <Brain className="w-3.5 h-3.5" />
+                <span>Lista Test Personalidad</span>
               </button>
             </div>
 
@@ -976,7 +1000,7 @@ export default function EvaluacionPage() {
             </div>
 
           </div>
-        ) : (
+        ) : viewMode === "lista" ? (
           /* Detailed List Layout */
           <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-md animate-fadeIn text-left">
             <table className="w-full text-xs text-left">
@@ -996,6 +1020,9 @@ export default function EvaluacionPage() {
                   </th>
                   <th className="px-5 py-4 min-w-[320px]">
                     Scorecard Entrevista IA
+                  </th>
+                  <th className="px-5 py-4 min-w-[240px]">
+                    Test Personalidad
                   </th>
                   <th className="px-5 py-4 cursor-pointer hover:text-white text-center" onClick={() => toggleSort("cnps")}>
                     cNPS {renderSortIcon("cnps")}
@@ -1202,6 +1229,31 @@ export default function EvaluacionPage() {
                           <span className="text-[#879391]/40 text-[10px] italic block">Sin entrevista de screening IA</span>
                         )}
                       </td>
+                      {/* Columna Resumen: Test Personalidad (P-EVA-01) */}
+                      <td className="py-4 px-5 min-w-[240px] max-w-[300px]">
+                        {cad.test_personalidad && cad.test_personalidad.arquetipo_codigo ? (
+                          <div className="p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-[#9b5de5]/30 transition-all space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#9b5de5]/20 border border-[#9b5de5]/30 text-[9.5px] font-bold text-[#c4c1fb]">
+                                <Brain className="w-3 h-3 text-[#9b5de5]" />
+                                <span>{cad.test_personalidad.arquetipo_codigo}</span>
+                              </span>
+                              {cad.test_personalidad.arquetipo_nombre && (
+                                <span className="text-[9.5px] font-bold text-white/90 truncate">
+                                  "{cad.test_personalidad.arquetipo_nombre}"
+                                </span>
+                              )}
+                            </div>
+                            {cad.test_personalidad.analisis_encaje && (
+                              <p className="text-[10px] text-[#879391] line-clamp-1 italic">
+                                "{cad.test_personalidad.analisis_encaje}"
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[#879391]/40 text-[10px] italic block">Sin test de personalidad</span>
+                        )}
+                      </td>
                       <td className="px-5 py-4 text-center font-mono font-bold text-sm text-[#c4c1fb]">
                         {cad.cNPS !== undefined ? cad.cNPS : "-"}
                       </td>
@@ -1335,9 +1387,42 @@ export default function EvaluacionPage() {
               </tbody>
             </table>
           </div>
+        ) : (
+          /* Nueva Vista "Lista Test Personalidad" (ID: P-EVA-01) */
+          <TestPersonalidadTable
+            candidates={filteredCandidates}
+            density={density}
+            handleViewCv={handleViewCv}
+            onOpenAnalysisModal={(cad) => {
+              setSelectedCandidateForTest(cad);
+              setIsTestModalOpen(true);
+            }}
+            onViewDetails={handleViewDetails}
+          />
         )}
 
       </div>
+
+      {/* Modal Ingesta Test Personalidad CFV-V3 */}
+      {selectedCandidateForTest && (
+        <AnalizarTestPersonalidadModal
+          isOpen={isTestModalOpen}
+          onClose={() => {
+            setIsTestModalOpen(false);
+            setSelectedCandidateForTest(null);
+          }}
+          pipelineId={selectedCandidateForTest.pipeId || selectedCandidateForTest.id}
+          candidateName={selectedCandidateForTest.name}
+          onAnalysisComplete={() => {
+            fetchBackendData();
+            setToast({
+              type: "success",
+              message: "Test de personalidad analizado e inyectado correctamente."
+            });
+            setTimeout(() => setToast(null), 4000);
+          }}
+        />
+      )}
 
 
       {/* Modal Emergente Mejorado: Confirmar Cambio de Fase a Cliente (Fase 3) */}
@@ -1516,6 +1601,28 @@ function KanbanCard({
             <div className="text-[9px] text-[#c4c1fb]">
               Modalidad: {cad.informe_entrevista_ia.pretension_economica_condiciones.modalidad_preferida}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Test de Personalidad summary badge (CFV-V3) */}
+      {cad.test_personalidad && cad.test_personalidad.arquetipo_codigo && (
+        <div className="p-2 rounded-xl bg-[#9b5de5]/10 border border-[#9b5de5]/30 text-[10px] space-y-1 text-left shadow-sm">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#9b5de5]/20 border border-[#9b5de5]/30 text-[9.5px] font-bold text-[#c4c1fb]">
+              <Brain className="w-3 h-3 text-[#9b5de5]" />
+              <span>{cad.test_personalidad.arquetipo_codigo}</span>
+            </span>
+            {cad.test_personalidad.arquetipo_nombre && (
+              <span className="text-[9.5px] font-bold text-white/90 truncate">
+                "{cad.test_personalidad.arquetipo_nombre}"
+              </span>
+            )}
+          </div>
+          {cad.test_personalidad.analisis_encaje && (
+            <p className="text-[9.5px] text-[#879391] line-clamp-2 italic leading-relaxed">
+              "{cad.test_personalidad.analisis_encaje}"
+            </p>
           )}
         </div>
       )}
