@@ -11,7 +11,8 @@ import {
   Clock, 
   MoreHorizontal, 
   Compass, 
-  Sliders 
+  Sliders,
+  HelpCircle
 } from 'lucide-react';
 import type { EvaluacionCandidate } from '@/lib/evaluacion';
 import type { DensityMode } from '@/components/screening/DensitySelector';
@@ -58,20 +59,20 @@ export default function TestPersonalidadTable({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-white/10 bg-[#161a1b]/80 text-[10px] uppercase font-bold tracking-wider text-[#c4c1fb]">
-              <th className="py-3.5 px-4 select-none min-w-[200px]">
-                <span>Candidato</span>
+              <th className="py-3.5 px-4 select-none min-w-[200px] cursor-pointer hover:text-white" onClick={() => handleSort?.('name')}>
+                <span>Candidato</span> {renderSortIcon?.('name')}
               </th>
-              <th className="py-3.5 px-4 select-none min-w-[140px]">
-                <span>Arquetipo Extraído</span>
+              <th className="py-3.5 px-4 select-none min-w-[140px] cursor-pointer hover:text-white" onClick={() => handleSort?.('archetype')}>
+                <span>Arquetipo Extraído</span> {renderSortIcon?.('archetype')}
               </th>
-              <th className="py-3.5 px-4 select-none min-w-[320px] max-w-[420px]">
-                <span>Dimensiones Psicométricas</span>
+              <th className="py-3.5 px-4 select-none min-w-[320px] max-w-[420px] cursor-pointer hover:text-white" onClick={() => handleSort?.('dimensions')}>
+                <span>Dimensiones Psicométricas</span> {renderSortIcon?.('dimensions')}
               </th>
-              <th className="py-3.5 px-4 select-none min-w-[280px] max-w-[400px]">
-                <span>Veredicto de Alineación (Cultural Fit)</span>
+              <th className="py-3.5 px-4 select-none min-w-[280px] max-w-[400px] cursor-pointer hover:text-white" onClick={() => handleSort?.('verdict')}>
+                <span>Veredicto de Alineación (Cultural Fit)</span> {renderSortIcon?.('verdict')}
               </th>
-              <th className="py-3.5 px-4 select-none min-w-[130px]">
-                <span>Fecha Análisis</span>
+              <th className="py-3.5 px-4 select-none min-w-[220px] max-w-[320px] cursor-pointer hover:text-white" onClick={() => handleSort?.('notes')}>
+                <span>NOTAS RECLUTADOR EVALUACIONES</span> {renderSortIcon?.('notes')}
               </th>
               <th className="py-3.5 px-4 text-center select-none text-[#c4c1fb]/50 min-w-[200px]">
                 Acciones
@@ -86,10 +87,13 @@ export default function TestPersonalidadTable({
                 </td>
               </tr>
             ) : (
-              candidates.map((cad) => {
+              candidates.map((cad, index) => {
                 const test = cad.test_personalidad;
                 const dims = getDimensionBars(test?.dimensiones);
                 const paddingClass = density === 'compact' ? 'py-3 px-4' : 'py-5 px-5';
+                const isTopRow = index < 2;
+                const popoverPosVerdict = isTopRow ? 'top-full mt-2 left-1/2 -translate-x-1/2' : 'bottom-full mb-2 left-1/2 -translate-x-1/2';
+                const popoverPosNotes = isTopRow ? 'top-full mt-2 right-0' : 'bottom-full mb-2 right-0';
 
                 return (
                   <tr key={cad.id} className="hover:bg-white/[0.02] transition-colors">
@@ -190,11 +194,31 @@ export default function TestPersonalidadTable({
                     </td>
 
                     {/* Veredicto de Alineación (Cultural Fit) */}
-                    <td className={`${paddingClass} min-w-[280px] max-w-[400px]`}>
+                    <td className={`${paddingClass} min-w-[280px] max-w-[400px] relative group`}>
                       {test && test.analisis_encaje ? (
-                        <p className={`text-[10.5px] text-white/90 leading-relaxed font-normal ${density === 'compact' ? 'line-clamp-2' : ''}`}>
-                          "{test.analisis_encaje}"
-                        </p>
+                        <>
+                          <div className="flex items-start gap-1.5 cursor-help">
+                            <p className={`text-[10.5px] text-white/90 leading-relaxed font-normal flex-grow ${density === 'compact' ? 'line-clamp-2' : ''}`}>
+                              "{test.analisis_encaje}"
+                            </p>
+                            <span className="shrink-0 p-0.5 rounded-full bg-[#9b5de5]/20 text-[#c4c1fb] group-hover:bg-[#9b5de5] group-hover:text-black transition-all mt-0.5" title="Ver veredicto completo">
+                              <HelpCircle className="w-3.5 h-3.5" />
+                            </span>
+                          </div>
+
+                          {/* Hover Popover despliega el texto completo */}
+                          <div className={`absolute ${popoverPosVerdict} hidden group-hover:block z-50 w-96 p-4 rounded-2xl glass-panel border border-[#9b5de5]/40 bg-[#101415]/95 shadow-2xl space-y-2 pointer-events-none animate-fadeIn text-left backdrop-blur-md`}>
+                            <div className="flex items-center gap-2 pb-2 border-b border-white/10">
+                              <HelpCircle className="w-4 h-4 text-[#9b5de5]" />
+                              <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                                Veredicto de Alineación (Cultural Fit)
+                              </h4>
+                            </div>
+                            <p className="text-[11px] text-white/95 leading-relaxed font-normal">
+                              "{test.analisis_encaje}"
+                            </p>
+                          </div>
+                        </>
                       ) : (
                         <span className="text-[10px] text-[#879391]/60 italic block">
                           Sin análisis de encaje generado
@@ -202,15 +226,35 @@ export default function TestPersonalidadTable({
                       )}
                     </td>
 
-                    {/* Fecha Análisis */}
-                    <td className={paddingClass}>
-                      {test && test.fecha_analisis ? (
-                        <div className="flex items-center gap-1 text-[10px] text-[#879391] font-mono">
-                          <Clock className="w-3 h-3 text-[#6bd8cb]" />
-                          <span>{new Date(test.fecha_analisis).toLocaleDateString('es-ES')}</span>
-                        </div>
+                    {/* NOTAS RECLUTADOR EVALUACIONES */}
+                    <td className={`${paddingClass} min-w-[220px] max-w-[320px] relative group`}>
+                      {cad.recruiterNotes ? (
+                        <>
+                          <div className="flex items-start gap-1.5 cursor-help p-2 rounded-lg bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] text-[10px] leading-snug font-medium shadow-sm">
+                            <FileText className="w-3.5 h-3.5 text-[#6bd8cb] shrink-0 mt-0.5" />
+                            <span className="text-white font-medium line-clamp-2 flex-grow">{cad.recruiterNotes}</span>
+                            <span className="shrink-0 p-0.5 rounded-full bg-[#6bd8cb]/20 text-[#6bd8cb] group-hover:bg-[#6bd8cb] group-hover:text-black transition-all">
+                              <HelpCircle className="w-3.5 h-3.5" />
+                            </span>
+                          </div>
+
+                          {/* Hover Popover despliega el texto completo de las notas */}
+                          <div className={`absolute ${popoverPosNotes} hidden group-hover:block z-50 w-96 p-4 rounded-2xl glass-panel border border-[#6bd8cb]/40 bg-[#101415]/95 shadow-2xl space-y-2 pointer-events-none animate-fadeIn text-left backdrop-blur-md`}>
+                            <div className="flex items-center gap-2 pb-2 border-b border-white/10">
+                              <HelpCircle className="w-4 h-4 text-[#6bd8cb]" />
+                              <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                                Notas Reclutador Evaluaciones
+                              </h4>
+                            </div>
+                            <p className="text-[11px] text-white/95 leading-relaxed font-normal whitespace-pre-line">
+                              {cad.recruiterNotes}
+                            </p>
+                          </div>
+                        </>
                       ) : (
-                        <span className="text-[10px] text-[#879391]/50 italic block">-</span>
+                        <span className="text-[10px] text-[#879391]/50 italic block">
+                          Sin notas registradas
+                        </span>
                       )}
                     </td>
 

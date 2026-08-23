@@ -224,5 +224,7 @@ describe('Módulo de Evaluación - Capa de Lógica y Datos', () => {
 
     assert.ok(content.includes('evaluacion_selected_search'), 'La página P-EVA-01 debe gestionar localStorage con evaluacion_selected_search');
     assert.ok(content.includes('handleSelectSearchChange'), 'La página P-EVA-01 debe utilizar handleSelectSearchChange para mutar y persistir la búsqueda');
+    assert.ok(content.includes('NOTAS RECLUTADOR EVALUACIONES'), 'La vista Lista Detallada de P-EVA-01 debe renombrar la cabecera a NOTAS RECLUTADOR EVALUACIONES');
+    assert.ok(content.includes('toggleSort("notes")'), 'La cabecera NOTAS RECLUTADOR EVALUACIONES de Lista Detallada debe ser ejecutable con toggleSort("notes")');
   });
 });

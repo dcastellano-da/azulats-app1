@@ -88,11 +88,25 @@ describe('Cognitive Fit Vision (CFV) - V3 (Test de Personalidad)', () => {
     const tableContent = await fs.readFile(path.resolve('src/components/evaluacion/TestPersonalidadTable.tsx'), 'utf-8');
     assert.ok(tableContent.includes('DensitySelector'), 'TestPersonalidadTable debe soportar DensitySelector');
     assert.ok(tableContent.includes('arquetipo_codigo'), 'TestPersonalidadTable debe renderizar arquetipo_codigo');
+    assert.ok(tableContent.includes('NOTAS RECLUTADOR EVALUACIONES'), 'TestPersonalidadTable debe incluir la columna NOTAS RECLUTADOR EVALUACIONES');
+    assert.ok(!tableContent.includes('Fecha Análisis'), 'TestPersonalidadTable no debe incluir la columna Fecha Análisis');
+    assert.ok(tableContent.includes('handleSort'), 'TestPersonalidadTable debe invocar handleSort en cabeceras');
+    assert.ok(tableContent.includes('HelpCircle'), 'TestPersonalidadTable debe utilizar HelpCircle (?) para el desplegable en hover');
 
     // 4. Verificar TestPersonalidadCard.tsx (Human-in-the-loop y barras bivalentes)
     const cardContent = await fs.readFile(path.resolve('src/app/components/TestPersonalidadCard.tsx'), 'utf-8');
     assert.ok(cardContent.includes('actualizarTestPersonalidadAction'), 'TestPersonalidadCard debe utilizar actualizarTestPersonalidadAction para edicion');
     assert.ok(cardContent.includes('Extravertido'), 'TestPersonalidadCard debe incluir etiquetas bivalentes');
     assert.ok(cardContent.includes('Introvertido'), 'TestPersonalidadCard debe incluir etiquetas bivalentes');
+  });
+
+  test('Debería verificar que page.tsx de P-EVA-01 soporta ordenamiento por arquetipo, veredicto y notas', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+
+    const evalPageContent = await fs.readFile(path.resolve('src/app/evaluacion/page.tsx'), 'utf-8');
+    assert.ok(evalPageContent.includes('sortField === "archetype"'), 'page.tsx debe soportar ordenamiento por archetype');
+    assert.ok(evalPageContent.includes('sortField === "verdict"'), 'page.tsx debe soportar ordenamiento por verdict');
+    assert.ok(evalPageContent.includes('sortField === "notes"'), 'page.tsx debe soportar ordenamiento por notes');
   });
 });

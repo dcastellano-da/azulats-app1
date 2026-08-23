@@ -60,7 +60,9 @@ import { getCandidatosAPI, Candidato } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, actualizarPipelineAPI } from "@/actions/pipeline";
 import DensitySelector, { DensityMode } from "@/components/screening/DensitySelector";
 import TestPersonalidadTable from "@/components/evaluacion/TestPersonalidadTable";
+import EntrevistaTable from "@/components/evaluacion/EntrevistaTable";
 import AnalizarTestPersonalidadModal from "@/app/components/AnalizarTestPersonalidadModal";
+import AnalizarTranscripcionModal from "@/app/components/AnalizarTranscripcionModal";
 
 export default function EvaluacionPage() {
   const router = useRouter();
@@ -75,10 +77,12 @@ export default function EvaluacionPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSearch, setSelectedSearch] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
-  const [viewMode, setViewMode] = useState<"kanban" | "lista" | "test_personalidad">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "lista" | "lista_entrevista" | "test_personalidad">("kanban");
   const [density, setDensity] = useState<DensityMode>("compact");
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [selectedCandidateForTest, setSelectedCandidateForTest] = useState<EvaluacionCandidate | null>(null);
+  const [isTranscriptModalOpen, setIsTranscriptModalOpen] = useState(false);
+  const [selectedCandidateForTranscript, setSelectedCandidateForTranscript] = useState<EvaluacionCandidate | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   
   // Toast notification state
@@ -386,6 +390,45 @@ export default function EvaluacionPage() {
     } else if (sortField === "cnps") {
       valA = a.cNPS || 0;
       valB = b.cNPS || 0;
+    } else if (sortField === "archetype" || sortField === "dimensions") {
+      valA = `${a.test_personalidad?.arquetipo_codigo || ''} ${a.test_personalidad?.arquetipo_nombre || ''}`.toLowerCase();
+      valB = `${b.test_personalidad?.arquetipo_codigo || ''} ${b.test_personalidad?.arquetipo_nombre || ''}`.toLowerCase();
+    } else if (sortField === "verdict") {
+      valA = (a.test_personalidad?.analisis_encaje || "").toLowerCase();
+      valB = (b.test_personalidad?.analisis_encaje || "").toLowerCase();
+    } else if (sortField === "notes") {
+      valA = (a.recruiterNotes || "").toLowerCase();
+      valB = (b.recruiterNotes || "").toLowerCase();
+    } else if (sortField === "exp_entrevista") {
+      const expA = typeof a.informe_entrevista_ia?.experiencia_consolidada === "string"
+        ? a.informe_entrevista_ia.experiencia_consolidada
+        : (a.informe_entrevista_ia?.experiencia_consolidada?.resumen_trayectoria || "");
+      const expB = typeof b.informe_entrevista_ia?.experiencia_consolidada === "string"
+        ? b.informe_entrevista_ia.experiencia_consolidada
+        : (b.informe_entrevista_ia?.experiencia_consolidada?.resumen_trayectoria || "");
+      valA = expA.toLowerCase();
+      valB = expB.toLowerCase();
+    } else if (sortField === "alig_entrevista") {
+      const aligA = typeof a.informe_entrevista_ia?.alineacion_motivadores === "string"
+        ? a.informe_entrevista_ia.alineacion_motivadores
+        : (a.informe_entrevista_ia?.alineacion_motivadores?.encaje_cultural || "");
+      const aligB = typeof b.informe_entrevista_ia?.alineacion_motivadores === "string"
+        ? b.informe_entrevista_ia.alineacion_motivadores
+        : (b.informe_entrevista_ia?.alineacion_motivadores?.encaje_cultural || "");
+      valA = aligA.toLowerCase();
+      valB = aligB.toLowerCase();
+    } else if (sortField === "pretension") {
+      valA = (a.informe_entrevista_ia?.pretension_economica_condiciones?.pretension_salarial || "").toLowerCase();
+      valB = (b.informe_entrevista_ia?.pretension_economica_condiciones?.pretension_salarial || "").toLowerCase();
+    } else if (sortField === "auditoria") {
+      const incsA = Array.isArray(a.informe_entrevista_ia?.auditoria_veracidad?.inconsistencias_detectadas) 
+        ? a.informe_entrevista_ia.auditoria_veracidad.inconsistencias_detectadas.length 
+        : 0;
+      const incsB = Array.isArray(b.informe_entrevista_ia?.auditoria_veracidad?.inconsistencias_detectadas) 
+        ? b.informe_entrevista_ia.auditoria_veracidad.inconsistencias_detectadas.length 
+        : 0;
+      valA = incsA;
+      valB = incsB;
     }
 
     if (valA < valB) return sortDirection === "asc" ? -1 : 1;
@@ -806,8 +849,8 @@ export default function EvaluacionPage() {
               </div>
             )}
 
-            {/* Density Selector - Test Personalidad View exclusive */}
-            {viewMode === "test_personalidad" && (
+            {/* Density Selector - Test Personalidad or Lista Entrevista View */}
+            {(viewMode === "test_personalidad" || viewMode === "lista_entrevista") && (
               <DensitySelector density={density} onChange={setDensity} />
             )}
           </div>
@@ -836,6 +879,18 @@ export default function EvaluacionPage() {
               >
                 <List className="w-3.5 h-3.5" />
                 <span>Lista detallada</span>
+              </button>
+              <button
+                onClick={() => setViewMode("lista_entrevista")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === "lista_entrevista"
+                    ? "bg-[#6bd8cb] text-[#101415] shadow shadow-[#0d9488]/10"
+                    : "text-[#879391] hover:text-white"
+                }`}
+                title="Nueva Vista: Lista Entrevista de Screening (ID: P-EVA-01)"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Lista Entrevista</span>
               </button>
               <button
                 onClick={() => setViewMode("test_personalidad")}
@@ -1015,8 +1070,8 @@ export default function EvaluacionPage() {
                   <th className="px-5 py-4 cursor-pointer hover:text-white" onClick={() => toggleSort("phase")}>
                     Estado actual {renderSortIcon("phase")}
                   </th>
-                  <th className="px-5 py-4 min-w-[200px]">
-                    Notas Reclutador
+                  <th className="px-5 py-4 cursor-pointer hover:text-white min-w-[220px]" onClick={() => toggleSort("notes")}>
+                    NOTAS RECLUTADOR EVALUACIONES {renderSortIcon("notes")}
                   </th>
                   <th className="px-5 py-4 min-w-[320px]">
                     Scorecard Entrevista IA
@@ -1041,7 +1096,7 @@ export default function EvaluacionPage() {
                     </td>
                   </tr>
                 ) : (
-                  sortedListCandidates.map((cad) => (
+                  sortedListCandidates.map((cad, index) => (
                     <tr key={cad.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-5 py-4">
                         <button
@@ -1073,14 +1128,32 @@ export default function EvaluacionPage() {
                         </span>
                       </td>
                       {/* 1. Notas Reclutador (Humano) */}
-                      <td className="py-4 px-5 min-w-[200px] max-w-[250px]">
+                      <td className="py-4 px-5 min-w-[220px] max-w-[280px] relative group">
                         {cad.recruiterNotes ? (
-                          <div className="p-2 rounded-lg bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] text-[10px] leading-snug font-medium shadow-sm flex items-start gap-1.5">
-                            <FileText className="w-3.5 h-3.5 text-[#6bd8cb] shrink-0 mt-0.5" />
-                            <span className="text-white font-medium line-clamp-3">{cad.recruiterNotes}</span>
-                          </div>
+                          <>
+                            <div className="flex items-start gap-1.5 cursor-help p-2 rounded-lg bg-[#6bd8cb]/10 border border-[#6bd8cb]/25 text-[#6bd8cb] text-[10px] leading-snug font-medium shadow-sm">
+                              <FileText className="w-3.5 h-3.5 text-[#6bd8cb] shrink-0 mt-0.5" />
+                              <span className="text-white font-medium line-clamp-3 flex-grow">{cad.recruiterNotes}</span>
+                              <span className="shrink-0 p-0.5 rounded-full bg-[#6bd8cb]/20 text-[#6bd8cb] group-hover:bg-[#6bd8cb] group-hover:text-black transition-all">
+                                <HelpCircle className="w-3.5 h-3.5" />
+                              </span>
+                            </div>
+
+                            {/* Hover Popover despliega el texto completo de las notas */}
+                            <div className={`absolute ${index < 2 ? 'top-full mt-2' : 'bottom-full mb-2'} left-0 hidden group-hover:block z-50 w-96 p-4 rounded-2xl glass-panel border border-[#6bd8cb]/40 bg-[#101415]/95 shadow-2xl space-y-2 pointer-events-none animate-fadeIn text-left backdrop-blur-md`}>
+                              <div className="flex items-center gap-2 pb-2 border-b border-white/10">
+                                <HelpCircle className="w-4 h-4 text-[#6bd8cb]" />
+                                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                                  Notas Reclutador Evaluaciones
+                                </h4>
+                              </div>
+                              <p className="text-[11px] text-white/95 leading-relaxed font-normal whitespace-pre-line">
+                                {cad.recruiterNotes}
+                              </p>
+                            </div>
+                          </>
                         ) : (
-                          <span className="text-[#879391]/50 text-[10px] italic block">Sin notas de evaluación</span>
+                          <span className="text-[#879391]/50 text-[10px] italic block">Sin notas registradas</span>
                         )}
                       </td>
 
@@ -1145,7 +1218,7 @@ export default function EvaluacionPage() {
                               </div>
 
                               {/* HOVER TOOLTIP / POPOVER DESPLEGABLE CON DETALLES COMPLETOS */}
-                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 w-96 p-4 rounded-2xl glass-panel border border-[#6bd8cb]/40 bg-[#101415]/95 shadow-2xl space-y-3 pointer-events-none animate-fadeIn text-left backdrop-blur-md">
+                              <div className={`absolute ${index < 2 ? 'top-full mt-2' : 'bottom-full mb-2'} left-1/2 -translate-x-1/2 hidden group-hover:block z-50 w-96 p-4 rounded-2xl glass-panel border border-[#6bd8cb]/40 bg-[#101415]/95 shadow-2xl space-y-3 pointer-events-none animate-fadeIn text-left backdrop-blur-md`}>
                                 {/* Top Header */}
                                 <div className="flex items-center justify-between pb-2 border-b border-white/10">
                                   <div className="flex items-center gap-2">
@@ -1387,11 +1460,27 @@ export default function EvaluacionPage() {
               </tbody>
             </table>
           </div>
+        ) : viewMode === "lista_entrevista" ? (
+          /* Nueva Vista "Lista Entrevista" (ID: P-EVA-01) */
+          <EntrevistaTable
+            candidates={sortedListCandidates}
+            density={density}
+            handleSort={toggleSort}
+            renderSortIcon={renderSortIcon}
+            handleViewCv={handleViewCv}
+            onOpenTranscriptModal={(cad) => {
+              setSelectedCandidateForTranscript(cad);
+              setIsTranscriptModalOpen(true);
+            }}
+            onViewDetails={handleViewDetails}
+          />
         ) : (
           /* Nueva Vista "Lista Test Personalidad" (ID: P-EVA-01) */
           <TestPersonalidadTable
-            candidates={filteredCandidates}
+            candidates={sortedListCandidates}
             density={density}
+            handleSort={toggleSort}
+            renderSortIcon={renderSortIcon}
             handleViewCv={handleViewCv}
             onOpenAnalysisModal={(cad) => {
               setSelectedCandidateForTest(cad);
@@ -1418,6 +1507,29 @@ export default function EvaluacionPage() {
             setToast({
               type: "success",
               message: "Test de personalidad analizado e inyectado correctamente."
+            });
+            setTimeout(() => setToast(null), 4000);
+          }}
+        />
+      )}
+
+      {/* Modal Analizar Transcripción Entrevista Screening M-TRN-01 */}
+      {selectedCandidateForTranscript && (
+        <AnalizarTranscripcionModal
+          isOpen={isTranscriptModalOpen}
+          onClose={() => {
+            setIsTranscriptModalOpen(false);
+            setSelectedCandidateForTranscript(null);
+          }}
+          pipelineId={selectedCandidateForTranscript.pipeId || selectedCandidateForTranscript.id}
+          candidateName={selectedCandidateForTranscript.name}
+          currentState={selectedCandidateForTranscript.currentPhase}
+          initialInforme={selectedCandidateForTranscript.informe_entrevista_ia}
+          onSuccess={() => {
+            fetchBackendData();
+            setToast({
+              type: "success",
+              message: "Informe de entrevista de screening procesado e inyectado correctamente."
             });
             setTimeout(() => setToast(null), 4000);
           }}
