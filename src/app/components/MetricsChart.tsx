@@ -17,6 +17,24 @@ interface MetricsChartProps {
   candidatos?: Candidato[];
 }
 
+const COLOR_MAP: Record<string, string> = {
+  "Directo ATS": "#6bd8cb",
+  "LinkedIn InMail": "#c4c1fb",
+  "Referido": "#f59e0b",
+  "Referido Interno": "#f59e0b",
+  "Headhunting": "#3b82f6",
+  "Portal Empleo": "#10b981",
+  "Landing Page": "#ec4899",
+  "Manual": "#8b5cf6",
+  "Sourcing IA": "#9b5de5",
+  "Gemini AI": "#a855f7"
+};
+
+const FALLBACK_PALETTE = [
+  "#6bd8cb", "#c4c1fb", "#f59e0b", "#3b82f6", "#10b981",
+  "#ec4899", "#8b5cf6", "#9b5de5", "#f43f5e", "#06b6d4"
+];
+
 export default function MetricsChart({ candidatos = [] }: MetricsChartProps) {
   const [mounted, setMounted] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -53,10 +71,28 @@ export default function MetricsChart({ candidatos = [] }: MetricsChartProps) {
     };
   };
 
-  const chartData = useMemo(() => {
+  const { chartData, originCategories } = useMemo(() => {
     if (!candidatos || candidatos.length === 0) {
-      return [];
+      return { chartData: [], originCategories: [] };
     }
+
+    const originsSet = new Set<string>();
+    candidatos.forEach((cand) => {
+      const orig = cand.origen || (cand as any).canal_ingreso || "Directo ATS";
+      if (orig && orig.trim()) {
+        originsSet.add(orig.trim());
+      }
+    });
+
+    if (originsSet.size === 0) {
+      originsSet.add("Directo ATS");
+      originsSet.add("LinkedIn InMail");
+      originsSet.add("Referido");
+      originsSet.add("Headhunting");
+      originsSet.add("Portal Empleo");
+    }
+
+    const categories = Array.from(originsSet);
 
     const weekMap: Record<string, { label: string; timestamp: number; categories: Record<string, number> }> = {};
 
@@ -68,42 +104,36 @@ export default function MetricsChart({ candidatos = [] }: MetricsChartProps) {
       if (isNaN(d.getTime())) return;
 
       const weekInfo = getWeekInfo(d);
+      const candOrigen = (cand.origen || (cand as any).canal_ingreso || "Directo ATS").trim();
 
       if (!weekMap[weekInfo.key]) {
+        const catObj: Record<string, number> = {};
+        categories.forEach((cat) => { catObj[cat] = 0; });
         weekMap[weekInfo.key] = {
           label: weekInfo.label,
           timestamp: weekInfo.timestamp,
-          categories: {
-            "Directo ATS": 0,
-            "LinkedIn InMail": 0,
-            "Sourcing IA": 0,
-            "Referido Interno": 0
-          }
+          categories: catObj
         };
       }
 
-      const rawOrigen = (cand.origen || (cand as any).canal_ingreso || "Directo ATS").toLowerCase();
-      let category = "Directo ATS";
-      if (rawOrigen.includes("linkedin") || rawOrigen.includes("inmail")) {
-        category = "LinkedIn InMail";
-      } else if (rawOrigen.includes("ia") || rawOrigen.includes("sourcing") || rawOrigen.includes("boolean")) {
-        category = "Sourcing IA";
-      } else if (rawOrigen.includes("referido") || rawOrigen.includes("interno")) {
-        category = "Referido Interno";
-      }
-
-      weekMap[weekInfo.key].categories[category] = (weekMap[weekInfo.key].categories[category] || 0) + 1;
+      weekMap[weekInfo.key].categories[candOrigen] = (weekMap[weekInfo.key].categories[candOrigen] || 0) + 1;
     });
 
-    // Sort chronologically by Monday timestamp
     const sortedKeys = Object.keys(weekMap).sort(
       (a, b) => weekMap[a].timestamp - weekMap[b].timestamp
     );
 
-    return sortedKeys.map((wKey) => ({
+    const data = sortedKeys.map((wKey) => ({
       name: weekMap[wKey].label,
       ...weekMap[wKey].categories
     }));
+
+    const catWithColor = categories.map((cat, idx) => ({
+      name: cat,
+      color: COLOR_MAP[cat] || FALLBACK_PALETTE[idx % FALLBACK_PALETTE.length]
+    }));
+
+    return { chartData: data, originCategories: catWithColor };
   }, [candidatos]);
 
   if (!mounted) {
@@ -148,7 +178,7 @@ export default function MetricsChart({ candidatos = [] }: MetricsChartProps) {
               </button>
             </div>
             <p className="text-xs text-white/80 leading-relaxed">
-              Muestra la evolución semanal de postulantes ingresados en la base global de talentos, desglosados por su Origen del Perfil (campo "origen": Directo ATS, LinkedIn InMail, Sourcing IA, Referido Interno).
+              Muestra la evolución semanal de postulantes ingresados en la base global de talentos, desglosados por las opciones reales de Origen del Perfil (campo "origen": Directo ATS, LinkedIn InMail, Referido, Headhunting, Portal Empleo, Landing Page, Manual, Sourcing IA).
             </p>
             <p className="text-[10px] text-[#c4c1fb] font-mono tracking-tight pt-1">
               Nota: No aplican filtros de cliente ni de búsqueda al pertenecer al padrón global de postulantes (fuera de la colección pipeline).
@@ -203,34 +233,16 @@ export default function MetricsChart({ candidatos = [] }: MetricsChartProps) {
                 wrapperStyle={{ fontSize: "11px", color: "#c4c1fb" }}
               />
               
-              <Bar
-                name="Directo ATS"
-                dataKey="Directo ATS"
-                stackId="a"
-                fill="#6bd8cb"
-              />
-
-              <Bar
-                name="LinkedIn InMail"
-                dataKey="LinkedIn InMail"
-                stackId="a"
-                fill="#c4c1fb"
-              />
-
-              <Bar
-                name="Sourcing IA"
-                dataKey="Sourcing IA"
-                stackId="a"
-                fill="#9b5de5"
-              />
-
-              <Bar
-                name="Referido Interno"
-                dataKey="Referido Interno"
-                stackId="a"
-                fill="#f59e0b"
-                radius={[4, 4, 0, 0]}
-              />
+              {originCategories.map((cat, idx) => (
+                <Bar
+                  key={cat.name}
+                  name={cat.name}
+                  dataKey={cat.name}
+                  stackId="a"
+                  fill={cat.color}
+                  radius={idx === originCategories.length - 1 ? [4, 4, 0, 0] : undefined}
+                />
+              ))}
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -239,4 +251,3 @@ export default function MetricsChart({ candidatos = [] }: MetricsChartProps) {
     </div>
   );
 }
-

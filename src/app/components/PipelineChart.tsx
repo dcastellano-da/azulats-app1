@@ -1,29 +1,91 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from "react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-  Cell
-} from "recharts";
 import { Busqueda } from "@/actions/busquedas";
 import { Candidato } from "@/actions/candidatos";
+import { PipelineItem } from "@/actions/pipeline";
 
 interface PipelineChartProps {
   busquedas?: Busqueda[];
   candidatos?: Candidato[];
+  pipelineItems?: PipelineItem[];
   selectedClient?: string;
   selectedSearch?: string;
 }
 
+export interface StateDefinition {
+  code: string;
+  label: string;
+  fill: string;
+}
+
+export interface PhaseGroupDefinition {
+  phaseId: string;
+  phaseTitle: string;
+  badgeBg: string;
+  badgeText: string;
+  borderColor: string;
+  states: StateDefinition[];
+}
+
+export const PIPELINE_PHASES: PhaseGroupDefinition[] = [
+  {
+    phaseId: "F1",
+    phaseTitle: "F1 Descubrimiento",
+    badgeBg: "bg-indigo-500/10 border-indigo-500/30 text-indigo-400",
+    badgeText: "text-indigo-400",
+    borderColor: "border-t-indigo-500",
+    states: [
+      { code: "01_nuevo", label: "01 - NUEVO EN REVISION", fill: "#6366f1" },
+      { code: "02_contactado", label: "02 - BLOQUEADO / PENDIENTE", fill: "#6bd8cb" },
+      { code: "03_bloqueado", label: "03 - EN DUDA A CONFIRMAR", fill: "#f59e0b" },
+      { code: "04_rechazado", label: "04 - RECHAZADO EN FASE INICIAL", fill: "#f43f5e" }
+    ]
+  },
+  {
+    phaseId: "F2",
+    phaseTitle: "F2 Evaluación",
+    badgeBg: "bg-amber-500/10 border-amber-500/30 text-amber-400",
+    badgeText: "text-amber-400",
+    borderColor: "border-t-amber-500",
+    states: [
+      { code: "05_screening", label: "05 - SCREENING / ENTREVISTA INICIAL", fill: "#f59e0b" },
+      { code: "06_assessment", label: "06 - PRUEBA / ASSESSMENT TÉCNICO", fill: "#6bd8cb" },
+      { code: "07_en_duda_evaluacion", label: "07 - EN DUDA EVALUACIÓN", fill: "#fbbf24" },
+      { code: "08_descartado_interno", label: "08 - DESCARTADO (INTERNO)", fill: "#f43f5e" }
+    ]
+  },
+  {
+    phaseId: "F3",
+    phaseTitle: "F3 Cliente",
+    badgeBg: "bg-purple-500/10 border-purple-500/30 text-purple-400",
+    badgeText: "text-purple-400",
+    borderColor: "border-t-purple-500",
+    states: [
+      { code: "09_shortlist", label: "09 - SHORTLIST / ENVIADO", fill: "#a855f7" },
+      { code: "10_entrevista_cliente", label: "10 - ENTREVISTA CON CLIENTE", fill: "#10b981" },
+      { code: "11_standby", label: "11 - STAND-BY / BACK-UP", fill: "#c084fc" }
+    ]
+  },
+  {
+    phaseId: "F4",
+    phaseTitle: "F4 Cierre",
+    badgeBg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400",
+    badgeText: "text-emerald-400",
+    borderColor: "border-t-emerald-500",
+    states: [
+      { code: "12_oferta_extendida", label: "12 - OFERTA EXTENDIDA / NEGOCIACIÓN", fill: "#f59e0b" },
+      { code: "13_contratado", label: "13 - CONTRATADO (WON)", fill: "#10b981" },
+      { code: "14_rechazado_cliente", label: "14 - RECHAZADO CLIENTE (LOST)", fill: "#f43f5e" },
+      { code: "15_candidato_se_baja", label: "15 - CANDIDATO SE BAJA (DROP-OUT)", fill: "#fb7185" }
+    ]
+  }
+];
+
 export default function PipelineChart({
   busquedas = [],
   candidatos = [],
+  pipelineItems = [],
   selectedClient = "all",
   selectedSearch = "all"
 }: PipelineChartProps) {
@@ -34,7 +96,7 @@ export default function PipelineChart({
     setMounted(true);
   }, []);
 
-  const stageData = useMemo(() => {
+  const phaseData = useMemo(() => {
     // 1. Filter active searches matching selectedClient and selectedSearch
     let searchesInScope = busquedas.filter((b) => {
       const status = (b.estado_fase || b.estado_sla?.estado_busqueda || "").toLowerCase();
@@ -50,67 +112,166 @@ export default function PipelineChart({
       );
     }
 
-    // Default status counters for estado_actual
-    const statusCounts: Record<string, number> = {
-      "Sourcing / Triage": 0,
-      "Evaluación Técnica": 0,
-      "Revisión Cliente": 0,
-      "Oferta & Cierre": 0,
-      "Contratado": 0,
-      "Descartado": 0
+    const searchIds = new Set(
+      searchesInScope.flatMap((b) => [b.id, b.id_busqueda, b.codigo_busqueda].filter(Boolean) as string[])
+    );
+    const searchProfiles = new Set(
+      searchesInScope.map((b) => (b.perfil_busqueda || "").toLowerCase()).filter(Boolean)
+    );
+
+    const counts: Record<string, number> = {
+      "01_nuevo": 0,
+      "02_contactado": 0,
+      "03_bloqueado": 0,
+      "04_rechazado": 0,
+      "05_screening": 0,
+      "06_assessment": 0,
+      "07_en_duda_evaluacion": 0,
+      "08_descartado_interno": 0,
+      "09_shortlist": 0,
+      "10_entrevista_cliente": 0,
+      "11_standby": 0,
+      "12_oferta_extendida": 0,
+      "13_contratado": 0,
+      "14_rechazado_cliente": 0,
+      "15_candidato_se_baja": 0
     };
 
-    const searchProfiles = new Set(searchesInScope.map((b) => (b.perfil_busqueda || "").toLowerCase()));
+    if (pipelineItems && pipelineItems.length > 0) {
+      const itemsInScope = pipelineItems.filter((p: any) =>
+        searchIds.has(p.claves_conexion?.id_busqueda || p.id_busqueda)
+      );
 
-    let candidatesInScope = candidatos;
-    if (selectedClient !== "all" || selectedSearch !== "all") {
-      candidatesInScope = candidatos.filter((c) => searchProfiles.has((c.puesto || "").toLowerCase()));
-    }
+      itemsInScope.forEach((p: any) => {
+        const rawState = (
+          p.flujo?.estado_actual ||
+          p.estado_actual ||
+          p.currentPhase ||
+          ""
+        ).toString().toLowerCase().trim();
 
-    if (candidatesInScope.length > 0) {
-      candidatesInScope.forEach((c) => {
-        const estadoActual = ((c as any).estado_actual || c.estado_revision || (c as any).fase_pipeline || "").toLowerCase();
-
-        if (estadoActual.includes("descartado") || estadoActual.includes("rechazado")) {
-          statusCounts["Descartado"] += 1;
-        } else if (estadoActual.includes("contratado") || estadoActual.includes("finalizado")) {
-          statusCounts["Contratado"] += 1;
-        } else if (estadoActual.includes("oferta") || estadoActual.includes("cierre") || estadoActual === "seleccionado") {
-          statusCounts["Oferta & Cierre"] += 1;
-        } else if (estadoActual.includes("cliente") || estadoActual.includes("entrevista") || estadoActual === "revisado") {
-          statusCounts["Revisión Cliente"] += 1;
-        } else if (estadoActual.includes("evaluacion") || estadoActual.includes("tecnica")) {
-          statusCounts["Evaluación Técnica"] += 1;
+        if (rawState === "01_nuevo" || rawState.includes("01") || rawState.includes("nuevo")) {
+          counts["01_nuevo"] += 1;
+        } else if (rawState === "02_contactado" || rawState.includes("02") || rawState.includes("contactado")) {
+          counts["02_contactado"] += 1;
+        } else if (rawState === "03_bloqueado" || rawState.includes("03") || rawState.includes("bloqueado")) {
+          counts["03_bloqueado"] += 1;
+        } else if (rawState === "04_rechazado" || rawState.includes("04") || rawState.includes("rechazado en fase inicial")) {
+          counts["04_rechazado"] += 1;
+        } else if (rawState === "05_screening" || rawState.includes("05") || rawState.includes("screening")) {
+          counts["05_screening"] += 1;
+        } else if (rawState === "06_assessment" || rawState.includes("06") || rawState.includes("assessment") || rawState.includes("prueba")) {
+          counts["06_assessment"] += 1;
+        } else if (rawState === "07_en_duda_evaluacion" || rawState.includes("07") || rawState.includes("duda")) {
+          counts["07_en_duda_evaluacion"] += 1;
+        } else if (rawState === "08_descartado_interno" || rawState.includes("08") || rawState.includes("descartado")) {
+          counts["08_descartado_interno"] += 1;
+        } else if (rawState === "09_shortlist" || rawState.includes("09") || rawState.includes("shortlist")) {
+          counts["09_shortlist"] += 1;
+        } else if (rawState === "10_entrevista_cliente" || rawState.includes("10") || rawState.includes("entrevista con cliente")) {
+          counts["10_entrevista_cliente"] += 1;
+        } else if (rawState === "11_standby" || rawState.includes("11") || rawState.includes("standby")) {
+          counts["11_standby"] += 1;
+        } else if (rawState === "12_oferta_extendida" || rawState.includes("12") || rawState.includes("oferta")) {
+          counts["12_oferta_extendida"] += 1;
+        } else if (rawState === "13_contratado" || rawState.includes("13") || rawState.includes("contratado")) {
+          counts["13_contratado"] += 1;
+        } else if (rawState === "14_rechazado_cliente" || rawState.includes("14") || rawState.includes("rechazado cliente")) {
+          counts["14_rechazado_cliente"] += 1;
+        } else if (rawState === "15_candidato_se_baja" || rawState.includes("15") || rawState.includes("se baja")) {
+          counts["15_candidato_se_baja"] += 1;
         } else {
-          statusCounts["Sourcing / Triage"] += 1;
+          counts["01_nuevo"] += 1;
         }
       });
     } else {
-      // Fallback stage distribution proportional to search candidates counter in scope
-      const totalContador = searchesInScope.reduce((acc, b) => acc + (b.candidatos_contador || 15), 0);
-      if (totalContador > 0) {
-        statusCounts["Sourcing / Triage"] = Math.round(totalContador * 0.42);
-        statusCounts["Evaluación Técnica"] = Math.round(totalContador * 0.26);
-        statusCounts["Revisión Cliente"] = Math.round(totalContador * 0.16);
-        statusCounts["Oferta & Cierre"] = Math.round(totalContador * 0.08);
-        statusCounts["Contratado"] = Math.round(totalContador * 0.05);
-        statusCounts["Descartado"] = Math.round(totalContador * 0.03);
+      let candidatesInScope = candidatos;
+      if (selectedClient !== "all" || selectedSearch !== "all") {
+        candidatesInScope = candidatos.filter((c: any) => {
+          const cSearchId = c.id_busqueda || c.codigo_busqueda || c.busqueda_id || c.searchId || c.claves_conexion?.id_busqueda;
+          if (cSearchId && searchIds.has(cSearchId)) return true;
+          const cPuesto = (c.puesto || c.role || "").toLowerCase();
+          if (cPuesto && searchProfiles.has(cPuesto)) return true;
+          return false;
+        });
+      }
+
+      if (candidatesInScope.length > 0) {
+        candidatesInScope.forEach((c: any) => {
+          const rawState = (
+            c.estado_actual ||
+            c.currentPhase ||
+            c.flujo?.estado_actual ||
+            c.phase1State ||
+            c.fase_pipeline ||
+            c.estado_revision ||
+            ""
+          ).toString().toLowerCase().trim();
+
+          if (rawState.includes("01") || rawState === "01_nuevo" || rawState.includes("nuevo")) {
+            counts["01_nuevo"] += 1;
+          } else if (rawState.includes("02") || rawState === "02_contactado" || rawState.includes("contactado")) {
+            counts["02_contactado"] += 1;
+          } else if (rawState.includes("03") || rawState === "03_bloqueado" || rawState.includes("bloqueado")) {
+            counts["03_bloqueado"] += 1;
+          } else if (rawState.includes("04") || rawState === "04_rechazado" || rawState.includes("rechazado en fase inicial")) {
+            counts["04_rechazado"] += 1;
+          } else if (rawState.includes("05") || rawState === "05_screening" || rawState.includes("screening")) {
+            counts["05_screening"] += 1;
+          } else if (rawState.includes("06") || rawState === "06_assessment" || rawState.includes("assessment") || rawState.includes("prueba")) {
+            counts["06_assessment"] += 1;
+          } else if (rawState.includes("07") || rawState === "07_en_duda_evaluacion" || rawState.includes("duda")) {
+            counts["07_en_duda_evaluacion"] += 1;
+          } else if (rawState.includes("08") || rawState === "08_descartado_interno" || rawState.includes("descartado (interno)")) {
+            counts["08_descartado_interno"] += 1;
+          } else if (rawState.includes("09") || rawState === "09_shortlist" || rawState.includes("shortlist")) {
+            counts["09_shortlist"] += 1;
+          } else if (rawState.includes("10") || rawState === "10_entrevista_cliente" || rawState.includes("entrevista con cliente")) {
+            counts["10_entrevista_cliente"] += 1;
+          } else if (rawState.includes("11") || rawState === "11_standby" || rawState.includes("standby") || rawState.includes("back-up")) {
+            counts["11_standby"] += 1;
+          } else if (rawState.includes("12") || rawState === "12_oferta_extendida" || rawState.includes("oferta")) {
+            counts["12_oferta_extendida"] += 1;
+          } else if (rawState.includes("13") || rawState === "13_contratado" || rawState.includes("contratado") || rawState.includes("won")) {
+            counts["13_contratado"] += 1;
+          } else if (rawState.includes("14") || rawState === "14_rechazado_cliente" || rawState.includes("rechazado cliente")) {
+            counts["14_rechazado_cliente"] += 1;
+          } else if (rawState.includes("15") || rawState === "15_candidato_se_baja" || rawState.includes("se baja") || rawState.includes("drop")) {
+            counts["15_candidato_se_baja"] += 1;
+          } else if (rawState.includes("descartado") || rawState.includes("rechazado")) {
+            counts["08_descartado_interno"] += 1;
+          } else if (rawState.includes("finalizado")) {
+            counts["13_contratado"] += 1;
+          } else if (rawState.includes("seleccionado") || rawState.includes("revisado")) {
+            counts["01_nuevo"] += 1;
+          } else {
+            counts["01_nuevo"] += 1;
+          }
+        });
       }
     }
 
-    return [
-      { name: "Sourcing / Triage", candidatos: statusCounts["Sourcing / Triage"], fill: "#6bd8cb" },
-      { name: "Evaluación Técnica", candidatos: statusCounts["Evaluación Técnica"], fill: "#c4c1fb" },
-      { name: "Revisión Cliente", candidatos: statusCounts["Revisión Cliente"], fill: "#9b5de5" },
-      { name: "Oferta & Cierre", candidatos: statusCounts["Oferta & Cierre"], fill: "#f59e0b" },
-      { name: "Contratado", candidatos: statusCounts["Contratado"], fill: "#10b981" },
-      { name: "Descartado", candidatos: statusCounts["Descartado"], fill: "#f43f5e" }
-    ];
-  }, [busquedas, candidatos, selectedClient, selectedSearch]);
+    return PIPELINE_PHASES.map((phase) => {
+      const statesWithCount = phase.states.map((st) => ({
+        ...st,
+        candidatos: counts[st.code] || 0
+      }));
+      const totalPhaseCandidates = statesWithCount.reduce((acc, curr) => acc + curr.candidatos, 0);
+      return {
+        ...phase,
+        totalPhaseCandidates,
+        states: statesWithCount
+      };
+    });
+  }, [busquedas, candidatos, pipelineItems, selectedClient, selectedSearch]);
 
   const totalCandidatesInPipeline = useMemo(() => {
-    return stageData.reduce((acc, item) => acc + item.candidatos, 0);
-  }, [stageData]);
+    return phaseData.reduce((acc, phase) => acc + phase.totalPhaseCandidates, 0);
+  }, [phaseData]);
+
+  const maxStateCount = useMemo(() => {
+    return Math.max(1, ...phaseData.flatMap((p) => p.states.map((s) => s.candidatos)));
+  }, [phaseData]);
 
   if (!mounted) {
     return (
@@ -154,7 +315,7 @@ export default function PipelineChart({
               </button>
             </div>
             <p className="text-xs text-white/80 leading-relaxed">
-              Muestra la cantidad total de postulantes clasificados en cada categoría del campo "estado_actual" en el pipeline de reclutamiento, calculados dinámicamente en función de los filtros seleccionados (Cliente y Búsqueda).
+              Muestra la cantidad total de postulantes clasificados en cada categoría del campo "estado_actual" en el pipeline de reclutamiento (los 15 estados estandarizados agrupados en F1 Descubrimiento, F2 Evaluación, F3 Cliente y F4 Cierre), calculados dinámicamente en función de los filtros seleccionados (Cliente y Búsqueda).
             </p>
             <p className="text-[10px] text-[#c4c1fb] font-mono tracking-tight pt-1">
               Fórmula: Agregación de Count(Candidatos) por el campo estado_actual en las búsquedas en alcance.
@@ -163,60 +324,48 @@ export default function PipelineChart({
         </div>
       )}
 
+      {/* Grouped Phase Grid with States */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-2">
+        {phaseData.map((phase) => (
+          <div 
+            key={phase.phaseId}
+            className={`rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3 border-t-2 ${phase.borderColor}`}
+          >
+            <div className="flex justify-between items-center pb-2 border-b border-white/5">
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${phase.badgeBg}`}>
+                {phase.phaseTitle}
+              </span>
+              <span className="text-xs font-mono font-semibold text-[#879391]">
+                {phase.totalPhaseCandidates} postulantes
+              </span>
+            </div>
 
-      {totalCandidatesInPipeline === 0 ? (
-        <div className="w-full flex-grow h-64 flex flex-col items-center justify-center border border-dashed border-white/10 rounded-xl p-4 text-center">
-          <p className="text-xs text-[#879391]">No hay postulantes en el pipeline para los filtros seleccionados.</p>
-        </div>
-      ) : (
-        <div className="w-full flex-grow h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              layout="vertical"
-              data={stageData}
-              margin={{ top: 10, right: 30, left: 35, bottom: 0 }}
-            >
-              <CartesianGrid stroke="#ffffff" strokeOpacity={0.06} strokeDasharray="3 3" horizontal={false} />
-              
-              <XAxis
-                type="number"
-                stroke="#879391"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-              />
-              
-              <YAxis
-                type="category"
-                dataKey="name"
-                stroke="#879391"
-                fontSize={11}
-                tickLine={false}
-                axisLine={false}
-                width={95}
-              />
-              
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "rgba(16, 20, 21, 0.95)",
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                  borderRadius: "12px",
-                  boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5)",
-                }}
-                labelStyle={{ color: "#ffffff", fontWeight: "bold", fontSize: "12px" }}
-                itemStyle={{ fontSize: "12px" }}
-                formatter={(value: any) => [`${value} postulantes`, "Cantidad"]}
-              />
-              
-              <Bar dataKey="candidatos" radius={[0, 4, 4, 0]} barSize={20}>
-                {stageData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+            <div className="space-y-2.5">
+              {phase.states.map((st) => {
+                const pct = Math.min(100, Math.round((st.candidatos / maxStateCount) * 100));
+                return (
+                  <div key={st.code} className="space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-semibold text-white/90 text-[11px] truncate tracking-wide">
+                        {st.label}
+                      </span>
+                      <span className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded-full border ${st.candidatos > 0 ? 'bg-white/10 border-white/20 text-white' : 'bg-white/5 border-white/5 text-[#879391]'}`}>
+                        {st.candidatos}
+                      </span>
+                    </div>
+                    <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
+                      <div 
+                        className="h-full rounded-full transition-all duration-500" 
+                        style={{ width: `${st.candidatos > 0 ? Math.max(pct, 6) : 0}%`, backgroundColor: st.fill }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

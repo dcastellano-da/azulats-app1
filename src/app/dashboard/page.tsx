@@ -3,11 +3,12 @@
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, Calendar, Building2, User, RefreshCw, Contact, Briefcase, Users, Settings, Compass } from "lucide-react";
+import { LogOut, LayoutDashboard, Calendar, Building2, User, RefreshCw, Contact, Briefcase, Users, Settings, Compass, ArrowRight } from "lucide-react";
 import { signOutUser } from "@/lib/firebase/auth";
 import { useAuth } from "@/context/AuthContext";
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, Candidato } from "@/actions/candidatos";
+import { getPipelineAPI, PipelineItem } from "@/actions/pipeline";
 import KpiCards from "../components/KpiCards";
 import MetricsChart from "../components/MetricsChart";
 import PipelineChart from "../components/PipelineChart";
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   // Dynamic searches, candidates and filtering state
   const [busquedas, setBusquedas] = useState<Busqueda[]>([]);
   const [candidatos, setCandidatos] = useState<Candidato[]>([]);
+  const [pipelineItems, setPipelineItems] = useState<PipelineItem[]>([]);
   const [loadingSearches, setLoadingSearches] = useState(true);
   const [selectedClient, setSelectedClient] = useState("all");
   const [selectedSearch, setSelectedSearch] = useState("all");
@@ -43,7 +45,7 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Fetch real searches and candidates
+  // Fetch real searches, candidates and pipeline items
   const fetchData = async () => {
     try {
       setLoadingSearches(true);
@@ -51,15 +53,39 @@ export default function DashboardPage() {
         getBusquedasAPI(),
         getCandidatosAPI()
       ]);
-      setBusquedas(bData || []);
+      const bList = bData || [];
+      setBusquedas(bList);
       if (cRes && cRes.success && Array.isArray(cRes.data)) {
         setCandidatos(cRes.data);
       }
+
+      // Fetch real pipeline items for all active searches
+      const activeSearches = bList.filter((b) => {
+        const status = (b.estado_fase || b.estado_sla?.estado_busqueda || "").toLowerCase();
+        return status !== "cerrada" && status !== "cancelada";
+      });
+
+      const promises = activeSearches.map((s) => getPipelineAPI(s.id_busqueda || s.id));
+      const results = await Promise.all(promises);
+      const loadedItems: PipelineItem[] = [];
+      results.forEach((res) => {
+        if (res && res.success && Array.isArray(res.data)) {
+          loadedItems.push(...res.data);
+        }
+      });
+      setPipelineItems(loadedItems);
     } catch (err) {
       console.error("[P-DSH-01 Dashboard] Error cargando datos:", err);
     } finally {
       setLoadingSearches(false);
     }
+  };
+
+  const handleNavigateToPipeline = (searchId: string) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("descubrimiento_selected_search", searchId);
+    }
+    router.push(`/descubrimiento?search=${encodeURIComponent(searchId)}`);
   };
 
   useEffect(() => {
@@ -123,6 +149,17 @@ export default function DashboardPage() {
       );
     }
 
+    const searchIds = new Set(
+      activeSearchesInScope.flatMap((b) => [b.id, b.id_busqueda, b.codigo_busqueda].filter(Boolean) as string[])
+    );
+
+    if (pipelineItems.length > 0) {
+      const itemsInScope = pipelineItems.filter((p) =>
+        searchIds.has(p.claves_conexion?.id_busqueda || (p as any).id_busqueda)
+      );
+      return itemsInScope.length;
+    }
+
     const sumContador = activeSearchesInScope.reduce((acc, b) => acc + (b.candidatos_contador || 0), 0);
     if (sumContador > 0) {
       return sumContador;
@@ -138,7 +175,7 @@ export default function DashboardPage() {
     }
 
     return activeSearchesInScope.length * 15;
-  }, [busquedas, candidatos, selectedClient, selectedSearch]);
+  }, [busquedas, pipelineItems, candidatos, selectedClient, selectedSearch]);
 
   // Dynamic calculation for TIEMPO DE ASIGNACIÓN KPI: Σ(Fecha Asignación - Fecha Creación) / Total Búsquedas Asignadas
   const allocationTimeAvg = useMemo(() => {
@@ -180,8 +217,8 @@ export default function DashboardPage() {
     return "18.2 días";
   }, [busquedas, selectedClient, selectedSearch]);
 
-  // Dynamic list of real active searches for PROCESOS ACTIVOS RECIENTES
-  const realRecentSearches = useMemo(() => {
+  // Dynamic list of real active searches for PROCESOS ACTIVOS RECIENTES grouped by Responsable Operativo
+  const realRecentSearchesGrouped = useMemo(() => {
     let filtered = busquedas.filter((b) => {
       const status = (b.estado_fase || b.estado_sla?.estado_busqueda || "").toLowerCase();
       return status !== "cerrada" && status !== "cancelada";
@@ -196,7 +233,24 @@ export default function DashboardPage() {
       );
     }
 
-    return filtered.slice(0, 5).map((b) => {
+    const grouped: Record<string, Array<{
+      id: string;
+      role: string;
+      company: string;
+      location: string;
+      status: string;
+      date: string;
+      responsable: string;
+    }>> = {};
+
+    filtered.forEach((b) => {
+      const resp = (
+        b.responsable_operativo ||
+        (b as any).hiring_manager ||
+        (b as any).responsable ||
+        "Sin Responsable Asignado"
+      ).trim();
+
       let relativeDate = "Reciente";
       if (b.fecha_creacion) {
         const d = new Date(b.fecha_creacion);
@@ -205,16 +259,29 @@ export default function DashboardPage() {
           relativeDate = diffDays <= 0 ? "Hoy" : `Hace ${diffDays}d`;
         }
       }
-      return {
-        id: b.id || b.id_busqueda || b.codigo_busqueda,
+
+      const searchKey = b.id || b.id_busqueda || b.codigo_busqueda || "";
+
+      const item = {
+        id: searchKey,
         role: b.perfil_busqueda || "Perfil de Búsqueda",
         company: b.cliente || "Cliente",
         location: (b as any).ubicacion || (b as any).modalidad || "España",
         status: (b.estado_fase || b.estado_sla?.estado_busqueda || "Activa").replace("_", " "),
-        date: relativeDate
+        date: relativeDate,
+        responsable: resp
       };
+
+      if (!grouped[resp]) {
+        grouped[resp] = [];
+      }
+      grouped[resp].push(item);
     });
+
+    return grouped;
   }, [busquedas, selectedClient, selectedSearch]);
+
+  const realRecentSearches = realRecentSearchesGrouped;
 
   const isFiltered = selectedClient !== "all" || selectedSearch !== "all";
 
@@ -467,6 +534,7 @@ export default function DashboardPage() {
             <PipelineChart
               busquedas={busquedas}
               candidatos={candidatos}
+              pipelineItems={pipelineItems}
               selectedClient={selectedClient}
               selectedSearch={selectedSearch}
             />
@@ -476,8 +544,8 @@ export default function DashboardPage() {
           <div className="lg:col-span-1 flex flex-col gap-6">
             
             {/* Search list detail */}
-            <div className="glass-panel rounded-2xl p-6 backdrop-blur-md flex-grow flex flex-col justify-between relative overflow-hidden">
-              <div className="space-y-1 mb-5">
+            <div className="glass-panel rounded-2xl p-6 backdrop-blur-md flex flex-col gap-4 relative overflow-hidden">
+              <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#c4c1fb]">
@@ -518,30 +586,62 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              <div className="space-y-3.5 flex-grow">
-                {realRecentSearches.length === 0 ? (
+              <div className="space-y-4 flex-grow max-h-[600px] overflow-y-auto pr-1">
+                {Object.keys(realRecentSearchesGrouped).length === 0 ? (
                   <div className="p-4 border border-dashed border-white/10 rounded-xl text-center">
                     <p className="text-xs text-[#879391]">No hay procesos activos que coincidan con los filtros seleccionados.</p>
                   </div>
                 ) : (
-                  realRecentSearches.map((search, idx) => (
-                    <div
-                      key={search.id || idx}
-                      className="p-3 bg-[#191c1e]/70 border border-white/5 rounded-xl hover:border-[#6bd8cb]/20 transition-all flex justify-between items-center"
-                    >
-                      <div className="space-y-1">
-                        <div className="font-bold text-xs text-white">{search.role}</div>
-                        <div className="text-[10px] text-[#879391] flex items-center gap-1.5">
-                          <span>{search.company}</span>
-                          <span>•</span>
-                          <span>{search.location}</span>
+                  Object.entries(realRecentSearchesGrouped).map(([responsable, searches]) => (
+                    <div key={responsable} className="space-y-2">
+                      {/* Recruiter / Responsable Operativo Group Header */}
+                      <div className="flex items-center justify-between px-2.5 py-1.5 bg-white/5 border border-white/10 rounded-lg">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-[#c4c1fb]">
+                          <User className="w-3.5 h-3.5 text-[#6bd8cb]" />
+                          <span>Responsable Operativo: {responsable}</span>
                         </div>
-                      </div>
-                      <div className="text-right flex flex-col items-end gap-1">
-                        <span className="px-2 py-0.5 text-[9px] font-bold bg-[#6bd8cb]/10 text-[#6bd8cb] rounded border border-[#6bd8cb]/15">
-                          {search.status}
+                        <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white border border-white/10">
+                          {searches.length} {searches.length === 1 ? 'búsqueda' : 'búsquedas'}
                         </span>
-                        <span className="text-[9px] text-[#879391]">{search.date}</span>
+                      </div>
+
+                      {/* Searches list for this recruiter */}
+                      <div className="space-y-2 pl-1">
+                        {searches.map((search) => (
+                          <div
+                            key={search.id}
+                            className="p-3 bg-[#191c1e]/70 border border-white/5 rounded-xl hover:border-[#6bd8cb]/30 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                          >
+                            <div className="space-y-1">
+                              <div className="font-bold text-xs text-white">{search.role}</div>
+                              <div className="text-[10px] text-[#879391] flex items-center gap-1.5 flex-wrap">
+                                <span className="font-medium text-white/80">{search.company}</span>
+                                <span>•</span>
+                                <span>{search.location}</span>
+                                <span>•</span>
+                                <span className="text-[9px] text-[#879391]">{search.date}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                              {/* Status indicator dot label (non-button appearance) */}
+                              <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[#6bd8cb] bg-[#6bd8cb]/10 px-2 py-0.5 rounded-md">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#6bd8cb] shrink-0"></span>
+                                <span>{search.status}</span>
+                              </div>
+
+                              {/* Direct link button to Phase 1 Pipeline P-DIS-01 pre-filtering search */}
+                              <button
+                                onClick={() => handleNavigateToPipeline(search.id)}
+                                className="px-2.5 py-1 text-[10px] font-bold text-[#6bd8cb] bg-[#6bd8cb]/10 hover:bg-[#6bd8cb]/20 border border-[#6bd8cb]/25 hover:border-[#6bd8cb]/50 rounded-lg transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-sm"
+                                title={`Ir al Pipeline F1 Descubrimiento para ${search.role}`}
+                              >
+                                <span>Pipeline F1</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))

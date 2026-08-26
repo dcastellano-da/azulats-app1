@@ -204,8 +204,11 @@ describe('P-DSH-01: Filtros Generales y Botones de Ayuda con Criterios de Cálcu
 
     assert.ok(chartContent.includes('Directo ATS'), 'MetricsChart.tsx debe desglosar la categoría Directo ATS');
     assert.ok(chartContent.includes('LinkedIn InMail'), 'MetricsChart.tsx debe desglosar la categoría LinkedIn InMail');
-    assert.ok(chartContent.includes('Sourcing IA'), 'MetricsChart.tsx debe desglosar la categoría Sourcing IA');
-    assert.ok(chartContent.includes('Referido Interno'), 'MetricsChart.tsx debe desglosar la categoría Referido Interno');
+    assert.ok(chartContent.includes('Headhunting'), 'MetricsChart.tsx debe desglosar la categoría Headhunting');
+    assert.ok(chartContent.includes('Portal Empleo'), 'MetricsChart.tsx debe desglosar la categoría Portal Empleo');
+    assert.ok(chartContent.includes('Landing Page'), 'MetricsChart.tsx debe desglosar la categoría Landing Page');
+    assert.ok(chartContent.includes('Manual'), 'MetricsChart.tsx debe desglosar la categoría Manual');
+    assert.ok(chartContent.includes('Referido'), 'MetricsChart.tsx debe desglosar la categoría Referido');
 
     // 2. Verificar aclaración de no aplicación de filtros de búsqueda/pipeline
     assert.ok(chartContent.includes('No aplican filtros de cliente ni de búsqueda'), 'MetricsChart.tsx debe documentar expresamente que no aplica filtros de búsqueda');
@@ -234,6 +237,41 @@ describe('P-DSH-01: Filtros Generales y Botones de Ayuda con Criterios de Cálcu
     assert.ok(pageContent.includes('selectedSearch={selectedSearch}'), 'page.tsx debe pasar selectedSearch a PipelineChart');
   });
 
+  // Test 10: Agrupación por las 4 Fases y 15 Estados del Pipeline en PipelineChart (P-DSH-01)
+  test('PipelineChart agrupa los estados por sus 4 fases e incluye las 15 etiquetas correlativas exactas', () => {
+    const pipelinePath = path.resolve('src/app/components/PipelineChart.tsx');
+    const pipelineContent = fs.readFileSync(pipelinePath, 'utf-8');
+
+    // 1. Verificación de las 4 fases principales
+    const phases = ['F1 Descubrimiento', 'F2 Evaluación', 'F3 Cliente', 'F4 Cierre'];
+    phases.forEach((phaseTitle) => {
+      assert.ok(pipelineContent.includes(phaseTitle), `PipelineChart.tsx debe incluir la fase "${phaseTitle}"`);
+    });
+
+    // 2. Verificación de los 15 estados correlativos exactos de la vista Kanban
+    const expectedStates = [
+      '01 - NUEVO EN REVISION',
+      '02 - BLOQUEADO / PENDIENTE',
+      '03 - EN DUDA A CONFIRMAR',
+      '04 - RECHAZADO EN FASE INICIAL',
+      '05 - SCREENING / ENTREVISTA INICIAL',
+      '06 - PRUEBA / ASSESSMENT TÉCNICO',
+      '07 - EN DUDA EVALUACIÓN',
+      '08 - DESCARTADO (INTERNO)',
+      '09 - SHORTLIST / ENVIADO',
+      '10 - ENTREVISTA CON CLIENTE',
+      '11 - STAND-BY / BACK-UP',
+      '12 - OFERTA EXTENDIDA / NEGOCIACIÓN',
+      '13 - CONTRATADO (WON)',
+      '14 - RECHAZADO CLIENTE (LOST)',
+      '15 - CANDIDATO SE BAJA (DROP-OUT)'
+    ];
+
+    expectedStates.forEach((stateLabel) => {
+      assert.ok(pipelineContent.includes(stateLabel), `PipelineChart.tsx debe incluir la etiqueta de estado "${stateLabel}"`);
+    });
+  });
+
   // Test 9: Procesos Activos Recientes usa datos reales y se elimina Sesión de Reclutador
   test('P-DSH-01 reemplaza mocks de Procesos Activos Recientes por datos reales y elimina Sesión de Reclutador', () => {
     const pageContent = fs.readFileSync(path.resolve('src/app/dashboard/page.tsx'), 'utf-8');
@@ -249,7 +287,32 @@ describe('P-DSH-01: Filtros Generales y Botones de Ayuda con Criterios de Cálcu
     assert.ok(!pageContent.includes('Sesión de Reclutador'), 'page.tsx no debe contener la sección "Sesión de Reclutador"');
   });
 
+  // Test 11: Integración de ítems reales de pipeline desde backend en P-DSH-01
+  test('P-DSH-01 integra pipelineItems en page.tsx y lo propaga a PipelineChart', () => {
+    const pageContent = fs.readFileSync(path.resolve('src/app/dashboard/page.tsx'), 'utf-8');
+    const pipelineContent = fs.readFileSync(path.resolve('src/app/components/PipelineChart.tsx'), 'utf-8');
+
+    assert.ok(pageContent.includes('getPipelineAPI'), 'dashboard/page.tsx debe consumir getPipelineAPI para consultar Firestore/Express');
+    assert.ok(pageContent.includes('pipelineItems={pipelineItems}'), 'dashboard/page.tsx debe pasar pipelineItems a PipelineChart');
+    assert.ok(pipelineContent.includes('pipelineItems'), 'PipelineChart.tsx debe aceptar la prop pipelineItems');
+  });
+
+  // Test 12: Agrupamiento por Responsable Operativo y botón directo a Pipeline F1 en Procesos Activos Recientes (P-DSH-01)
+  test('P-DSH-01 agrupa Procesos Activos por Responsable Operativo e incluye botón directo a Pipeline F1 (P-DIS-01)', () => {
+    const pageContent = fs.readFileSync(path.resolve('src/app/dashboard/page.tsx'), 'utf-8');
+
+    // 1. Verificar la agrupación por Responsable Operativo
+    assert.ok(pageContent.includes('Responsable Operativo:'), 'page.tsx debe incluir la cabecera "Responsable Operativo:"');
+    assert.ok(pageContent.includes('realRecentSearchesGrouped'), 'page.tsx debe calcular realRecentSearchesGrouped');
+
+    // 2. Verificar el botón de navegación directo a Pipeline F1
+    assert.ok(pageContent.includes('Pipeline F1'), 'page.tsx debe incluir el botón "Pipeline F1"');
+    assert.ok(pageContent.includes('handleNavigateToPipeline'), 'page.tsx debe incluir la función handleNavigateToPipeline');
+    assert.ok(pageContent.includes('descubrimiento_selected_search'), 'page.tsx debe guardar descubrimiento_selected_search en localStorage');
+  });
+
 });
+
 
 
 

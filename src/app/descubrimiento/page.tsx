@@ -568,9 +568,18 @@ export default function DescubrimientoPage() {
       if (savedDensity === "compact" || savedDensity === "expanded") {
         setDensityMode(savedDensity as DensityMode);
       }
-      const savedSearch = localStorage.getItem("descubrimiento_selected_search");
-      if (savedSearch) {
-        setSelectedSearch(savedSearch);
+      const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const urlSearch = urlParams?.get("search") || urlParams?.get("selectedSearch") || urlParams?.get("id_busqueda");
+      if (urlSearch) {
+        setSelectedSearch(urlSearch);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("descubrimiento_selected_search", urlSearch);
+        }
+      } else {
+        const savedSearch = localStorage.getItem("descubrimiento_selected_search");
+        if (savedSearch) {
+          setSelectedSearch(savedSearch);
+        }
       }
     }
   }, []);
