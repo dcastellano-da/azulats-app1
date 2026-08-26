@@ -259,7 +259,7 @@ export default function DashboardPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchSearches();
+    await fetchData();
     setTimeout(() => {
       setRefreshing(false);
     }, 800);
