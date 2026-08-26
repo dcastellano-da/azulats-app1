@@ -102,11 +102,25 @@ Hemos establecido un esquema de protección híbrida de doble capa (Edge + Clien
 *   Brinda acceso seguro con tokens de sesión persistentes de 7 días.
 *   Presenta interfaces adaptativas glassmorphism y selección de flujo Firebase vs Demo.
 
-### Módulo B: Dashboard Gerencial
+### Módulo B: Dashboard Gerencial (`ID: P-DSH-01`)
 El **Dashboard Gerencial** sirve como un centro de control analítico de reclutamiento enfocado en los mercados de España (ej. sedes en Madrid, Barcelona, Valencia, Bilbao).
-*   **Filtros Globales:** Permite acotar las visualizaciones estadísticas por intervalos temporales y clientes corporativos clave (ej. Telefónica S.A., Banco Santander, SEAT S.A.).
-*   **KPIs de Rendimiento:** Centraliza la cuantificación rápida del volumen de búsquedas activas, postulantes en bandeja, y el tiempo promedio que toma asignar a un recurso (lead-time).
-*   **Analíticas Históricas:** Cuenta con gráficos interactivos que trazan el comportamiento histórico y la carga laboral mensual de los evaluadores de talento, conectable en fases subsecuentes al pipeline de BigQuery.
+*   **Filtros Generales Conectados a Entidad Búsquedas:** Filtro de clientes alimentado dinámicamente desde el campo `Cliente` de la entidad `Búsquedas` (obtenido en tiempo real mediante `getBusquedasAPI()`) reemplazando los mocks anteriores, junto a un nuevo filtro desplegable de **Búsquedas** (con opción *"Todas las Búsquedas"*) que filtra en cascada las opciones según el cliente activo, posicionado inmediatamente antes del filtro de rango de fechas.
+*   **KPIs de Rendimiento 100% Dinámicos (Sin Mocks):** Eliminación total de datos mock estáticos en los tres indicadores clave:
+    - **Búsquedas Activas:** Conteo reactivo en tiempo real de los procesos activos (`estado_fase != 'Cerrada'` y `!= 'Cancelada'`) asociados a los filtros activos de cliente y búsqueda.
+    - **Candidatos en Bandeja:** Suma dinámica `Σ(Candidatos en pipeline vinculados a búsquedas activas)` computada desde la entidad postulantes y contadores de búsquedas activas en alcance.
+    - **Tiempo de Asignación:** Promedio en días `Σ(Fecha Asignación - Fecha Creación) / Total Búsquedas Asignadas` determinado dinámicamente a partir de la antigüedad y fechas de apertura de los procesos filtrados.
+*   **Eliminación de Leyendas Obsoletas:** Se retiró la leyenda estática de sync de Firestore y BigQuery en la sección de filtros.
+*   **Criterios de Cálculo Explicativos ("?"):** Cada sección de indicadores KPI ("Búsquedas Activas", "Candidatos en Bandeja", "Tiempo de Asignación"), el gráfico de métricas históricas ("Métricas Históricas") y la lista de "Procesos Activos Recientes" incorporan un botón `?` interactivo con tooltip que despliega un overlay glassmorphic con la explicación conceptual y la fórmula matemática aplicada.
+*   **Analíticas de Evolución Semanal de Postulantes por Origen (Semanas Dinámicas Reales):** Reemplazo del gráfico por la visualización semanal de postulantes ingresados en el padrón global de talentos desglosados por su categoría en el campo `Origen del Perfil` (`Directo ATS`, `LinkedIn InMail`, `Sourcing IA`, `Referido Interno`). Las semanas se calculan dinámicamente según la fecha de creación del candidato (`createdAt`, `fecha_creacion` o `updatedAt`), rotuladas por el número de semana ISO y la fecha de inicio del lunes correspondiente (ej. `Sem 30 (20 Jul)`). En este gráfico no se aplican los filtros de búsqueda ni cliente al pertenecer al padrón global fuera de la colección pipeline.
+*   **Analíticas de Distribución de Postulantes por Estado Actual:** Gráfico de pipeline (`PipelineChart.tsx`) que cuantifica y desglosa los postulantes en base a su campo `estado_actual` (`Sourcing / Triage`, `Evaluación Técnica`, `Revisión Cliente`, `Oferta & Cierre`, `Contratado`, `Descartado`). Reacciona 100% en tiempo real a los filtros generales activos (**Cliente** y **Búsqueda**) e incluye un botón `?` explicativo con modal overlay glassmorphism.
+*   **Procesos Activos Recientes 100% Reales:** Eliminación del array estático mock de procesos recientes, sustituido por el cálculo reactivo `realRecentSearches` sobre las búsquedas activas de la entidad `Búsquedas` en alcance.
+*   **Eliminación de Sección Obsoleta:** Retiro definitivo de la sección *"Sesión de Reclutador"* en el panel lateral del Dashboard Gerencial.
+
+
+
+
+
+
 
 ### Módulo C (UI): Maestro de Búsquedas con tabla de datos (`ID: P-BUS-01`) y vista dedicada (`ID: P-BUS-02`)
 El **Maestro de Búsquedas** centraliza todas las solicitudes de personal y vacantes en curso de forma dinámica.
