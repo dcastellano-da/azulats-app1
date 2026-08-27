@@ -46,11 +46,12 @@ import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, actualizarPipelineAPI, Reunion } from "@/actions/pipeline";
 import { EvaluacionCandidate } from "@/lib/evaluacion";
-import type { InformeEntrevistaIA, TestPersonalidad } from "@/types/screening";
+import type { InformeEntrevistaIA, TestPersonalidad, AssessmentManual } from "@/types/screening";
 import AnalizarTranscripcionModal from "@/app/components/AnalizarTranscripcionModal";
 import InformeScreeningCard from "@/app/components/InformeScreeningCard";
 import AnalizarTestPersonalidadModal from "@/app/components/AnalizarTestPersonalidadModal";
 import TestPersonalidadCard from "@/app/components/TestPersonalidadCard";
+import AssessmentManualCard from "@/app/components/AssessmentManualCard";
 
 const generateDefaultToolsDetails = (candName: string, role: string, score: number) => {
   const isRust = role.toLowerCase().includes("rust") || role.toLowerCase().includes("architect");
@@ -121,6 +122,7 @@ export default function EvaluacionDetallePage() {
   // Test de Personalidad CFV-V3 State
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [testPersonalidad, setTestPersonalidad] = useState<TestPersonalidad | null>(null);
+  const [assessmentManual, setAssessmentManual] = useState<AssessmentManual | null>(null);
 
   // Editing state for Recruiter Notes across all phases
   const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -259,6 +261,7 @@ export default function EvaluacionDetallePage() {
         setActivePipelineItem(targetPipe || null);
         setInformeEntrevistaIA(targetPipe?.f2_evaluacion?.informe_entrevista_ia || (targetPipe?.evaluacion as any)?.informe_entrevista_ia || null);
         setTestPersonalidad(targetPipe?.f2_evaluacion?.test_personalidad || (targetPipe?.evaluacion as any)?.test_personalidad || null);
+        setAssessmentManual(targetPipe?.f2_evaluacion?.assessment_manual || (targetPipe?.evaluacion as any)?.assessment_manual || null);
         setEditInitialNotes(initialNotes);
         setEditF1Notes(f1Notes);
         setEditF2Notes(f2Notes);
@@ -803,6 +806,16 @@ export default function EvaluacionDetallePage() {
               onReanalyzeClick={() => setIsTestModalOpen(true)}
               onSaveComplete={(updated) => {
                 setTestPersonalidad(updated);
+                loadCandidateData();
+              }}
+            />
+
+            {/* Tarjeta de Assessment Técnico Manual (Registro Manual y Trazabilidad en F2) */}
+            <AssessmentManualCard
+              pipelineId={cand.pipeId || cand.id}
+              assessmentManual={assessmentManual}
+              onSaveComplete={(updated) => {
+                setAssessmentManual(updated);
                 loadCandidateData();
               }}
             />

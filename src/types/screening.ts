@@ -70,4 +70,10 @@ export interface TestPersonalidad {
   fecha_analisis: string;   // Timestamp ISO 8601 del backend
 }
 
+export interface AssessmentManual {
+  resumen_texto: string;
+  fecha_evaluacion?: string; // String ISO 8601 inyectado por el backend
+}
+
+
 

@@ -46,7 +46,8 @@ import {
   Camera,
   ChevronsRight,
   HelpCircle,
-  Brain
+  Brain,
+  ClipboardCheck
 } from "lucide-react";
 import { 
   EvaluacionCandidate, 
@@ -1079,6 +1080,9 @@ export default function EvaluacionPage() {
                   <th className="px-5 py-4 min-w-[240px]">
                     Test Personalidad
                   </th>
+                  <th className="px-5 py-4 min-w-[240px]">
+                    Assessment Técnico
+                  </th>
                   <th className="px-5 py-4 cursor-pointer hover:text-white text-center" onClick={() => toggleSort("cnps")}>
                     cNPS {renderSortIcon("cnps")}
                   </th>
@@ -1091,7 +1095,7 @@ export default function EvaluacionPage() {
               <tbody className="divide-y divide-white/5 font-medium">
                 {sortedListCandidates.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-5 py-8 text-center text-[#879391] bg-white/5">
+                    <td colSpan={10} className="px-5 py-8 text-center text-[#879391] bg-white/5">
                       No se encontraron candidatos evaluados que coincidan con los criterios establecidos.
                     </td>
                   </tr>
@@ -1325,6 +1329,35 @@ export default function EvaluacionPage() {
                           </div>
                         ) : (
                           <span className="text-[#879391]/40 text-[10px] italic block">Sin test de personalidad</span>
+                        )}
+                      </td>
+                      {/* Columna Resumen: Assessment Técnico Manual (P-EVA-01) */}
+                      <td className="py-4 px-5 min-w-[240px] max-w-[300px] relative group">
+                        {cad.assessment_manual && cad.assessment_manual.resumen_texto ? (
+                          <>
+                            <div className="flex items-start gap-1.5 cursor-help p-2 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[10px] leading-snug font-medium shadow-sm">
+                              <ClipboardCheck className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                              <span className="text-white font-medium line-clamp-2 flex-grow">{cad.assessment_manual.resumen_texto}</span>
+                              <span className="shrink-0 p-0.5 rounded-full bg-amber-500/20 text-amber-300 group-hover:bg-amber-400 group-hover:text-black transition-all" title="Leer todo el resumen de evaluación técnica">
+                                <HelpCircle className="w-3.5 h-3.5" />
+                              </span>
+                            </div>
+
+                            {/* Hover Popover despliega el contenido íntegro del resumen_texto (sin la fecha) */}
+                            <div className={`absolute ${index < 2 ? 'top-full mt-2' : 'bottom-full mb-2'} left-0 hidden group-hover:block z-50 w-96 p-4 rounded-2xl glass-panel border border-amber-500/40 bg-[#101415]/95 shadow-2xl space-y-2 pointer-events-none animate-fadeIn text-left backdrop-blur-md`}>
+                              <div className="flex items-center gap-2 pb-2 border-b border-white/10">
+                                <ClipboardCheck className="w-4 h-4 text-amber-400" />
+                                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                                  Resumen de Evaluación Técnica
+                                </h4>
+                              </div>
+                              <p className="text-[11px] text-white/95 leading-relaxed font-normal whitespace-pre-line">
+                                {cad.assessment_manual.resumen_texto}
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-[#879391]/40 text-[10px] italic block">Sin evaluación técnica</span>
                         )}
                       </td>
                       <td className="px-5 py-4 text-center font-mono font-bold text-sm text-[#c4c1fb]">
@@ -1736,6 +1769,19 @@ function KanbanCard({
               "{cad.test_personalidad.analisis_encaje}"
             </p>
           )}
+        </div>
+      )}
+
+      {/* Assessment Técnico Manual summary badge */}
+      {cad.assessment_manual && cad.assessment_manual.resumen_texto && (
+        <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] space-y-1 text-left shadow-sm">
+          <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[9.5px]">
+            <ClipboardCheck className="w-3.5 h-3.5 shrink-0" />
+            <span>Assessment Técnico:</span>
+          </div>
+          <p className="text-[9.5px] text-white/90 line-clamp-2 leading-relaxed font-normal">
+            {cad.assessment_manual.resumen_texto}
+          </p>
         </div>
       )}
 

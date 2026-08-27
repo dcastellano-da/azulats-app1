@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import type { ResultadoScreeningItem, InformeEntrevistaIA, TestPersonalidad } from "@/types/screening";
+import type { ResultadoScreeningItem, InformeEntrevistaIA, TestPersonalidad, AssessmentManual } from "@/types/screening";
 import { getApiEndpoint } from "@/utils/api";
 
 export interface Reunion {
@@ -51,6 +51,7 @@ export interface PipelineItem {
     reuniones?: Reunion[] | null;
     informe_entrevista_ia?: InformeEntrevistaIA | null;
     test_personalidad?: TestPersonalidad | null;
+    assessment_manual?: AssessmentManual | null;
   } | null;
   evaluacion?: {
     notas_reclutador?: string | null;
@@ -59,6 +60,7 @@ export interface PipelineItem {
     reuniones?: Reunion[] | null;
     informe_entrevista_ia?: InformeEntrevistaIA | null;
     test_personalidad?: TestPersonalidad | null;
+    assessment_manual?: AssessmentManual | null;
   } | null;
   f3_presentacion?: {
     notas_reclutador?: string | null;
@@ -871,6 +873,72 @@ export async function actualizarTestPersonalidadAction(
     };
   }
 }
+
+/**
+ * Server Action: Actualiza manualmente f2_evaluacion.assessment_manual (Resumen de Evaluación Técnica).
+ * PATCH /api/v1/pipeline/:id
+ * Inmutabilidad Temporal: El cliente HTTP envía únicamente { resumen_texto }.
+ * El servidor backend inyecta fecha_evaluacion obligatoriamente con su reloj interno.
+ */
+export async function actualizarAssessmentManualAction(
+  pipelineId: string,
+  resumenTexto: string
+): Promise<APIResponse> {
+  try {
+    const token = await getServerAuthToken();
+    const url = getApiEndpoint(`pipeline/${encodeURIComponent(pipelineId)}`);
+
+    const payload = {
+      f2_evaluacion: {
+        assessment_manual: {
+          resumen_texto: resumenTexto
+        }
+      }
+    };
+
+    console.log(`[Pipeline Action] Actualizando assessment_manual en: ${url}`);
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const status = response.status;
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch (_) {}
+
+    if (status === 200) {
+      revalidatePath(`/evaluacion/${pipelineId}`);
+      revalidatePath("/evaluacion");
+      return {
+        status,
+        success: true,
+        message: "Resumen de evaluación técnica guardado correctamente.",
+        data: data?.data || data
+      };
+    }
+
+    return {
+      status,
+      success: false,
+      message: data?.message || data?.error || `Error al guardar la evaluación técnica (Código HTTP ${status}).`,
+      data
+    };
+  } catch (error: any) {
+    console.error("[Pipeline Action] Error en actualizarAssessmentManualAction:", error);
+    return {
+      status: 500,
+      success: false,
+      message: `Error de red al conectar con el servidor: ${error.message || error}`
+    };
+  }
+}
+
 
 
 

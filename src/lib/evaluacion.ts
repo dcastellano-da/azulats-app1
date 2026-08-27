@@ -1,7 +1,7 @@
 import type { Busqueda } from "@/actions/busquedas";
 import type { PipelineItem } from "@/actions/pipeline";
 import type { Candidato } from "@/actions/candidatos";
-import type { TestPersonalidad } from "@/types/screening";
+import type { TestPersonalidad, AssessmentManual } from "@/types/screening";
 
 export interface EvaluacionCandidate {
   id: string;
@@ -32,6 +32,7 @@ export interface EvaluacionCandidate {
   reuniones?: any[] | null;
   informe_entrevista_ia?: any | null;
   test_personalidad?: TestPersonalidad | null;
+  assessment_manual?: AssessmentManual | null;
   toolsDetails: {
     sintetizador: {
       pros: string[];
@@ -526,6 +527,7 @@ export const mapPipelineToEvaluacionCandidates = (
       url_cv: cand?.url_cv || undefined,
       informe_entrevista_ia: pipe.f2_evaluacion?.informe_entrevista_ia || (pipe.evaluacion as any)?.informe_entrevista_ia || null,
       test_personalidad: pipe.f2_evaluacion?.test_personalidad || (pipe.evaluacion as any)?.test_personalidad || null,
+      assessment_manual: pipe.f2_evaluacion?.assessment_manual || (pipe.evaluacion as any)?.assessment_manual || null,
       toolsDetails: generateDefaultToolsDetails(candName, role, score)
     });
   }
