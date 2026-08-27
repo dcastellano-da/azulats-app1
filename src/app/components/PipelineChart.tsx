@@ -108,12 +108,16 @@ export default function PipelineChart({
     }
     if (selectedSearch !== "all") {
       searchesInScope = searchesInScope.filter(
-        (b) => (b.id || b.id_busqueda || b.codigo_busqueda) === selectedSearch
+        (b) =>
+          (b.id || b.id_busqueda || b.codigo_busqueda) === selectedSearch ||
+          `${b.cliente} - ${b.perfil_busqueda}` === selectedSearch
       );
     }
 
     const searchIds = new Set(
-      searchesInScope.flatMap((b) => [b.id, b.id_busqueda, b.codigo_busqueda].filter(Boolean) as string[])
+      searchesInScope.flatMap((b) =>
+        [b.id, b.id_busqueda, b.codigo_busqueda, `${b.cliente} - ${b.perfil_busqueda}`].filter(Boolean) as string[]
+      )
     );
     const searchProfiles = new Set(
       searchesInScope.map((b) => (b.perfil_busqueda || "").toLowerCase()).filter(Boolean)

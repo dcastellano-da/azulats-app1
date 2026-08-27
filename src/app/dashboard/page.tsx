@@ -125,7 +125,11 @@ export default function DashboardPage() {
       filtered = filtered.filter((b) => b.cliente === selectedClient);
     }
     if (selectedSearch !== "all") {
-      filtered = filtered.filter((b) => (b.id || b.id_busqueda || b.codigo_busqueda) === selectedSearch);
+      filtered = filtered.filter(
+        (b) =>
+          (b.id || b.id_busqueda || b.codigo_busqueda) === selectedSearch ||
+          `${b.cliente} - ${b.perfil_busqueda}` === selectedSearch
+      );
     }
     return filtered.filter((b) => {
       const status = (b.estado_fase || b.estado_sla?.estado_busqueda || "").toLowerCase();
@@ -145,12 +149,16 @@ export default function DashboardPage() {
     }
     if (selectedSearch !== "all") {
       activeSearchesInScope = activeSearchesInScope.filter(
-        (b) => (b.id || b.id_busqueda || b.codigo_busqueda) === selectedSearch
+        (b) =>
+          (b.id || b.id_busqueda || b.codigo_busqueda) === selectedSearch ||
+          `${b.cliente} - ${b.perfil_busqueda}` === selectedSearch
       );
     }
 
     const searchIds = new Set(
-      activeSearchesInScope.flatMap((b) => [b.id, b.id_busqueda, b.codigo_busqueda].filter(Boolean) as string[])
+      activeSearchesInScope.flatMap((b) =>
+        [b.id, b.id_busqueda, b.codigo_busqueda, `${b.cliente} - ${b.perfil_busqueda}`].filter(Boolean) as string[]
+      )
     );
 
     if (pipelineItems.length > 0) {
@@ -189,7 +197,9 @@ export default function DashboardPage() {
     }
     if (selectedSearch !== "all") {
       activeSearchesInScope = activeSearchesInScope.filter(
-        (b) => (b.id || b.id_busqueda || b.codigo_busqueda) === selectedSearch
+        (b) =>
+          (b.id || b.id_busqueda || b.codigo_busqueda) === selectedSearch ||
+          `${b.cliente} - ${b.perfil_busqueda}` === selectedSearch
       );
     }
 
@@ -229,7 +239,9 @@ export default function DashboardPage() {
     }
     if (selectedSearch !== "all") {
       filtered = filtered.filter(
-        (b) => (b.id || b.id_busqueda || b.codigo_busqueda) === selectedSearch
+        (b) =>
+          (b.id || b.id_busqueda || b.codigo_busqueda) === selectedSearch ||
+          `${b.cliente} - ${b.perfil_busqueda}` === selectedSearch
       );
     }
 

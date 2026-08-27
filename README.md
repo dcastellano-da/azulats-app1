@@ -385,6 +385,12 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
 --------------------------------------------------------------------------------------------------------
 # Historico de Cambios (ordenados por los recientes cambios primeros, formato de fecha "AAAA/MM/DD")
 
+*   **2026/08/27:** Homologación 100% de Conteos de Postulantes entre Dashboard (`ID: P-DSH-01`) y Pantallas de Fase (`P-DIS-01`, `P-EVA-01`, `P-PRE-01`, `P-CIE-01`):
+    *   **Aislamiento Estricto de Fases en Fase 1 Descubrimiento (`ID: P-DIS-01`):** Actualizada la función `mapPipelineToSourcedCandidates` en `descubrimiento/page.tsx` para descartar candidatos de pipeline pertenecientes a Fases 2, 3 o 4 (estados 05 a 15), previniendo que postulantes avanzados inflen artificialmente el conteo de `01 - NUEVO EN REVISION`.
+    *   **Corrección de Índices de Estado en Fase 4 Cierre (`ID: P-CIE-01`):** Ajustados los condicionales numéricos en `cierre.ts` para que los estados 12, 13, 14 y 15 correspondan exactamente con `12_oferta_extendida`, `13_contratado`, `14_rechazado_cliente` y `15_candidato_se_baja`.
+    *   **Homologación de Claves de Filtrado (`selectedSearch`):** Ampliado el conjunto de claves en `PipelineChart.tsx` y `dashboard/page.tsx` contemplando `id`, `id_busqueda`, `codigo_busqueda` y `${cliente} - ${perfil_busqueda}` para garantizar concordancia absoluta al filtrar por proceso activo.
+    *   **Pruebas Automatizadas:** Ejecución de suites en `tests/dashboard_p_dsh_01.test.js` (12/12 pasadas con 100% éxito) y `tests/descubrimiento_screening_ia_view.test.js` (19/19 pasadas con 100% éxito).
+
 *   **2026/08/26:** Homologación de Etiquetas de Estado, Agrupar por Fases y Precisión de Filtros en Gráfico de Postulantes (`ID: P-DSH-01`):
     *   **Estructuración por 4 Fases Principales:** Rediseño del componente `PipelineChart.tsx` en 4 secciones visuales glassmorphism dedicadas a las fases **F1 Descubrimiento**, **F2 Evaluación**, **F3 Cliente** y **F4 Cierre**.
     *   **Etiquetas Kanban de Estados 01 a 15:** Homologación exacta de las etiquetas de estado con su número de orden correlativo y título idéntico a las columnas Kanban de las fases (ej. `01 - NUEVO EN REVISION`, `05 - SCREENING / ENTREVISTA INICIAL`, `13 - CONTRATADO (WON)`, `15 - CANDIDATO SE BAJA (DROP-OUT)`).

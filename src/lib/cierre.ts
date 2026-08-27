@@ -127,13 +127,13 @@ export const mapPipelineToCierreCandidates = (
 
     // Map pipeline states to Cierre phases (12_oferta_extendida, 13_contratado, 14_rechazado_cliente, 15_candidato_se_baja)
     let currentPhase: CierreCandidate["currentPhase"] | null = null;
-    if (stateStr.includes("11") || stateStr.includes("oferta") || stateStr.includes("negociacion")) {
+    if (stateStr.includes("12") || stateStr.includes("oferta") || stateStr.includes("negociacion")) {
       currentPhase = "12_oferta_extendida";
-    } else if (stateStr.includes("12") || stateStr.includes("contratado") || stateStr.includes("won") || stateStr.includes("ganado") || stateStr.includes("cierre")) {
+    } else if (stateStr.includes("13") || stateStr.includes("contratado") || stateStr.includes("won") || stateStr.includes("ganado")) {
       currentPhase = "13_contratado";
-    } else if (stateStr.includes("13") || stateStr.includes("rechazado") || stateStr.includes("lost")) {
+    } else if (stateStr.includes("14") || stateStr.includes("rechazado_cliente") || stateStr.includes("lost")) {
       currentPhase = "14_rechazado_cliente";
-    } else if (stateStr.includes("14") || stateStr.includes("baja") || stateStr.includes("drop")) {
+    } else if (stateStr.includes("15") || stateStr.includes("baja") || stateStr.includes("drop")) {
       currentPhase = "15_candidato_se_baja";
     }
 

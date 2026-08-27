@@ -261,21 +261,23 @@ const mapPipelineToSourcedCandidates = (
     const cand = candidatoMap.get(pipe.claves_conexion.id_candidato);
     const busq = busquedaMap.get(pipe.claves_conexion.id_busqueda);
 
-    let phase1State: SourcedCandidate["phase1State"] = "01_nuevo";
+    let phase1State: SourcedCandidate["phase1State"] | null = null;
     const stateStr = pipe.flujo?.estado_actual || "";
-    const lowerState = stateStr.toLowerCase();
-    if (lowerState.includes("01 -") || lowerState.includes("01_nuevo")) {
+    const lowerState = stateStr.toLowerCase().trim();
+
+    if (lowerState.includes("01") || lowerState.includes("nuevo")) {
       phase1State = "01_nuevo";
-    } else if (lowerState.includes("02 -") || lowerState.includes("02_contactado")) {
+    } else if (lowerState.includes("02") || lowerState.includes("contactado")) {
       phase1State = "02_contactado";
-    } else if (lowerState.includes("03 -") || lowerState.includes("03_bloqueado")) {
+    } else if (lowerState.includes("03") || lowerState.includes("bloqueado")) {
       phase1State = "03_bloqueado";
-    } else if (lowerState.includes("04 -") || lowerState.includes("04_rechazado") || lowerState.includes("descartado") || lowerState.includes("rechazado")) {
+    } else if (lowerState.includes("04") || lowerState.includes("rechazado en fase inicial") || lowerState === "04_rechazado") {
       phase1State = "04_rechazado";
-    } else {
-      if (lowerState === "02_contactado") phase1State = "02_contactado";
-      else if (lowerState === "03_bloqueado") phase1State = "03_bloqueado";
-      else if (lowerState === "04_rechazado") phase1State = "04_rechazado";
+    }
+
+    // Strict phase isolation: skip candidates belonging to F2, F3, F4 (05 to 15)
+    if (!phase1State) {
+      return null;
     }
 
     let lastChangeDate = "Hace poco";
@@ -349,7 +351,7 @@ const mapPipelineToSourcedCandidates = (
       fitScoreScreening,
       tieneKnockout
     };
-  });
+  }).filter((item): item is SourcedCandidate => item !== null);
 };
 
 // Global mockup active searches
