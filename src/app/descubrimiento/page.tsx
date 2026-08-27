@@ -257,7 +257,9 @@ const mapPipelineToSourcedCandidates = (
     if (b.codigo_busqueda) busquedaMap.set(b.codigo_busqueda, b);
   });
 
-  return pipelineItems.map(pipe => {
+  const result: SourcedCandidate[] = [];
+
+  for (const pipe of pipelineItems) {
     const cand = candidatoMap.get(pipe.claves_conexion.id_candidato);
     const busq = busquedaMap.get(pipe.claves_conexion.id_busqueda);
 
@@ -277,7 +279,7 @@ const mapPipelineToSourcedCandidates = (
 
     // Strict phase isolation: skip candidates belonging to F2, F3, F4 (05 to 15)
     if (!phase1State) {
-      return null;
+      continue;
     }
 
     let lastChangeDate = "Hace poco";
@@ -322,7 +324,7 @@ const mapPipelineToSourcedCandidates = (
     const fitScoreScreening = pipe.fit_score_screening ?? (pipe as any).fitScoreScreening ?? pipe.f1_descubrimiento?.analisis_semantico?.fit_score ?? score;
     const tieneKnockout = pipe.tiene_knockout ?? (pipe as any).tieneKnockout ?? (resultadoScreening?.some((r: any) => r.es_knockout && r.evaluacion === "NO") || false);
 
-    return {
+    result.push({
       id: pipe.claves_conexion.id_candidato,
       pipeId: pipe.id,
       searchId: busq?.id_busqueda || busq?.id || pipe.claves_conexion.id_busqueda,
@@ -350,8 +352,10 @@ const mapPipelineToSourcedCandidates = (
       resultadoScreening,
       fitScoreScreening,
       tieneKnockout
-    };
-  }).filter((item): item is SourcedCandidate => item !== null);
+    });
+  }
+
+  return result;
 };
 
 // Global mockup active searches
