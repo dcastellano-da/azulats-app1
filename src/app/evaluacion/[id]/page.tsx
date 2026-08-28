@@ -38,7 +38,8 @@ import {
   Video,
   ExternalLink,
   Calendar,
-  Brain
+  Brain,
+  Download
 } from "lucide-react";
 
 // Backend API Actions
@@ -52,6 +53,7 @@ import InformeScreeningCard from "@/app/components/InformeScreeningCard";
 import AnalizarTestPersonalidadModal from "@/app/components/AnalizarTestPersonalidadModal";
 import TestPersonalidadCard from "@/app/components/TestPersonalidadCard";
 import AssessmentManualCard from "@/app/components/AssessmentManualCard";
+import GenerarFichaPdfModal from "@/app/components/GenerarFichaPdfModal";
 
 const generateDefaultToolsDetails = (candName: string, role: string, score: number) => {
   const isRust = role.toLowerCase().includes("rust") || role.toLowerCase().includes("architect");
@@ -121,6 +123,7 @@ export default function EvaluacionDetallePage() {
 
   // Test de Personalidad CFV-V3 State
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+  const [isFichaPdfModalOpen, setIsFichaPdfModalOpen] = useState(false);
   const [testPersonalidad, setTestPersonalidad] = useState<TestPersonalidad | null>(null);
   const [assessmentManual, setAssessmentManual] = useState<AssessmentManual | null>(null);
 
@@ -643,6 +646,16 @@ export default function EvaluacionDetallePage() {
             >
               <Brain className="w-3.5 h-3.5" />
               <span>Analizar Test Personalidad</span>
+            </button>
+
+            {/* Generar Ficha PDF Button */}
+            <button
+              onClick={() => setIsFichaPdfModalOpen(true)}
+              title="Generar Ficha Técnica a PDF (Dossier Presentación a Cliente)"
+              className="px-3.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/15 hover:bg-emerald-500 hover:text-stone-950 text-emerald-300 transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs shadow-sm shadow-emerald-500/10"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Generar Ficha (PDF)</span>
             </button>
 
             <span className="text-[10px] font-bold text-[#c4c1fb] bg-[#c4c1fb]/10 px-3 py-1 rounded-full uppercase tracking-wider border border-[#c4c1fb]/20">
@@ -1717,6 +1730,15 @@ export default function EvaluacionDetallePage() {
           setTestPersonalidad(nuevoTestData);
           loadCandidateData();
         }}
+      />
+
+      {/* Modal: Generar Ficha Técnica a PDF (Dossier Presentación a Cliente) */}
+      <GenerarFichaPdfModal
+        isOpen={isFichaPdfModalOpen}
+        onClose={() => setIsFichaPdfModalOpen(false)}
+        pipelineId={cand.pipeId || id}
+        candidateName={cand.name}
+        roleName={cand.role}
       />
     </main>
   );

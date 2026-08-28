@@ -24,9 +24,11 @@ import {
   MapPin,
   Globe,
   Award,
-  Pencil
+  Pencil,
+  Download
 } from "lucide-react";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
+import GenerarFichaPdfModal from "@/app/components/GenerarFichaPdfModal";
 
 export default function CandidatoDetailPage() {
   const router = useRouter();
@@ -40,6 +42,7 @@ export default function CandidatoDetailPage() {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
+  const [isFichaPdfModalOpen, setIsFichaPdfModalOpen] = useState(false);
 
 
 
@@ -393,13 +396,25 @@ Notas iniciales: ${cand.notas_iniciales || 'Ninguna'}`;
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="px-4 py-1.5 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 text-[10px] uppercase font-bold text-[#6bd8cb] hover:bg-[#6bd8cb]/20 transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                <span>Editar Ficha</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="px-4 py-1.5 rounded-xl bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 text-[10px] uppercase font-bold text-[#6bd8cb] hover:bg-[#6bd8cb]/20 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Editar Ficha</span>
+                </button>
+
+                {/* Generar Ficha PDF Button */}
+                <button
+                  onClick={() => setIsFichaPdfModalOpen(true)}
+                  title="Generar Ficha Técnica a PDF (Dossier Presentación a Cliente)"
+                  className="px-3.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/15 hover:bg-emerald-500 hover:text-stone-950 text-emerald-300 transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs shadow-sm shadow-emerald-500/10"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Generar Ficha (PDF)</span>
+                </button>
+              </div>
             )}
           </div>
         </header>
@@ -909,6 +924,15 @@ Notas iniciales: ${cand.notas_iniciales || 'Ninguna'}`;
         )}
 
       </div>
+
+      {/* Modal: Generar Ficha Técnica a PDF (Dossier Presentación a Cliente) */}
+      <GenerarFichaPdfModal
+        isOpen={isFichaPdfModalOpen}
+        onClose={() => setIsFichaPdfModalOpen(false)}
+        pipelineId={id}
+        candidateName={cand?.nombre_completo || "Candidato"}
+        roleName={cand?.puesto || "Perfil Tech"}
+      />
     </div>
   );
 }

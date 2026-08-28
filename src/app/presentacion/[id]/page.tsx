@@ -42,7 +42,8 @@ import {
   Trash2,
   Video,
   ExternalLink,
-  HelpCircle
+  HelpCircle,
+  Download
 } from "lucide-react";
 
 // Backend API Actions
@@ -53,6 +54,7 @@ import {
   PresentacionCandidate, 
   generateDefaultPresentacionToolsDetails 
 } from "@/lib/presentacion";
+import GenerarFichaPdfModal from "@/app/components/GenerarFichaPdfModal";
 
 type DiagTab = "general" | "analitica" | "traductor" | "briefing" | "agenda" | "tracker";
 
@@ -70,6 +72,8 @@ export default function PresentacionDetallePage() {
 
   // Active Tab for Client & AI Tools
   const [activeTab, setActiveTab] = useState<DiagTab>("general");
+
+  const [isFichaPdfModalOpen, setIsFichaPdfModalOpen] = useState(false);
 
   // Editing state for Recruiter Notes across all phases
   const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -744,6 +748,16 @@ export default function PresentacionDetallePage() {
             >
               <FileText className="w-3.5 h-3.5" />
               <span>CV</span>
+            </button>
+
+            {/* Generar Ficha PDF Button */}
+            <button
+              onClick={() => setIsFichaPdfModalOpen(true)}
+              title="Generar Ficha Técnica a PDF (Dossier Presentación a Cliente)"
+              className="px-3.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/15 hover:bg-emerald-500 hover:text-stone-950 text-emerald-300 transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold text-xs shadow-sm shadow-emerald-500/10"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Generar Ficha (PDF)</span>
             </button>
 
             <span className="text-[10px] font-bold text-[#c4c1fb] bg-[#c4c1fb]/10 px-3 py-1 rounded-full uppercase tracking-wider border border-[#c4c1fb]/20">
@@ -1890,6 +1904,15 @@ export default function PresentacionDetallePage() {
           </div>
         </div>
       )}
+
+      {/* Modal: Generar Ficha Técnica a PDF (Dossier Presentación a Cliente) */}
+      <GenerarFichaPdfModal
+        isOpen={isFichaPdfModalOpen}
+        onClose={() => setIsFichaPdfModalOpen(false)}
+        pipelineId={cand.pipeId || id}
+        candidateName={cand.name}
+        roleName={cand.role}
+      />
     </main>
   );
 }

@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import type { ResultadoScreeningItem, InformeEntrevistaIA, TestPersonalidad, AssessmentManual } from "@/types/screening";
+import type { FichaPdfOpciones, GenerarFichaPdfResponse } from "@/types/fichaPdf";
 import { getApiEndpoint } from "@/utils/api";
 
 export interface Reunion {
@@ -938,6 +939,114 @@ export async function actualizarAssessmentManualAction(
     };
   }
 }
+
+/**
+ * Server Action: Genera la Ficha Técnica de Presentación a Cliente a PDF.
+ * POST /api/v1/pipeline/:id/generar-ficha-pdf
+ */
+export async function generarFichaPdfAction(
+  pipelineId: string,
+  opciones: FichaPdfOpciones
+): Promise<GenerarFichaPdfResponse> {
+  try {
+    const isMock = process.env.NEXT_PUBLIC_USE_MOCKS === "true";
+    if (isMock) {
+      console.log(`[Pipeline Action] Modo Mocks activo (NEXT_PUBLIC_USE_MOCKS=true). Generando PDF simulado.`);
+      // Mock minimal PDF header in Base64
+      const mockPdfBase64 = "JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDAKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPj4KZW5kb2JqCjMgMCBvYmoKPDAKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQo+PgplbmRvYmoKeHJlZgowIDQKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDE5IDAwMDAwIG4gCjAwMDAwMDAwNjggMDAwMDAgbiAKMDAwMDAwMDEzMCAwMDAwMCBuIAp0cmFpbGVyCjw8Ci9TaXplIDQKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjE5MgolJUVPRgo=";
+      return {
+        status: 200,
+        success: true,
+        message: "Ficha PDF generada con éxito (modo mock).",
+        data: mockPdfBase64,
+        contentType: "application/pdf"
+      };
+    }
+
+    const token = await getServerAuthToken();
+    const url = getApiEndpoint(`pipeline/${encodeURIComponent(pipelineId)}/generar-ficha-pdf`);
+    console.log(`[Pipeline Action] Solicitando generación de Ficha PDF a: ${url}`);
+
+    const payload = {
+      incluir_resumen_ia: opciones.incluir_resumen_ia ?? true,
+      incluir_test_personalidad: opciones.incluir_test_personalidad ?? true,
+      incluir_pretension_salarial: opciones.incluir_pretension_salarial ?? true,
+      incluir_notas_assessment: opciones.incluir_notas_assessment ?? true,
+      incluir_bitacora: opciones.incluir_bitacora ?? true,
+      incluir_trayectoria: opciones.incluir_trayectoria ?? true,
+      anonimizar_candidato: opciones.anonimizar_candidato ?? false
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const status = response.status;
+
+    if (status === 200) {
+      const contentType = response.headers.get("content-type") || "application/pdf";
+      if (contentType.includes("application/pdf")) {
+        const arrayBuffer = await response.arrayBuffer();
+        console.log('[DEBUG SERVER ACTION] Bytes recibidos del backend:', arrayBuffer.byteLength);
+        const base64Data = Buffer.from(arrayBuffer).toString("base64");
+        console.log('[DEBUG SERVER ACTION] Cabecera Base64:', base64Data.substring(0, 20));
+        return {
+          status: 200,
+          success: true,
+          message: "Ficha PDF generada correctamente por el backend.",
+          data: base64Data,
+          contentType: "application/pdf"
+        };
+      } else {
+        const json = await response.json();
+        const rawData = json.data?.base64 || json.data || "";
+        console.log('[DEBUG SERVER ACTION] Longitud Base64 (JSON):', typeof rawData === "string" ? rawData.length : "objeto");
+        console.log('[DEBUG SERVER ACTION] Cabecera Base64:', typeof rawData === "string" ? rawData.substring(0, 20) : "N/A");
+        return {
+          status: 200,
+          success: true,
+          message: json.message || "Ficha PDF generada.",
+          data: rawData,
+          contentType: "application/pdf"
+        };
+      }
+    }
+
+    let errorData: any = null;
+    try {
+      errorData = await response.json();
+    } catch (_) {}
+
+    console.log(`[Pipeline Action] generarFichaPdfAction HTTP ${status} respuesta:`, errorData);
+
+    if (status === 404) {
+      return {
+        status: 404,
+        success: false,
+        message: `Ruta no encontrada en el backend (HTTP 404). Verifica que el microservicio en ${url} tenga registrada la ruta POST /api/v1/pipeline/:id/generar-ficha-pdf.`
+      };
+    }
+
+    return {
+      status,
+      success: false,
+      message: errorData?.detail || errorData?.message || errorData?.error || `Error al generar la Ficha PDF en el servidor (Código HTTP ${status}).`
+    };
+  } catch (error: any) {
+    console.error("[Pipeline Action] Error en generarFichaPdfAction:", error);
+    return {
+      status: 500,
+      success: false,
+      message: `Error de red al solicitar la Ficha PDF al servidor: ${error.message || error}`
+    };
+  }
+}
+
 
 
 
