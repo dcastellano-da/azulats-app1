@@ -47,60 +47,14 @@ import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, actualizarPipelineAPI, Reunion } from "@/actions/pipeline";
 import { EvaluacionCandidate } from "@/lib/evaluacion";
-import type { InformeEntrevistaIA, TestPersonalidad, AssessmentManual } from "@/types/screening";
+import type { InformeEntrevistaIA, TestPersonalidad, AssessmentManual, CriterioScreening } from "@/types/screening";
 import AnalizarTranscripcionModal from "@/app/components/AnalizarTranscripcionModal";
 import InformeScreeningCard from "@/app/components/InformeScreeningCard";
 import AnalizarTestPersonalidadModal from "@/app/components/AnalizarTestPersonalidadModal";
 import TestPersonalidadCard from "@/app/components/TestPersonalidadCard";
 import AssessmentManualCard from "@/app/components/AssessmentManualCard";
 import GenerarFichaPdfModal from "@/app/components/GenerarFichaPdfModal";
-
-const generateDefaultToolsDetails = (candName: string, role: string, score: number) => {
-  const isRust = role.toLowerCase().includes("rust") || role.toLowerCase().includes("architect");
-  const isSenior = role.toLowerCase().includes("lead") || role.toLowerCase().includes("senior") || role.toLowerCase().includes("architect");
-  
-  return {
-    sintetizador: {
-      pros: [
-        `Sólida trayectoria alineada con la posición de ${role}.`,
-        "Capacidad comunicativa fluida en entornos multiculturales.",
-        "Buen desempeño demostrado en la resolución de problemas técnicos complejos."
-      ],
-      contras: [
-        "Requiere breve período de adaptación a las herramientas internas específicas del cliente."
-      ],
-      riesgos: [
-        "Disponibilidad sujeta a preaviso de 15 días en su empresa actual."
-      ]
-    },
-    inconsistencias: {
-      hasGaps: false,
-      gaps: [] as { period: string; duration: string; description: string }[],
-      overlaps: [] as string[]
-    },
-    preguntas: [
-      `¿Cómo abordas la optimización y escalabilidad en arquitecturas para ${role}?`,
-      "Describe un proyecto donde tuviste que tomar decisiones críticas bajo presión.",
-      "¿Cuál es tu enfoque para la entrega continua y colaboración con equipos de producto?"
-    ],
-    validador: {
-      ip: "185.220.101.5",
-      location: "España / Remoto",
-      envStatus: "Ambiente limpio verificado. Sin señales de software no autorizado.",
-      verificationStatus: "success" as const
-    },
-    copilot: {
-      activeSession: true,
-      difficultyLevel: isSenior ? ("Senior" as const) : ("Middle" as const),
-      completionRate: Math.min(100, score + 5),
-      effortScore: Math.round(((score / 20) + Number.EPSILON) * 10) / 10,
-      languageUsed: isRust ? "Rust / WebAssembly" : "TypeScript / React",
-      summary: `${candName} completó la sesión de Live Coding con un desempeño sólido (${score}% fit score). Código limpio y estructurado.`
-    }
-  };
-};
-
-type DiagTab = "sintetizador" | "inconsistencias" | "preguntas" | "validador" | "copilot";
+import ScreeningAccordionSection from "@/app/components/ScreeningAccordionSection";
 
 export default function EvaluacionDetallePage() {
   const params = useParams();
@@ -111,11 +65,9 @@ export default function EvaluacionDetallePage() {
 
   const [cand, setCand] = useState<EvaluacionCandidate | null>(null);
   const [activePipelineItem, setActivePipelineItem] = useState<PipelineItem | null>(null);
+  const [criteriosBusqueda, setCriteriosBusqueda] = useState<CriterioScreening[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Active Tab for AI Diagnostic Tools
-  const [activeTab, setActiveTab] = useState<DiagTab>("sintetizador");
 
   // Transcripción de Screening IA State
   const [isTranscripcionModalOpen, setIsTranscripcionModalOpen] = useState(false);
@@ -256,12 +208,12 @@ export default function EvaluacionDetallePage() {
           recruiterNotes: f2Notes,
           url_cv: cObj?.url_cv || undefined,
           canal_ingreso: cObj?.canal_ingreso || null,
-          reuniones: targetPipe?.f1_descubrimiento?.reuniones || [],
-          toolsDetails: generateDefaultToolsDetails(candName, role, score)
+          reuniones: targetPipe?.f1_descubrimiento?.reuniones || []
         };
 
         setCand(item);
         setActivePipelineItem(targetPipe || null);
+        if (bObj?.criterios_screening) setCriteriosBusqueda(bObj.criterios_screening);
         setInformeEntrevistaIA(targetPipe?.f2_evaluacion?.informe_entrevista_ia || (targetPipe?.evaluacion as any)?.informe_entrevista_ia || null);
         setTestPersonalidad(targetPipe?.f2_evaluacion?.test_personalidad || (targetPipe?.evaluacion as any)?.test_personalidad || null);
         setAssessmentManual(targetPipe?.f2_evaluacion?.assessment_manual || (targetPipe?.evaluacion as any)?.assessment_manual || null);
@@ -1136,193 +1088,17 @@ export default function EvaluacionDetallePage() {
               </div>
             </div>
 
-            {/* ── Diagnostic Tools Tabs ── */}
-            <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden">
-              {/* Tab header */}
-              <div className="px-6 py-3 border-b border-white/10 bg-[#101415]/60">
-                <div className="flex items-center gap-2 mb-3">
-                  <Cpu className="w-4 h-4 text-[#c4c1fb] animate-pulse" />
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">Herramientas de Diagnóstico IA — F2</span>
-                </div>
-                <nav className="flex items-center overflow-x-auto gap-1 select-none">
-                  {([
-                    { key: "sintetizador", icon: <FileText className="w-3.5 h-3.5" />, label: "5. Sintetizador" },
-                    { key: "inconsistencias", icon: <AlertTriangle className="w-3.5 h-3.5 text-[#ffb4ab]" />, label: "6. Detector Crono" },
-                    { key: "preguntas", icon: <Zap className="w-3.5 h-3.5" />, label: "7. Preguntas STAR" },
-                    { key: "validador", icon: <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />, label: "8. Validador ID" },
-                    { key: "copilot", icon: <Code className="w-3.5 h-3.5 text-[#6bd8cb]" />, label: "Co-Pilot" }
-                  ] as { key: DiagTab; icon: React.ReactNode; label: string }[]).map(tab => (
-                    <button
-                      key={tab.key}
-                      onClick={() => setActiveTab(tab.key)}
-                      className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                        activeTab === tab.key
-                          ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30"
-                          : "text-[#879391] hover:text-white"
-                      }`}
-                    >
-                      {tab.icon}
-                      <span>{tab.label}</span>
-                    </button>
-                  ))}
-                </nav>
-              </div>
-
-              {/* Tab body */}
-              <div className="p-6 space-y-5">
-
-                {/* 5. Sintetizador */}
-                {activeTab === "sintetizador" && (
-                  <div className="space-y-5 animate-fadeIn">
-                    <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
-                      <span className="font-bold text-[#6bd8cb]">Sintetizador de Entrevistas</span>
-                      <p className="mt-0.5 text-[#879391] leading-relaxed">
-                        Cruza el manuscrito de la llamada del reclutador con los requerimientos vacantes de la búsqueda.
-                      </p>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="p-4 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.02] space-y-2">
-                        <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider block">Puntos Fuertes (Pros)</span>
-                        <ul className="list-disc pl-4 text-xs space-y-1 text-white/80">
-                          {cand.toolsDetails.sintetizador.pros.map((pro, i) => <li key={i}>{pro}</li>)}
-                        </ul>
-                      </div>
-                      <div className="p-4 rounded-xl border border-amber-500/10 bg-amber-500/[0.02] space-y-2">
-                        <span className="text-xs text-amber-400 font-bold uppercase tracking-wider block">Déficit o Brechas (Cons)</span>
-                        <ul className="list-disc pl-4 text-xs space-y-1 text-white/80">
-                          {cand.toolsDetails.sintetizador.contras.map((c, i) => <li key={i}>{c}</li>)}
-                        </ul>
-                      </div>
-                      <div className="p-4 rounded-xl border border-rose-500/10 bg-rose-500/[0.02] space-y-2">
-                        <span className="text-xs text-rose-400 font-bold uppercase tracking-wider block">Señales de Alerta (Riesgos)</span>
-                        <ul className="list-disc pl-4 text-xs space-y-1 text-white/80">
-                          {cand.toolsDetails.sintetizador.riesgos.map((r, i) => <li key={i}>{r}</li>)}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 6. Detector Crono */}
-                {activeTab === "inconsistencias" && (
-                  <div className="space-y-5 animate-fadeIn">
-                    <div className="p-4 rounded-xl border border-white/5 bg-rose-950/20 text-xs text-white/90">
-                      <span className="font-bold text-rose-400">Detector de Inconsistencias Cronológicas</span>
-                      <p className="mt-0.5 text-[#879391]">
-                        Analiza secuencias temporales en la hoja de vida para alertar sobre huecos desocupados o solapamientos.
-                      </p>
-                    </div>
-                    <div className="p-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center flex flex-col items-center gap-2">
-                      <Check className="w-8 h-8 text-emerald-400" />
-                      <span className="text-xs font-bold text-white uppercase tracking-wider">Línea temporal impecable</span>
-                      <p className="text-xs text-[#879391]">No se detectaron brechas sin justificar en su trayectoria profesional.</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* 7. Preguntas STAR */}
-                {activeTab === "preguntas" && (
-                  <div className="space-y-5 animate-fadeIn">
-                    <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
-                      <span className="font-bold text-[#6bd8cb]">Generador de Preguntas Técnicas STAR</span>
-                      <p className="mt-0.5 text-[#879391]">
-                        Preguntas de comportamiento y código personalizadas según el stack funcional de la vacante.
-                      </p>
-                    </div>
-                    <div className="space-y-3">
-                      {cand.toolsDetails.preguntas.map((q, idx) => (
-                        <div key={idx} className="p-4 rounded-xl border border-white/5 bg-white/[0.01] space-y-2">
-                          <div className="flex gap-3 items-start">
-                            <span className="w-5 h-5 rounded bg-[#c4c1fb] text-[#101415] flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
-                              {idx + 1}
-                            </span>
-                            <span className="text-xs text-white leading-relaxed flex-grow font-semibold">{q}</span>
-                          </div>
-                          <div className="pt-2 border-t border-white/5 flex items-center justify-between">
-                            <button
-                              onClick={() => handleCopyText(q, `q-${idx}`)}
-                              className="text-[10px] text-[#6bd8cb] hover:underline flex items-center gap-1 font-bold cursor-pointer"
-                            >
-                              <Copy className="w-3 h-3" />
-                              <span>{copiedTextType === `q-${idx}` ? "¡Copiado!" : "Copiar plantilla"}</span>
-                            </button>
-                            <span className="text-[9px] uppercase tracking-wider font-bold text-[#c4c1fb]">Método STAR</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 8. Validador */}
-                {activeTab === "validador" && (
-                  <div className="space-y-5 animate-fadeIn">
-                    <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
-                      <span className="font-bold text-[#6bd8cb]">Validador de Identidad y Entorno</span>
-                      <p className="mt-0.5 text-[#879391]">
-                        Chequeo por IP, geolocalización latente y verificación de entorno de test sin proxies sospechosos.
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="p-4 rounded-xl bg-black/30 border border-white/5 space-y-1">
-                        <span className="text-[9px] text-[#879391] uppercase font-bold tracking-wider block">Dirección IP Escaneada</span>
-                        <code className="text-xs font-mono text-[#6bd8cb] block">{cand.toolsDetails.validador.ip}</code>
-                      </div>
-                      <div className="p-4 rounded-xl bg-black/30 border border-white/5 space-y-1">
-                        <span className="text-[9px] text-[#879391] uppercase font-bold tracking-wider block">Geolocalización declarada</span>
-                        <code className="text-xs font-mono text-[#c4c1fb] block">{cand.toolsDetails.validador.location}</code>
-                      </div>
-                    </div>
-                    <div className={`p-4 rounded-xl border flex items-center gap-3 text-xs font-bold ${
-                      cand.toolsDetails.validador.verificationStatus === "success"
-                        ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400"
-                        : "border-rose-500/20 bg-rose-500/5 text-rose-400"
-                    }`}>
-                      <ShieldCheck className="w-5 h-5 shrink-0" />
-                      <div>
-                        <span className="block">
-                          {cand.toolsDetails.validador.verificationStatus === "success"
-                            ? "VERIFICADO — ENTORNO ÍNTEGRO"
-                            : "ALERTA — POSIBLE FRAUDE DETECTADO"}
-                        </span>
-                        <p className="font-normal text-[#879391] leading-relaxed mt-0.5">{cand.toolsDetails.validador.envStatus}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Co-Pilot */}
-                {activeTab === "copilot" && (
-                  <div className="space-y-5 animate-fadeIn">
-                    <div className="p-4 rounded-xl border border-white/5 bg-indigo-950/20 text-xs text-white/90">
-                      <span className="font-bold text-[#c4c1fb]">Entorno de Pair-Programming Adaptativo (AI Co-Pilot)</span>
-                      <p className="mt-0.5 text-[#879391]">Colaboración en vivo de código asistida por IA y telemetría de esfuerzo técnico.</p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Nivel Dificultad</span>
-                        <span className="text-base font-bold text-white block mt-1">{cand.toolsDetails.copilot.difficultyLevel}</span>
-                      </div>
-                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Tasa Completación</span>
-                        <span className="text-base font-bold text-[#6bd8cb] block mt-1">{cand.toolsDetails.copilot.completionRate}%</span>
-                      </div>
-                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Esfuerzo Estimado</span>
-                        <span className="text-base font-bold text-[#c4c1fb] block mt-1">{cand.toolsDetails.copilot.effortScore} / 5 pts</span>
-                      </div>
-                    </div>
-                    <div className="p-4 rounded-xl border border-white/5 bg-[#15181a]">
-                      <span className="text-[10px] text-white/40 uppercase tracking-widest font-bold block mb-1">Comentario del Evaluador Co-Pilot</span>
-                      <p className="text-xs text-[#879391] leading-relaxed italic">
-                        &quot;{cand.toolsDetails.copilot.summary}&quot;
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </div>
+            {/* ── Screening Inteligente IA (Fase 1) Desplegable ── */}
+            {cand && (
+              <ScreeningAccordionSection
+                pipelineItem={activePipelineItem}
+                criteriosBusqueda={criteriosBusqueda}
+                candidateName={cand.name}
+                busquedaName={cand.client}
+                hasCv={Boolean(cand.url_cv)}
+                onRefresh={loadCandidateData}
+              />
+            )}
           </div>
 
           {/* ══════════════════════════════════

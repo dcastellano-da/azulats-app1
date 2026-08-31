@@ -33,9 +33,7 @@ import {
   ChevronRight,
   Compass,
   Send,
-  Languages,
   Calendar,
-  Bell,
   Sparkles,
   Share2,
   Plus,
@@ -51,12 +49,11 @@ import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, actualizarCandidatoAPI, Candidato } from "@/actions/candidatos";
 import { getPipelineAPI, PipelineItem, actualizarPipelineAPI, Reunion } from "@/actions/pipeline";
 import { 
-  PresentacionCandidate, 
-  generateDefaultPresentacionToolsDetails 
+  PresentacionCandidate 
 } from "@/lib/presentacion";
 import GenerarFichaPdfModal from "@/app/components/GenerarFichaPdfModal";
-
-type DiagTab = "general" | "analitica" | "traductor" | "briefing" | "agenda" | "tracker";
+import ScreeningAccordionSection from "@/app/components/ScreeningAccordionSection";
+import type { CriterioScreening } from "@/types/screening";
 
 export default function PresentacionDetallePage() {
   const params = useParams();
@@ -67,11 +64,9 @@ export default function PresentacionDetallePage() {
 
   const [cand, setCand] = useState<PresentacionCandidate | null>(null);
   const [activePipelineItem, setActivePipelineItem] = useState<PipelineItem | null>(null);
+  const [criteriosBusqueda, setCriteriosBusqueda] = useState<CriterioScreening[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Active Tab for Client & AI Tools
-  const [activeTab, setActiveTab] = useState<DiagTab>("general");
 
   const [isFichaPdfModalOpen, setIsFichaPdfModalOpen] = useState(false);
 
@@ -86,13 +81,6 @@ export default function PresentacionDetallePage() {
   // Notifications & Toast
   const [copiedTextType, setCopiedTextType] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Tool Simulation Loading States
-  const [isSimulatingAnalysis, setIsSimulatingAnalysis] = useState(false);
-  const [isSimulatingTranslation, setIsSimulatingTranslation] = useState(false);
-  const [isSimulatingBriefingGen, setIsSimulatingBriefingGen] = useState(false);
-  const [isSimulatingAgendasSlot, setIsSimulatingAgendasSlot] = useState(false);
-  const [isSimulatingSlaPing, setIsSimulatingSlaPing] = useState(false);
 
   // Phase 4 Advance Modal State
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
@@ -224,12 +212,12 @@ export default function PresentacionDetallePage() {
           recruiterNotes: f3Notes || f2Notes,
           url_cv: cObj?.url_cv || undefined,
           canal_ingreso: cObj?.canal_ingreso || null,
-          reuniones: targetPipe?.f1_descubrimiento?.reuniones || [],
-          toolsDetails: generateDefaultPresentacionToolsDetails(candName, role, score)
+          reuniones: targetPipe?.f1_descubrimiento?.reuniones || []
         };
 
         setCand(item);
         setActivePipelineItem(targetPipe || null);
+        if (bObj?.criterios_screening) setCriteriosBusqueda(bObj.criterios_screening);
         setEditInitialNotes(initialNotes);
         setEditF1Notes(f1Notes);
         setEditF2Notes(f2Notes);
@@ -548,115 +536,6 @@ export default function PresentacionDetallePage() {
     setCopiedTextType(type);
     triggerToast("Texto copiado al portapapeles con éxito.");
     setTimeout(() => setCopiedTextType(null), 2000);
-  };
-
-  // TOOL 1: Analítica Zoom
-  const runZoomAnalysis = () => {
-    if (!cand) return;
-    setIsSimulatingAnalysis(true);
-    setTimeout(() => {
-      setIsSimulatingAnalysis(false);
-      setCand(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          analitica: {
-            ...prev.toolsDetails.analitica,
-            sentimentScore: 94,
-            globalSentiment: "Positivo",
-            microExpressionsDetected: [
-              ...prev.toolsDetails.analitica.microExpressionsDetected,
-              "Alineación de objetivos de equipo",
-              "Sinceridad en banda salarial"
-            ]
-          }
-        }
-      } : null);
-      triggerToast("Análisis telemétrico de Zoom completado (+2 insights añadidos).");
-    }, 2000);
-  };
-
-  // TOOL 2: Traductor ATS
-  const runTranslationAndStadardizer = () => {
-    if (!cand) return;
-    setIsSimulatingTranslation(true);
-    setTimeout(() => {
-      setIsSimulatingTranslation(false);
-      setCand(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          traductor: {
-            ...prev.toolsDetails.traductor,
-            cvTranslated: true
-          }
-        }
-      } : null);
-      triggerToast("CV traducido y normalizado al inglés bajo formato ATS.");
-    }, 2000);
-  };
-
-  // TOOL 3: Briefing Generator
-  const runBriefingGenerator = () => {
-    if (!cand) return;
-    setIsSimulatingBriefingGen(true);
-    setTimeout(() => {
-      setIsSimulatingBriefingGen(false);
-      const outputText = `El candidato ${cand.name} califica con aptitudes relevantes para la vacante de ${cand.role} en ${cand.client}.\n\nDemuestra contar con ${cand.experienceYears} años de experiencia laboral. El Co-Pilot de IA valora sus capacidades técnicas y fluidez conversacional en un ${cand.score}% de coincidencia inicial.\n\nSLA salarial comprobado favorablemente. Se posiciona como una contratación estratégica recomendada por la agencia.`;
-      setCand(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          briefing: {
-            generated: true,
-            content: outputText
-          }
-        }
-      } : null);
-      triggerToast("Briefing Ejecutivo redactado por IA.");
-    }, 2000);
-  };
-
-  // TOOL 4: Agenda Orchestrator
-  const suggestOptimalSlot = () => {
-    if (!cand) return;
-    setIsSimulatingAgendasSlot(true);
-    setTimeout(() => {
-      setIsSimulatingAgendasSlot(false);
-      setCand(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          agenda: {
-            ...prev.toolsDetails.agenda,
-            recruiterSlotSelected: "Jueves 23 Julio - 11:30h CEST (Sugerido por IA)",
-            isScheduled: true
-          }
-        }
-      } : null);
-      triggerToast("Slot óptimo reservado y coordinado automáticamente.");
-    }, 1800);
-  };
-
-  // TOOL 5: SLA Tracker Ping
-  const sendSlaAlertPing = () => {
-    if (!cand) return;
-    setIsSimulatingSlaPing(true);
-    setTimeout(() => {
-      setIsSimulatingSlaPing(false);
-      setCand(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          tracker: {
-            ...prev.toolsDetails.tracker,
-            totalRemindersSent: prev.toolsDetails.tracker.totalRemindersSent + 1,
-            lastReminderTime: new Date().toISOString()
-          }
-        }
-      } : null);
-      triggerToast("Notificación de escalamiento SLA enviada al Hiring Manager.");
-    }, 1200);
   };
 
   const getPhaseLabel = (phase: PresentacionCandidate["currentPhase"]) => {
@@ -1247,300 +1126,17 @@ export default function PresentacionDetallePage() {
               </div>
             </div>
 
-            {/* ── Diagnostic Tools Tabs ── */}
-            <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden">
-              {/* Tab header */}
-              <div className="px-6 py-3 border-b border-white/10 bg-[#101415]/60">
-                <div className="flex items-center gap-2 mb-3">
-                  <Cpu className="w-4 h-4 text-[#c4c1fb] animate-pulse" />
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">Herramientas de Cliente e IA — F3</span>
-                </div>
-                <nav className="flex items-center overflow-x-auto gap-1 select-none">
-                  {([
-                    { key: "general", icon: <FileText className="w-3.5 h-3.5" />, label: "1. General" },
-                    { key: "analitica", icon: <Zap className="w-3.5 h-3.5" />, label: "2. Analítica Zoom" },
-                    { key: "traductor", icon: <Languages className="w-3.5 h-3.5" />, label: "3. Traductor ATS" },
-                    { key: "briefing", icon: <Sparkles className="w-3.5 h-3.5" />, label: "4. Briefing IA" },
-                    { key: "agenda", icon: <Calendar className="w-3.5 h-3.5" />, label: "5. Orquestador Agendas" },
-                    { key: "tracker", icon: <Bell className="w-3.5 h-3.5" />, label: "6. Bot SLA Tracker" }
-                  ] as { key: DiagTab; icon: React.ReactNode; label: string }[]).map(tab => (
-                    <button
-                      key={tab.key}
-                      onClick={() => setActiveTab(tab.key)}
-                      className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                        activeTab === tab.key
-                          ? "bg-[#c4c1fb]/15 text-[#c4c1fb] border border-[#c4c1fb]/30"
-                          : "text-[#879391] hover:text-white"
-                      }`}
-                    >
-                      {tab.icon}
-                      <span>{tab.label}</span>
-                    </button>
-                  ))}
-                </nav>
-              </div>
-
-              {/* Tab body */}
-              <div className="p-6 space-y-5">
-
-                {/* 1. General & Briefing */}
-                {activeTab === "general" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="p-4 rounded-xl border border-white/5 bg-[#6bd8cb]/5 text-xs text-white/90">
-                      <span className="font-bold text-[#6bd8cb]">Resumen Ejecutivo de Calibración</span>
-                      <p className="mt-0.5 text-[#879391] leading-relaxed">
-                        {`El expediente de ${cand.name} para la vacante de ${cand.role} en ${cand.client} se encuentra presentado activamente.`}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Años Experiencia</span>
-                        <span className="text-base font-bold text-white block mt-1">{cand.experienceYears} años</span>
-                      </div>
-                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">cNPS Evaluador</span>
-                        <span className="text-base font-bold text-amber-400 block mt-1">{cand.cNPS || 9} / 10</span>
-                      </div>
-                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5">
-                        <span className="text-[9px] text-[#879391] uppercase tracking-wider font-bold block">Fit Score</span>
-                        <span className="text-base font-bold text-[#6bd8cb] block mt-1">{cand.score}%</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. Analítica Zoom */}
-                {activeTab === "analitica" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Analítica Telemétrica Zoom / Meet</h4>
-                        <p className="text-[10px] text-[#879391]">Transcripciones e inferencias de sentimiento del postulante</p>
-                      </div>
-                      <button
-                        onClick={runZoomAnalysis}
-                        disabled={isSimulatingAnalysis}
-                        className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20"
-                      >
-                        {isSimulatingAnalysis ? (
-                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Zap className="w-3.5 h-3.5" />
-                        )}
-                        <span>Ejecutar Análisis Telemétrico</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Sentiment Score General</span>
-                        <span className="text-2xl font-black text-amber-400">{cand.toolsDetails.analitica.sentimentScore} / 100</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold block w-fit">
-                          {cand.toolsDetails.analitica.globalSentiment}
-                        </span>
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Microexpresiones Detectadas</span>
-                        <ul className="space-y-1">
-                          {cand.toolsDetails.analitica.microExpressionsDetected.map((m, idx) => (
-                            <li key={idx} className="flex items-center gap-1.5 text-[#e0e3e5]">
-                              <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                              <span>{m}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                      <span className="text-[10px] font-bold text-white/40 uppercase block">Snippets de Transcripción Registrados</span>
-                      <div className="space-y-2">
-                        {cand.toolsDetails.analitica.transcriptSnippets.map((t, idx) => (
-                          <div key={idx} className="p-2.5 rounded-xl bg-black/40 border border-white/5 text-[11px]">
-                            <span className="font-bold text-[#6bd8cb] block">{t.speaker}:</span>
-                            <p className="text-[#879391] italic">"{t.text}"</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. Traductor ATS */}
-                {activeTab === "traductor" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Traductor & Estandarizador ATS</h4>
-                        <p className="text-[10px] text-[#879391]">Formateo unificado de currículums en inglés para clientes corporativos</p>
-                      </div>
-                      <button
-                        onClick={runTranslationAndStadardizer}
-                        disabled={isSimulatingTranslation}
-                        className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20"
-                      >
-                        {isSimulatingTranslation ? (
-                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Languages className="w-3.5 h-3.5" />
-                        )}
-                        <span>Traducir CV al Inglés</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">CV Original</span>
-                        <p className="text-[#879391] leading-relaxed italic">{cand.toolsDetails.traductor.originalCVText}</p>
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                        <span className="text-[10px] font-bold text-[#6bd8cb] uppercase block">Resumen Traducido ATS</span>
-                        <p className="text-[#e0e3e5] leading-relaxed font-mono">
-                          {cand.toolsDetails.traductor.translatedCVText}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. Briefing IA */}
-                {activeTab === "briefing" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Candidate Briefing Ejecutivo por IA</h4>
-                        <p className="text-[10px] text-[#879391]">Documento estructurado de presentación para el Hiring Manager</p>
-                      </div>
-                      <button
-                        onClick={runBriefingGenerator}
-                        disabled={isSimulatingBriefingGen}
-                        className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20"
-                      >
-                        {isSimulatingBriefingGen ? (
-                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3.5 h-3.5" />
-                        )}
-                        <span>Generar Briefing IA</span>
-                      </button>
-                    </div>
-
-                    {cand.toolsDetails.briefing.generated ? (
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Briefing Listo</span>
-                          <button
-                            onClick={() => handleCopyText(cand.toolsDetails.briefing.content, "briefing")}
-                            className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-white text-[10px] flex items-center gap-1 cursor-pointer"
-                          >
-                            <Copy className="w-3 h-3 text-amber-500" />
-                            <span>{copiedTextType === "briefing" ? "¡Copiado!" : "Copiar Briefing"}</span>
-                          </button>
-                        </div>
-                        <p className="text-[#e0e3e5] leading-relaxed whitespace-pre-line">
-                          {cand.toolsDetails.briefing.content}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-[#879391]">
-                        Aún no se ha generado el briefing ejecutivo. Haz clic en el botón superior para generarlo.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 5. Orquestador Agendas */}
-                {activeTab === "agenda" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Orquestador de Agendas Condicional</h4>
-                        <p className="text-[10px] text-[#879391]">Mapeo de slots óptimos para entrevista con el Hiring Manager</p>
-                      </div>
-                      <button
-                        onClick={suggestOptimalSlot}
-                        disabled={isSimulatingAgendasSlot}
-                        className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20"
-                      >
-                        {isSimulatingAgendasSlot ? (
-                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Calendar className="w-3.5 h-3.5" />
-                        )}
-                        <span>Reservar Slot Óptimo</span>
-                      </button>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                      <span className="text-[10px] font-bold text-white/40 uppercase block">Slots Sugeridos Disponibles</span>
-                      <div className="space-y-2">
-                        {cand.toolsDetails.agenda.suggestedSlots.map((slot, idx) => (
-                          <div key={idx} className="p-2.5 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between text-xs">
-                            <span className="text-[#e0e3e5]">{slot}</span>
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold">Disponible</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {cand.toolsDetails.agenda.recruiterSlotSelected && (
-                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 space-y-1">
-                          <span className="text-[10px] font-bold uppercase block">Slot Seleccionado</span>
-                          <span className="font-bold">{cand.toolsDetails.agenda.recruiterSlotSelected}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* 6. Bot SLA Tracker */}
-                {activeTab === "tracker" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Bot Rastreador de SLA</h4>
-                        <p className="text-[10px] text-[#879391]">Monitoreo de horas de espera y envío de recordatorios al cliente</p>
-                      </div>
-                      <button
-                        onClick={sendSlaAlertPing}
-                        disabled={isSimulatingSlaPing}
-                        className="px-3.5 py-1.5 rounded-xl bg-[#6bd8cb] hover:bg-[#6bd8cb]/90 text-stone-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#6bd8cb]/20"
-                      >
-                        {isSimulatingSlaPing ? (
-                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Send className="w-3.5 h-3.5" />
-                        )}
-                        <span>Enviar Alerta SLA</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Horas Transcurridas</span>
-                        <span className="text-xl font-black text-white">{cand.toolsDetails.tracker.hoursSinceSent} horas</span>
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Estado SLA</span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded inline-block ${
-                          cand.toolsDetails.tracker.slaExceeded ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        }`}>
-                          {cand.toolsDetails.tracker.slaExceeded ? "Excedido (>48h)" : "Normal (<48h)"}
-                        </span>
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Alertas Enviadas</span>
-                        <span className="text-xl font-black text-amber-400">{cand.toolsDetails.tracker.totalRemindersSent} alertas</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </div>
+            {/* ── Screening Inteligente IA (Fase 1) Desplegable ── */}
+            {cand && (
+              <ScreeningAccordionSection
+                pipelineItem={activePipelineItem}
+                criteriosBusqueda={criteriosBusqueda}
+                candidateName={cand.name}
+                busquedaName={cand.client}
+                hasCv={Boolean(cand.url_cv)}
+                onRefresh={loadCandidateData}
+              />
+            )}
           </div>
 
           {/* ══════════════════════════════════

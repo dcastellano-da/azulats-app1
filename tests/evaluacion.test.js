@@ -16,13 +16,6 @@ describe('Módulo de Evaluación - Capa de Lógica y Datos', () => {
     assert.strictEqual(typeof first.client, 'string');
     assert.strictEqual(typeof first.score, 'number');
     assert.ok(['05_screening', '06_assessment', '08_descartado_interno'].includes(first.currentPhase));
-    
-    // Tools details validation
-    assert.ok(first.toolsDetails, 'Debe tener la sección toolsDetails');
-    assert.ok(Array.isArray(first.toolsDetails.sintetizador.pros), 'Sintetizador pros debe ser un arreglo');
-    assert.ok(Array.isArray(first.toolsDetails.preguntas), 'Preguntas STAR debe ser un arreglo de strings');
-    assert.ok(first.toolsDetails.validador, 'Debe tener validador de identidad');
-    assert.ok(first.toolsDetails.copilot, 'Debe tener co-pilot telemetry details');
   });
 
   test('Debería calcular KPIs correctos para un set controlado de candidatos', () => {

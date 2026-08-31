@@ -76,10 +76,6 @@ export default function PresentacionPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "lista">("kanban");
   const [isFullScreen, setIsFullScreen] = useState(false);
   
-  // Details slide-over
-  const [activeCandidate, setActiveCandidate] = useState<PresentacionCandidate | null>(null);
-  const [activeTab, setActiveTab] = useState<"general" | "analitica" | "traductor" | "briefing" | "agenda" | "tracker">("general");
-  
   // Sorting states (list view)
   const [sortField, setSortField] = useState<string>("score");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -89,13 +85,6 @@ export default function PresentacionPage() {
   const [copiedTextType, setCopiedTextType] = useState<string | null>(null);
   const [activeMetricHelp, setActiveMetricHelp] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Simulated Tool Action States
-  const [isSimulatingAnalysis, setIsSimulatingAnalysis] = useState(false);
-  const [isSimulatingTranslation, setIsSimulatingTranslation] = useState(false);
-  const [isSimulatingBriefingGen, setIsSimulatingBriefingGen] = useState(false);
-  const [isSimulatingAgendasSlot, setIsSimulatingAgendasSlot] = useState(false);
-  const [isSimulatingSlaPing, setIsSimulatingSlaPing] = useState(false);
 
   // Toast notifier helper
   const triggerToast = (msg: string) => {
@@ -228,9 +217,6 @@ export default function PresentacionPage() {
     setCandidates((prev) =>
       prev.map((c) => (c.id === id ? { ...c, currentPhase: targetPhase, lastActivity: `Estado cambiado a ${label}` } : c))
     );
-    if (activeCandidate && activeCandidate.id === id) {
-      setActiveCandidate((prev) => prev ? { ...prev, currentPhase: targetPhase } : null);
-    }
     triggerToast(`Candidato reubicado a la columna de ${label.substring(5)}`);
 
     if (targetCandidate?.pipeId) {
@@ -281,173 +267,6 @@ export default function PresentacionPage() {
     setCopiedTextType(type);
     triggerToast("Texto copiado al portapapeles con éxito.");
     setTimeout(() => setCopiedTextType(null), 2000);
-  };
-
-  // TOOL 1: Analítica de Entrevistas Zoom/Meet
-  const runZoomAnalysis = () => {
-    if (!activeCandidate) return;
-    setIsSimulatingAnalysis(true);
-    setTimeout(() => {
-      setIsSimulatingAnalysis(false);
-      setCandidates(prev => prev.map(c => c.id === activeCandidate.id ? {
-        ...c,
-        toolsDetails: {
-          ...c.toolsDetails,
-          analitica: {
-            ...c.toolsDetails.analitica,
-            sentimentScore: 94,
-            globalSentiment: "Positivo",
-            microExpressionsDetected: [
-              ...c.toolsDetails.analitica.microExpressionsDetected,
-              "Alineación de objetivos de equipo",
-              "Sinceridad en banda salarial"
-            ]
-          }
-        }
-      } : c));
-      setActiveCandidate(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          analitica: {
-            ...prev.toolsDetails.analitica,
-            sentimentScore: 94,
-            globalSentiment: "Positivo",
-            microExpressionsDetected: [
-              ...prev.toolsDetails.analitica.microExpressionsDetected,
-              "Alineación de objetivos de equipo",
-              "Sinceridad en banda salarial"
-            ]
-          }
-        }
-      } : null);
-      triggerToast("Análisis telemétrico de Zoom y Calibración completado. Co-Pilot indexó +2 insights de microexpresiones.");
-    }, 2000);
-  };
-
-  // TOOL 2: Traductor y Estandarizador de Perfiles
-  const runTranslationAndStadardizer = () => {
-    if (!activeCandidate) return;
-    setIsSimulatingTranslation(true);
-    setTimeout(() => {
-      setIsSimulatingTranslation(false);
-      setCandidates(prev => prev.map(c => c.id === activeCandidate.id ? {
-        ...c,
-        toolsDetails: {
-          ...c.toolsDetails,
-          traductor: {
-            ...c.toolsDetails.traductor,
-            cvTranslated: true
-          }
-        }
-      } : c));
-      setActiveCandidate(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          traductor: {
-            ...prev.toolsDetails.traductor,
-            cvTranslated: true
-          }
-        }
-      } : null);
-      triggerToast("CV traducido y normalizado al inglés bajo el formato unificado ATS.");
-    }, 2000);
-  };
-
-  // TOOL 3: Generador de Candidate Briefings
-  const runBriefingGenerator = () => {
-    if (!activeCandidate) return;
-    setIsSimulatingBriefingGen(true);
-    setTimeout(() => {
-      setIsSimulatingBriefingGen(false);
-      const outputText = `El candidato ${activeCandidate.name} califica con aptitudes relevantes para la vacante de ${activeCandidate.role} en ${activeCandidate.client}.\n\nDemuestra contar con ${activeCandidate.experienceYears} años de experiencia laboral. El Co-Pilot de IA valora sus capacidades técnicas y fluidez conversacional en un ${activeCandidate.score}% de coincidencia inicial.\n\nSLA salarial comprobado favorablemente. Se posiciona como una contratación estratégica recomendada por la agencia.`;
-      setCandidates(prev => prev.map(c => c.id === activeCandidate.id ? {
-        ...c,
-        toolsDetails: {
-          ...c.toolsDetails,
-          briefing: {
-            generated: true,
-            content: outputText
-          }
-        }
-      } : c));
-      setActiveCandidate(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          briefing: {
-            generated: true,
-            content: outputText
-          }
-        }
-      } : null);
-      triggerToast("Briefing Ejecutivo redactado inteligentemente por IA.");
-    }, 2000);
-  };
-
-  // TOOL 4: Orquestador de Agendas Condicional
-  const suggestOptimalSlot = () => {
-    if (!activeCandidate) return;
-    setIsSimulatingAgendasSlot(true);
-    setTimeout(() => {
-      setIsSimulatingAgendasSlot(false);
-      setCandidates(prev => prev.map(c => c.id === activeCandidate.id ? {
-        ...c,
-        toolsDetails: {
-          ...c.toolsDetails,
-          agenda: {
-            ...c.toolsDetails.agenda,
-            recruiterSlotSelected: "Jueves 23 Julio - 11:30h CEST (Sugerido por IA)",
-            isScheduled: true
-          }
-        }
-      } : c));
-      setActiveCandidate(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          agenda: {
-            ...prev.toolsDetails.agenda,
-            recruiterSlotSelected: "Jueves 23 Julio - 11:30h CEST (Sugerido por IA)",
-            isScheduled: true
-          }
-        }
-      } : null);
-      triggerToast("Calendarios mapeados. Slot óptimo reservado y coordinado automáticamente.");
-    }, 1800);
-  };
-
-  // TOOL 5: Bot Rastreador de SLA para Clientes
-  const sendSlaAlertPing = () => {
-    if (!activeCandidate) return;
-    setIsSimulatingSlaPing(true);
-    setTimeout(() => {
-      setIsSimulatingSlaPing(false);
-      setCandidates(prev => prev.map(c => c.id === activeCandidate.id ? {
-        ...c,
-        toolsDetails: {
-          ...c.toolsDetails,
-          tracker: {
-            ...c.toolsDetails.tracker,
-            totalRemindersSent: c.toolsDetails.tracker.totalRemindersSent + 1,
-            lastReminderTime: new Date().toISOString()
-          }
-        }
-      } : c));
-      setActiveCandidate(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          tracker: {
-            ...prev.toolsDetails.tracker,
-            totalRemindersSent: prev.toolsDetails.tracker.totalRemindersSent + 1,
-            lastReminderTime: new Date().toISOString()
-          }
-        }
-      } : null);
-      triggerToast("Notificación de escalamiento SLA enviada al Hiring Manager por Teams, Slack y Correo.");
-    }, 1200);
   };
 
   // Sort list view candidates helper
@@ -1182,11 +1001,11 @@ export default function PresentacionPage() {
 
                           <button
                             onClick={() => handleViewDetails(cad)}
-                            className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                            className="px-2.5 py-1 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 hover:shadow-md hover:shadow-[#6bd8cb]/10 text-[10px] font-extrabold text-[#6bd8cb] transition-all flex items-center gap-1 cursor-pointer shrink-0"
                             title="Ver expediente y detalles completos"
                           >
-                            <Eye className="w-3.5 h-3.5" />
                             <span>Detalles</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-[#6bd8cb]" />
                           </button>
                           {/* PDF CV Direct View button */}
                           <button
@@ -1271,9 +1090,19 @@ function KanbanCard({
       </div>
 
       <div>
-        <h3 className="text-xs font-bold text-white tracking-tight group-hover:text-amber-500 transition-colors break-words">
-          {cad.name}
-        </h3>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(cad);
+          }}
+          className="hover:underline cursor-pointer text-left inline-block"
+          title="Ver expediente y detalles completos del candidato"
+        >
+          <h3 className="text-xs font-bold text-white tracking-tight group-hover:text-[#6bd8cb] transition-colors break-words">
+            {cad.name}
+          </h3>
+        </button>
         <p className="text-[10px] text-[#c4c1fb] mt-0.5 font-medium leading-normal">{cad.role}</p>
       </div>
 
@@ -1298,22 +1127,26 @@ function KanbanCard({
         onClick={() => {
           onSelect(cad);
         }}
-        className="w-full py-1.5 rounded-xl border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb]/15 transition-all text-[9.5px] font-black text-[#c4c1fb] flex items-center justify-center gap-1 cursor-pointer shadow"
+        className="w-full py-1.5 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 hover:shadow-md hover:shadow-[#6bd8cb]/10 transition-all text-[10px] font-extrabold text-[#6bd8cb] flex items-center justify-center gap-1 cursor-pointer"
+        title="Ver expediente y detalles completos del candidato"
       >
-        <Cpu className="w-3.5 h-3.5 text-[#c4c1fb] animate-pulse" />
-        <span>Ver Expediente Completo</span>
+        <span>Detalles</span>
+        <ChevronRight className="w-3.5 h-3.5 text-[#6bd8cb]" />
       </button>
 
       {/* Footer controls quick shifts */}
       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
         {/* Detalles button */}
         <button
-          onClick={() => onSelect(cad)}
-          className="px-2 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb] hover:text-[#101415] text-[9px] font-bold text-[#c4c1fb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(cad);
+          }}
+          className="px-2.5 py-1 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 hover:shadow-md hover:shadow-[#6bd8cb]/10 text-[10px] font-extrabold text-[#6bd8cb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
           title="Ver expediente y detalles completos del candidato"
         >
-          <Eye className="w-3 h-3 shrink-0" />
           <span>Detalles</span>
+          <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[#6bd8cb]" />
         </button>
 
         {/* PDF CV Direct View button */}

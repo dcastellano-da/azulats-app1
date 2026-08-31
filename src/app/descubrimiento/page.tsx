@@ -1336,9 +1336,16 @@ export default function DescubrimientoPage() {
 
         {/* Basic information */}
         <div>
-          <h3 className="text-xs font-bold text-white tracking-tight group-hover:text-[#6bd8cb] transition-colors">
-            {cad.name}
-          </h3>
+          <Link
+            href={`/descubrimiento/${cad.pipeId || cad.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="hover:underline cursor-pointer inline-block"
+            title="Ver expediente y detalles completos del candidato"
+          >
+            <h3 className="text-xs font-bold text-white tracking-tight group-hover:text-[#6bd8cb] transition-colors">
+              {cad.name}
+            </h3>
+          </Link>
           <p className="text-[10px] text-[#c4c1fb] mt-0.5 font-medium">{cad.role}</p>
         </div>
 
@@ -1481,10 +1488,12 @@ export default function DescubrimientoPage() {
           {/* Detalles button */}
           <Link
             href={`/descubrimiento/${cad.pipeId || cad.id}`}
-            className="px-2 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb] hover:text-[#101415] text-[9px] font-bold text-[#c4c1fb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+            onClick={(e) => e.stopPropagation()}
+            className="px-2.5 py-1 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 hover:shadow-md hover:shadow-[#6bd8cb]/10 text-[10px] font-extrabold text-[#6bd8cb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
             title="Ver detalles completos del candidato"
           >
             <span>Detalles</span>
+            <ChevronRight className="w-3.5 h-3.5" />
           </Link>
           {/* PDF CV Direct View button */}
           <button

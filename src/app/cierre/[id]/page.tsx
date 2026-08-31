@@ -37,10 +37,7 @@ import {
   Bell,
   Sparkles,
   TrendingUp,
-  DollarSign,
   Briefcase,
-  FileCheck,
-  HeartHandshake,
   UserPlus,
   Share2,
   Plus,
@@ -60,8 +57,8 @@ import {
   generateDefaultCierreToolsDetails 
 } from "@/lib/cierre";
 import GenerarFichaPdfModal from "@/app/components/GenerarFichaPdfModal";
-
-type DiagTab = "motor" | "simulador" | "contratos" | "feedback" | "onboarding";
+import ScreeningAccordionSection from "@/app/components/ScreeningAccordionSection";
+import type { CriterioScreening } from "@/types/screening";
 
 export default function CierreDetallePage() {
   const params = useParams();
@@ -72,11 +69,10 @@ export default function CierreDetallePage() {
 
   const [cand, setCand] = useState<CierreCandidate | null>(null);
   const [activePipelineItem, setActivePipelineItem] = useState<PipelineItem | null>(null);
+  const [criteriosBusqueda, setCriteriosBusqueda] = useState<CriterioScreening[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Active Tab for Closure & AI Facilities
-  const [activeTab, setActiveTab] = useState<DiagTab>("motor");
   const [isFichaPdfModalOpen, setIsFichaPdfModalOpen] = useState(false);
 
   // Editing state for Recruiter Notes across all phases
@@ -88,20 +84,9 @@ export default function CierreDetallePage() {
   const [editF4Notes, setEditF4Notes] = useState("");
   const [isSavingNotes, setIsSavingNotes] = useState(false);
 
-  // Salary Simulator Interactive States
-  const [simBaseSalary, setSimBaseSalary] = useState(55000);
-  const [simBonusAnnual, setSimBonusAnnual] = useState(7000);
-  const [simBenefitsValue, setSimBenefitsValue] = useState(4000);
-
   // Notifications & Toast
   const [copiedTextType, setCopiedTextType] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Facility Simulation Loading States
-  const [isSimulatingMotor, setIsSimulatingMotor] = useState(false);
-  const [isSimulatingContractGen, setIsSimulatingContractGen] = useState(false);
-  const [isSimulatingFeedbackGen, setIsSimulatingFeedbackGen] = useState(false);
-  const [isSimulatingPreOnboarding, setIsSimulatingPreOnboarding] = useState(false);
 
   // Final Hire / Close Modal State
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
@@ -252,6 +237,7 @@ export default function CierreDetallePage() {
 
         setCand(item);
         setActivePipelineItem(targetPipe || null);
+        if (bObj?.criterios_screening) setCriteriosBusqueda(bObj.criterios_screening);
         setEditInitialNotes(initialNotes);
         setEditF1Notes(f1Notes);
         setEditF2Notes(f2Notes);
@@ -580,106 +566,6 @@ export default function CierreDetallePage() {
     setTimeout(() => setCopiedTextType(null), 2000);
   };
 
-  // FACILITY 1: Motor Predictivo
-  const runPredictiveEngine = () => {
-    if (!cand) return;
-    setIsSimulatingMotor(true);
-    setTimeout(() => {
-      setIsSimulatingMotor(false);
-      setCand(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          predictiveMotor: {
-            ...prev.toolsDetails.predictiveMotor,
-            adjustedProbability: 95,
-            mitigationActionSelected: true
-          }
-        }
-      } : null);
-      triggerToast("Motor predictivo recalculado con éxito (+5% probabilidad por ajuste).");
-    }, 1800);
-  };
-
-  // FACILITY 2: Simulador Salarial
-  const recalculateOfferSimulator = () => {
-    if (!cand) return;
-    setCand(prev => prev ? {
-      ...prev,
-      salaryDetails: {
-        ...prev.salaryDetails,
-        baseSalary: simBaseSalary,
-        bonusAnnual: simBonusAnnual,
-        benefitsValue: simBenefitsValue
-      }
-    } : null);
-    triggerToast("Propuesta económica recalculada y actualizada en la ficha.");
-  };
-
-  // FACILITY 3: Generador Contratos
-  const generateDraftContract = () => {
-    if (!cand) return;
-    setIsSimulatingContractGen(true);
-    setTimeout(() => {
-      setIsSimulatingContractGen(false);
-      setCand(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          contractGenerator: {
-            ...prev.toolsDetails.contractGenerator,
-            generated: true,
-            documentUrl: `/documents/contrato_borrador_${cand.id}.pdf`
-          }
-        }
-      } : null);
-      triggerToast("Carta Oferta y borrador de contrato redactados por IA.");
-    }, 2000);
-  };
-
-  // FACILITY 4: Feedback Empatía
-  const generateEmpathyFeedback = () => {
-    if (!cand) return;
-    setIsSimulatingFeedbackGen(true);
-    setTimeout(() => {
-      setIsSimulatingFeedbackGen(false);
-      const text = `Estimado/a ${cand.name},\n\nQueremos agradecerte sinceramente por tu dedicación a lo largo del proceso de selección para la vacante de ${cand.role} en ${cand.client}.\n\nTras una exhaustiva evaluación, el equipo ha tomado una decisión basada en requerimientos técnicos muy específicos de la fase final. Queremos destacar tus fortalezas en Fit Score (${cand.score}%) y mantener tu perfil en nuestra red preferencial para futuras búsquedas de alta jerarquía.`;
-      setCand(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          feedbackWriter: {
-            ...prev.toolsDetails.feedbackWriter,
-            generatedFeedback: text,
-            isSent: true
-          }
-        }
-      } : null);
-      triggerToast("Feedback empático generado y listo para enviar.");
-    }, 2000);
-  };
-
-  // FACILITY 5: Pre-Onboarding Cadences
-  const triggerPreOnboardingCadence = () => {
-    if (!cand) return;
-    setIsSimulatingPreOnboarding(true);
-    setTimeout(() => {
-      setIsSimulatingPreOnboarding(false);
-      setCand(prev => prev ? {
-        ...prev,
-        toolsDetails: {
-          ...prev.toolsDetails,
-          preOnboard: {
-            ...prev.toolsDetails.preOnboard,
-            ghostingRisk: "Bajo",
-            cadenceSteps: prev.toolsDetails.preOnboard.cadenceSteps.map(s => ({ ...s, status: "sent" }))
-          }
-        }
-      } : null);
-      triggerToast("Cadencia pre-onboarding activada y secuencia de bienvenida iniciada.");
-    }, 1500);
-  };
-
   const getPhaseLabel = (phase: CierreCandidate["currentPhase"]) => {
     switch (phase) {
       case "12_oferta_extendida": return "12 - Oferta / Negociación";
@@ -732,8 +618,6 @@ export default function CierreDetallePage() {
       </div>
     );
   }
-
-  const totalComp = cand.salaryDetails.baseSalary + cand.salaryDetails.bonusAnnual + cand.salaryDetails.benefitsValue;
 
   return (
     <main className="min-h-screen bg-[#101415] text-[#e0e3e5] px-4 md:px-8 py-6 selection:bg-[#c4c1fb] selection:text-stone-900">
@@ -1312,288 +1196,17 @@ export default function CierreDetallePage() {
               </div>
             </div>
 
-            {/* ── Diagnostic Tools Tabs ── */}
-            <div className="glass-panel rounded-3xl border border-white/10 overflow-hidden">
-              {/* Tab header */}
-              <div className="px-6 py-3 border-b border-white/10 bg-[#101415]/60">
-                <div className="flex items-center gap-2 mb-3">
-                  <Cpu className="w-4 h-4 text-emerald-400 animate-pulse" />
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">Facilidades de Cierre e IA — F4</span>
-                </div>
-                <nav className="flex items-center overflow-x-auto gap-1 select-none">
-                  {([
-                    { key: "motor", icon: <TrendingUp className="w-3.5 h-3.5" />, label: "1. Motor Predictivo" },
-                    { key: "simulador", icon: <DollarSign className="w-3.5 h-3.5" />, label: "2. Simulador Salarial" },
-                    { key: "contratos", icon: <FileCheck className="w-3.5 h-3.5" />, label: "3. Generador Contratos" },
-                    { key: "feedback", icon: <HeartHandshake className="w-3.5 h-3.5" />, label: "4. Feedback Empatía" },
-                    { key: "onboarding", icon: <Sparkles className="w-3.5 h-3.5" />, label: "5. Pre-Onboarding" }
-                  ] as { key: DiagTab; icon: React.ReactNode; label: string }[]).map(tab => (
-                    <button
-                      key={tab.key}
-                      onClick={() => setActiveTab(tab.key)}
-                      className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                        activeTab === tab.key
-                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                          : "text-[#879391] hover:text-white"
-                      }`}
-                    >
-                      {tab.icon}
-                      <span>{tab.label}</span>
-                    </button>
-                  ))}
-                </nav>
-              </div>
-
-              {/* Tab body */}
-              <div className="p-6 space-y-5">
-
-                {/* 1. Motor Predictivo */}
-                {activeTab === "motor" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Motor Predictivo de Aceptación de Ofertas</h4>
-                        <p className="text-[10px] text-[#879391]">Inferencia por machine learning sobre probabilidad de firma de propuesta económica</p>
-                      </div>
-                      <button
-                        onClick={runPredictiveEngine}
-                        disabled={isSimulatingMotor}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
-                      >
-                        {isSimulatingMotor ? (
-                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <TrendingUp className="w-3.5 h-3.5" />
-                        )}
-                        <span>Recalcular Motor Predictivo</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Probabilidad Ajustada de Aceptación</span>
-                        <span className="text-3xl font-black text-emerald-400">{cand.toolsDetails.predictiveMotor.adjustedProbability}%</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-bold block w-fit">
-                          Alta certidumbre de cierre
-                        </span>
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Factores de Riesgo / Oportunidad</span>
-                        <ul className="space-y-1">
-                          {cand.toolsDetails.predictiveMotor.riskFactors.map((r, idx) => (
-                            <li key={idx} className="flex items-center gap-1.5 text-[#e0e3e5]">
-                              <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                              <span>{r}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. Simulador Salarial */}
-                {activeTab === "simulador" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Simulador Salarial & Paquete de Compensación</h4>
-                        <p className="text-[10px] text-[#879391]">Modelado interactivo de salario fijo, variable y beneficios monetizados</p>
-                      </div>
-                      <button
-                        onClick={recalculateOfferSimulator}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
-                      >
-                        <DollarSign className="w-3.5 h-3.5" />
-                        <span>Aplicar Cambios en Oferta</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Salario Fijo Bruto Anual (€)</span>
-                        <input
-                          type="number"
-                          value={simBaseSalary}
-                          onChange={(e) => setSimBaseSalary(Number(e.target.value))}
-                          className="w-full bg-[#101415] border border-white/15 rounded-xl p-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-400"
-                        />
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Bonus Variable Anual (€)</span>
-                        <input
-                          type="number"
-                          value={simBonusAnnual}
-                          onChange={(e) => setSimBonusAnnual(Number(e.target.value))}
-                          className="w-full bg-[#101415] border border-white/15 rounded-xl p-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-400"
-                        />
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Beneficios Monetizados (€)</span>
-                        <input
-                          type="number"
-                          value={simBenefitsValue}
-                          onChange={(e) => setSimBenefitsValue(Number(e.target.value))}
-                          className="w-full bg-[#101415] border border-white/15 rounded-xl p-2 text-sm text-white font-mono font-bold focus:outline-none focus:border-emerald-400"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 flex justify-between items-center">
-                      <span>Compensación Total Estimada (OTE):</span>
-                      <span className="text-xl font-black font-mono">{totalComp.toLocaleString("es-ES")} € / año</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. Generador Contratos */}
-                {activeTab === "contratos" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Generador de Cartas Oferta y Contratos por IA</h4>
-                        <p className="text-[10px] text-[#879391]">Generación automática de propuesta legal estructurada</p>
-                      </div>
-                      <button
-                        onClick={generateDraftContract}
-                        disabled={isSimulatingContractGen}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
-                      >
-                        {isSimulatingContractGen ? (
-                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <FileCheck className="w-3.5 h-3.5" />
-                        )}
-                        <span>Generar Carta Oferta IA</span>
-                      </button>
-                    </div>
-
-                    {cand.toolsDetails.contractGenerator.generated ? (
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Documento Listo</span>
-                          <a
-                            href={cand.toolsDetails.contractGenerator.documentUrl || "#"}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-3 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[10px] flex items-center gap-1"
-                          >
-                            <Copy className="w-3 h-3" />
-                            <span>Descargar Borrador PDF</span>
-                          </a>
-                        </div>
-                        <p className="text-[#e0e3e5] leading-relaxed font-mono">
-                          {`CARTA OFERTA DE EMPLEO DE ${cand.client.toUpperCase()}\nPosición: ${cand.role}\nCompensación Total: ${totalComp.toLocaleString("es-ES")} € / año\nTipo Contrato: ${cand.toolsDetails.contractGenerator.contractType}\nFecha Incorporación: ${cand.toolsDetails.contractGenerator.startDate}`}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-[#879391]">
-                        Aún no se ha redactado la carta oferta. Haz clic en el botón superior para generarla.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 4. Feedback Empatía */}
-                {activeTab === "feedback" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Generador de Feedback Empático por IA</h4>
-                        <p className="text-[10px] text-[#879391]">Comunicaciones empáticas para candidatos no seleccionados o bajas</p>
-                      </div>
-                      <button
-                        onClick={generateEmpathyFeedback}
-                        disabled={isSimulatingFeedbackGen}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
-                      >
-                        {isSimulatingFeedbackGen ? (
-                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <HeartHandshake className="w-3.5 h-3.5" />
-                        )}
-                        <span>Redactar Feedback Empático</span>
-                      </button>
-                    </div>
-
-                    {cand.toolsDetails.feedbackWriter.generatedFeedback ? (
-                      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Mensaje Preparado</span>
-                          <button
-                            onClick={() => handleCopyText(cand.toolsDetails.feedbackWriter.generatedFeedback, "feedback")}
-                            className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-white text-[10px] flex items-center gap-1 cursor-pointer"
-                          >
-                            <Copy className="w-3 h-3 text-emerald-400" />
-                            <span>{copiedTextType === "feedback" ? "¡Copiado!" : "Copiar Feedback"}</span>
-                          </button>
-                        </div>
-                        <p className="text-[#e0e3e5] leading-relaxed whitespace-pre-line">
-                          {cand.toolsDetails.feedbackWriter.generatedFeedback}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-[#879391]">
-                        Sin mensaje redactado aún. Haz clic en el botón superior para compilar el texto de devolución empática.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 5. Pre-Onboarding */}
-                {activeTab === "onboarding" && (
-                  <div className="space-y-4 animate-fadeIn text-xs">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-white">Cadencias de Pre-Onboarding Automatizadas</h4>
-                        <p className="text-[10px] text-[#879391]">Mantén el enganche del candidato contratado entre la firma y el primer día laboral</p>
-                      </div>
-                      <button
-                        onClick={triggerPreOnboardingCadence}
-                        disabled={isSimulatingPreOnboarding}
-                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-500/20"
-                      >
-                        {isSimulatingPreOnboarding ? (
-                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3.5 h-3.5" />
-                        )}
-                        <span>Iniciar Cadencia Pre-Onboarding</span>
-                      </button>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-white/40 uppercase block">Riesgo de Ghosting / Deserción:</span>
-                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          Riesgo {cand.toolsDetails.preOnboard.ghostingRisk}
-                        </span>
-                      </div>
-
-                      <div className="space-y-2 pt-1">
-                        {cand.toolsDetails.preOnboard.cadenceSteps.map((step, idx) => (
-                          <div key={idx} className="p-3 rounded-xl bg-black/40 border border-white/5 flex justify-between items-center text-xs">
-                            <div>
-                              <span className="text-emerald-400 font-bold font-mono text-[10px] block">{step.day}</span>
-                              <span className="text-[#e0e3e5] font-bold">{step.title}</span>
-                            </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                              step.status === "sent" ? "bg-emerald-500/10 text-emerald-400" : "bg-white/5 text-[#879391]"
-                            }`}>
-                              {step.status === "sent" ? "Enviado" : "Programado"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </div>
+            {/* ── Screening Inteligente IA (Fase 1) Desplegable ── */}
+            {cand && (
+              <ScreeningAccordionSection
+                pipelineItem={activePipelineItem}
+                criteriosBusqueda={criteriosBusqueda}
+                candidateName={cand.name}
+                busquedaName={cand.client}
+                hasCv={Boolean(cand.url_cv)}
+                onRefresh={loadCandidateData}
+              />
+            )}
           </div>
 
           {/* ══════════════════════════════════

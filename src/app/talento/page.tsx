@@ -514,9 +514,16 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
           {/* Card Header: name and State sphere */}
           <div className="flex justify-between items-start">
             <div className="space-y-1 max-w-[80%]">
-              <h3 className="text-xs font-extrabold text-white group-hover:text-[#6bd8cb] transition-colors leading-tight">
-                {cand.nombre_completo}
-              </h3>
+              <Link
+                href={`/talento/${cand.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="hover:underline cursor-pointer inline-block"
+                title="Ver expediente y detalles completos del postulante"
+              >
+                <h3 className="text-xs font-extrabold text-white group-hover:text-[#6bd8cb] transition-colors leading-tight">
+                  {cand.nombre_completo}
+                </h3>
+              </Link>
             </div>
 
             {/* Sphere status */}
@@ -635,10 +642,12 @@ Notas iniciales: ${c.notas_iniciales || 'Ninguna'}`;
             {/* View Details Link (opens DAW faders detail dashboard) */}
             <Link
               href={`/talento/${cand.id}`}
-              className="flex-grow flex items-center justify-center gap-1 px-2 py-1 rounded-xl text-[9px] font-bold text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex-grow flex items-center justify-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-extrabold text-[#6bd8cb] bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 hover:shadow-md hover:shadow-[#6bd8cb]/10 transition-all cursor-pointer"
+              title="Ver expediente y detalles completos"
             >
               <span>Detalles</span>
-              <ChevronRight className="w-3 h-3" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </Link>
 
             {/* PDF CV Direct View button */}

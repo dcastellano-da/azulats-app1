@@ -53,8 +53,7 @@ import {
   EvaluacionCandidate, 
   INITIAL_EVALUACION_CANDIDATES, 
   calculateEvaluacionKPIs,
-  mapPipelineToEvaluacionCandidates,
-  generateDefaultToolsDetails
+  mapPipelineToEvaluacionCandidates
 } from "@/lib/evaluacion";
 import { getBusquedasAPI, Busqueda } from "@/actions/busquedas";
 import { getCandidatosAPI, Candidato } from "@/actions/candidatos";
@@ -1373,11 +1372,11 @@ export default function EvaluacionPage() {
                           {/* Detalles button */}
                           <button
                             onClick={() => handleViewDetails(cad)}
-                            className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                            className="px-2.5 py-1 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 hover:shadow-md hover:shadow-[#6bd8cb]/10 text-[10px] font-extrabold text-[#6bd8cb] transition-all flex items-center gap-1 cursor-pointer shrink-0"
                             title="Ver expediente y detalles completos"
                           >
-                            <Eye className="w-3.5 h-3.5" />
                             <span>Detalles</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-[#6bd8cb]" />
                           </button>
 
                           {/* PDF CV Direct View button */}
@@ -1701,9 +1700,19 @@ function KanbanCard({
       </div>
 
       <div>
-        <h3 className="text-xs font-bold text-white tracking-tight group-hover:text-[#6bd8cb] transition-colors break-words">
-          {cad.name}
-        </h3>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(cad);
+          }}
+          className="hover:underline cursor-pointer text-left inline-block"
+          title="Ver expediente y detalles completos del candidato"
+        >
+          <h3 className="text-xs font-bold text-white tracking-tight group-hover:text-[#6bd8cb] transition-colors break-words">
+            {cad.name}
+          </h3>
+        </button>
         <p className="text-[10px] text-[#c4c1fb] mt-0.5 font-medium leading-normal">{cad.role}</p>
       </div>
 
@@ -1794,22 +1803,26 @@ function KanbanCard({
       {/* Advanced diagnostics trigger button */}
       <button
         onClick={() => onSelect(cad)}
-        className="w-full py-1.5 rounded-xl border border-[#c4c1fb]/25 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb]/15 hover:text-white transition-all text-[9.5px] font-black text-[#c4c1fb] flex items-center justify-center gap-1 cursor-pointer shadow shadow-[#4338ca]/5"
+        className="w-full py-1.5 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 hover:shadow-md hover:shadow-[#6bd8cb]/10 transition-all text-[10px] font-extrabold text-[#6bd8cb] flex items-center justify-center gap-1 cursor-pointer"
+        title="Ver expediente y detalles completos del candidato"
       >
-        <Cpu className="w-3.5 h-3.5 text-[#c4c1fb] animate-pulse" />
-        <span>Ver Expediente Completo</span>
+        <span>Detalles</span>
+        <ChevronRight className="w-3.5 h-3.5 text-[#6bd8cb]" />
       </button>
 
       {/* Footer controls quick shifts: Detalles, Avanzar estado, Avanzar Fase, Rechazar */}
       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
         {/* Detalles button */}
         <button
-          onClick={() => onSelect(cad)}
-          className="px-2 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 hover:bg-[#c4c1fb] hover:text-[#101415] text-[9px] font-bold text-[#c4c1fb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(cad);
+          }}
+          className="px-2.5 py-1 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 hover:shadow-md hover:shadow-[#6bd8cb]/10 text-[10px] font-extrabold text-[#6bd8cb] transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
           title="Ver expediente y detalles completos del candidato"
         >
-          <Eye className="w-3 h-3 shrink-0" />
           <span>Detalles</span>
+          <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[#6bd8cb]" />
         </button>
 
         {/* PDF CV Direct View button */}

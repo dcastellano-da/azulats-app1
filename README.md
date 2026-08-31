@@ -24,7 +24,8 @@ azulats-app1/
 │   │   │   ├── KpiCards.tsx       # Tarjetas rápidas de indicadores (Volumen, Tiempos, Candidatos)
 │   │   │   ├── MetricsChart.tsx   # Gráfico de rendimiento de búsquedas históricas (Recharts)
 │   │   │   ├── SlideOver.tsx      # Slide-over contenedor lateral dinámico
-│   │   │   └── CandidatoForm.tsx  # Formulario del Postulante (CV PDF <5MB opcional, floating labels, RGPD)
+│   │   │   ├── CandidatoForm.tsx  # Formulario del Postulante (CV PDF <5MB opcional, floating labels, RGPD)
+│   │   │   └── ScreeningAccordionSection.tsx # Acordeón desplegable de Screening Inteligente IA (Fase 1) homologado para P-EVA-02, P-PRE-02 y P-CIE-02
 │   │   ├── globals.css            # Estilos globales y tokens del Stitch Design System
 │   │   ├── layout.tsx             # Layout base, tipografía Google Font Manrope
 │   │   ├── dashboard/page.tsx     # Dashboard Gerencial con filtros temporales y de clientes
@@ -414,6 +415,30 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
     *   **Actualización de UI:** Modificación del texto `placeholder` del input a `"Buscar candidato por nombre, rol, email, habilidades o notas..."`.
     *   **Suite de Pruebas Automatizadas:** Actualización de `tests/talento_filtro_busqueda.test.js` agregando 4 nuevos casos de prueba (11/11 pasadas con 100% éxito) bajo `node:test`.
 
+*   **2026/08/31:** Patrón de Acceso Dual a Ficha/Expediente en Vistas Kanban (`ID: P-TAL-01`, `ID: P-DIS-01`, `ID: P-EVA-01`, `ID: P-PRE-01` y `ID: P-CIE-01`):
+    *   **Acceso Dual (Nombre Clicable + Botón Primario Acentuado "Detalles →"):** Implementación homogénea de doble vía de acceso rápido a los detalles/expediente del postulante (`P-TAL-02`, `P-DIS-02`, `P-EVA-02`, `P-PRE-02`, `P-CIE-02`) en todas las tarjetas del tablero Kanban.
+    *   **Nombre del Candidato Interactivo:** Enlace o disparador directo en la cabecera de la tarjeta con efecto hover y subrayado turquesa Stitch (`#6bd8cb`).
+    *   **Botón Primario Acentuado ("Detalles →"):** Reestilizado del botón `"Detalles"` con jerarquía primaria acentuada en color turquesa (`bg-[#6bd8cb]/10 border border-[#6bd8cb]/30 text-[#6bd8cb] hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 font-bold text-[10px]`) que destaca de forma inmediata sobre los botones secundarios neutros (*CV*, *Copiar*, etc.).
+    *   **Suite de Pruebas Automatizadas:** Creación del archivo `tests/kanban_acceso_detalle_global.test.js` con 10/10 pruebas unitarias/integración aprobadas con 100% de éxito (`node:test`).
+
+*   **2026/08/31:** Remoción de la Sección "Facilidades de Cierre e IA — F4" en pantalla `ID: P-CIE-02` (`src/app/cierre/[id]/page.tsx`):
+    *   **Eliminación del Bloque Mock F4:** Desmantelamiento completo del contenedor visual y sus 5 pestañas de demostración (*1. Motor Predictivo*, *2. Simulador Salarial*, *3. Generador Contratos*, *4. Feedback Empatía* y *5. Pre-Onboarding*).
+    *   **Limpieza de Código y Tipado:** Eliminación del tipo `DiagTab`, las 5 funciones de simulación local (`runPredictiveEngine`, `recalculateOfferSimulator`, `generateDraftContract`, `generateEmpathyFeedback`, `triggerPreOnboardingCadence`), los estados de carga locales (`isSimulatingMotor`, `isSimulatingContractGen`, etc.) y las constantes sin uso (`totalComp`).
+    *   **Mantenimiento de Funcionalidades Reales:** Preservación intacta de la Ficha General, Historial de Notas del Reclutador en todas las fases, Gestión de Reuniones F4, Transiciones e Historial de Estados de Cierre, Cierre de Contratación (Won) y el Acordeón Desplegable de Screening Inteligente IA.
+    *   **Suite de Pruebas Automatizadas:** Creación de `tests/cierre_f4_facilities_removal.test.js` y actualización de `tests/screening_accordion_integration.test.js` (aprobadas con 100% de éxito bajo `node:test`).
+
+*   **2026/08/31:** Remoción de la Sección "Herramientas de Cliente e IA — F3" en pantalla `ID: P-PRE-02` (`src/app/presentacion/[id]/page.tsx`):
+    *   **Eliminación del Bloque Mock F3:** Desmantelamiento completo del contenedor visual y sus 6 pestañas de demostración (*1. General*, *2. Analítica Zoom*, *3. Traductor ATS*, *4. Briefing IA*, *5. Orquestador Agendas* y *6. Bot SLA Tracker*).
+    *   **Limpieza de Código y Tipado:** Eliminación del helper `generateDefaultPresentacionToolsDetails`, las funciones de simulación local (`runZoomAnalysis`, `runTranslationAndStadardizer`, `runBriefingGenerator`, `suggestOptimalSlot`, `sendSlaAlertPing`), los estados de carga y la propiedad `toolsDetails` en `src/lib/presentacion.ts`.
+    *   **Mantenimiento de Funcionalidades Reales:** Preservación intacta del Hero Card, Historial de Notas del Reclutador, Gestión de Reuniones F3, Ficha PDF, Acciones de Avance/Reversión de Fase y el Acordeón Desplegable de Screening Inteligente IA.
+    *   **Suite de Pruebas Automatizadas:** Actualización de `tests/presentacion.test.js` (8/8 pasadas con 100% éxito) certificando la eliminación limpia del componente y sus utilidades mock.
+
+*   **2026/08/31:** Sección Desplegable de Screening Inteligente IA (Fase 1) en Fases 2, 3 y 4 (`P-EVA-02`, `P-PRE-02` y `P-CIE-02`):
+    *   **Componente Reutilizable (`ScreeningAccordionSection.tsx`):** Creación del contenedor acordeón glassmórfico homologado (estilo P-TAL-02) que integra `ScreeningPanel` y `EvaluarScreeningModal`.
+    *   **Resumen Colapsado y Cierre Visual por Defecto:** Muestra resumen compacto de Fit Score, alerta Knockout y fecha de evaluación al estar colapsado por defecto, permitiendo expandir y editar semáforos, evidencias y re-evaluaciones con IA en un clic.
+    *   **Ubicación tras Funciones de Fase:** Integrado en la columna principal inmediatamente a continuación de las herramientas y notas específicas de Evaluación (`P-EVA-02`), Presentación (`P-PRE-02`) y Cierre (`P-CIE-02`).
+    *   **Suite de Pruebas Automatizadas:** Creación de `tests/screening_accordion_integration.test.js` con 4/4 pruebas aprobadas con 100% de éxito.
+
 *   **2026/08/20:** Columna Habilidades Clave en Lista Detallada (`ID: P-TAL-01`) y Simplificación Ficha Detalle (`ID: P-TAL-02`):
     *   **Columna Habilidades Clave en P-TAL-01:** Adición de la columna "Habilidades clave" en la tabla del modo de vista "Lista Detallada" (`src/app/talento/page.tsx`), renderizando micro-chips dinámicos con el contenido de `cand.skills_principales`.
     *   **Remoción de Consola DAW y Badge en P-TAL-02:** Eliminación de la etiqueta `DAW Console Active` en la cabecera y de la sección completa `IA Analysis Equalizer Console` con sus 4 faders simulados en `src/app/talento/[id]/page.tsx`.
@@ -761,7 +786,7 @@ Para garantizar la estabilidad y prevenir regresiones entre entornos, el desarro
 *   **21/07/2026:** Lanzamiento e integración del Módulo "F2 Evaluación":
     *   **Tablero Kanban y Lista Glassmorphic:** Implementación del pipeline interactivo (Screening, Assessment, Descartado) con soporte Drag & Drop nativo de HTML5, animación de transiciones de fase y vista detallada en tabla ordenable.
     *   **Indicadores KPI de Negocio:** Cálculos automáticos de WIP Cycle Time, cNPS promedio e índice Pass-through Rate, con alertas visuales de sobrecarga (límite de 10 candidatos activos en cola).
-    *   **Herramientas Operativas Avanzadas de IA:** Slide-over contextual con tabulación interactiva que alberga simuladores visuales para el Sintetizador de llamadas (Pros/Cons/Riesgos), Detector Cronológico (Gaps/Overlaps), Preguntas STAR con copiado rápido, Validador de Identidad/Entorno (IP/Geofencing/Cámara) y AI Co-Pilot (Entorno de Live Coding con sandbox en Rust y TSX).
+    *   **Herramientas Operativas Avanzadas de IA (Desincorporado el 31/08/2026):** Pestañas de diagnóstico de demostración en F2 (Sintetizador, Detector Cronológico, Preguntas STAR, Validador ID y AI Co-Pilot) eliminadas de `P-EVA-02` a favor de un layout simplificado centrado en Screening, Personalidad, Assessment Manual y Registro de Notas.
     *   **Suite de Pruebas Unitarias:** Creación de `tests/evaluacion.test.js` bajo el framework nativo `node:test` para certificar la precisión del dataset inicial y el correcto cómputo de desviaciones en KPIs.
 
 *   **20/07/2026:** Integración de la Importación Asistida por IA (Módulo Postulantes):

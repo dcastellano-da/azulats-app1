@@ -16,14 +16,6 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
     assert.strictEqual(typeof first.client, 'string');
     assert.strictEqual(typeof first.score, 'number');
     assert.ok(['09_shortlist', '10_entrevista_cliente', '11_standby'].includes(first.currentPhase));
-    
-    // Tools details validation
-    assert.ok(first.toolsDetails, 'Debe tener la sección toolsDetails');
-    assert.ok(first.toolsDetails.analitica, 'Debe tener analítica de Zoom');
-    assert.ok(first.toolsDetails.traductor, 'Debe tener traductor');
-    assert.ok(first.toolsDetails.briefing, 'Debe tener briefing ejecutivo');
-    assert.ok(first.toolsDetails.agenda, 'Debe tener agenda');
-    assert.ok(first.toolsDetails.tracker, 'Debe tener tracker de SLA');
   });
 
   test('Debería calcular KPIs correctos para un set controlado de candidatos', () => {
@@ -41,22 +33,7 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
         lastActivity: 'Active',
         experienceYears: 7,
         contactNumber: '123',
-        email: 't1@t.com',
-        toolsDetails: {
-          analitica: {
-            transcriptSnippets: [],
-            sentimentScore: 90,
-            globalSentiment: 'Positivo',
-            salaryAlert: false,
-            salaryRequested: '',
-            salaryOffered: '',
-            microExpressionsDetected: []
-          },
-          traductor: { originalCVText: '', translatedCVText: '', cvTranslated: false },
-          briefing: { generated: false, content: '' },
-          agenda: { suggestedSlots: [], isScheduled: false },
-          tracker: { hoursSinceSent: 10, slaExceeded: false, totalRemindersSent: 0 }
-        }
+        email: 't1@t.com'
       },
       {
         id: 'TC-2',
@@ -71,22 +48,7 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
         lastActivity: 'Active',
         experienceYears: 8,
         contactNumber: '456',
-        email: 't2@t.com',
-        toolsDetails: {
-          analitica: {
-            transcriptSnippets: [],
-            sentimentScore: 85,
-            globalSentiment: 'Positivo',
-            salaryAlert: false,
-            salaryRequested: '',
-            salaryOffered: '',
-            microExpressionsDetected: []
-          },
-          traductor: { originalCVText: '', translatedCVText: '', cvTranslated: false },
-          briefing: { generated: false, content: '' },
-          agenda: { suggestedSlots: [], isScheduled: false },
-          tracker: { hoursSinceSent: 20, slaExceeded: false, totalRemindersSent: 0 }
-        }
+        email: 't2@t.com'
       },
       {
         id: 'TC-3',
@@ -101,22 +63,7 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
         lastActivity: 'Inactive',
         experienceYears: 3,
         contactNumber: '789',
-        email: 't3@t.com',
-        toolsDetails: {
-          analitica: {
-            transcriptSnippets: [],
-            sentimentScore: 70,
-            globalSentiment: 'Neutro',
-            salaryAlert: false,
-            salaryRequested: '',
-            salaryOffered: '',
-            microExpressionsDetected: []
-          },
-          traductor: { originalCVText: '', translatedCVText: '', cvTranslated: false },
-          briefing: { generated: false, content: '' },
-          agenda: { suggestedSlots: [], isScheduled: false },
-          tracker: { hoursSinceSent: 30, slaExceeded: false, totalRemindersSent: 0 }
-        }
+        email: 't3@t.com'
       }
     ];
 
@@ -150,22 +97,7 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
       lastActivity: 'Ready',
       experienceYears: 4,
       contactNumber: '1',
-      email: 'a@c.com',
-      toolsDetails: {
-        analitica: {
-          transcriptSnippets: [],
-          sentimentScore: 75,
-          globalSentiment: 'Positivo',
-          salaryAlert: false,
-          salaryRequested: '',
-          salaryOffered: '',
-          microExpressionsDetected: []
-        },
-        traductor: { originalCVText: '', translatedCVText: '', cvTranslated: false },
-        briefing: { generated: false, content: '' },
-        agenda: { suggestedSlots: [], isScheduled: false },
-        tracker: { hoursSinceSent: 0, slaExceeded: false, totalRemindersSent: 0 }
-      }
+      email: 'a@c.com'
     }));
 
     const kpis = calculatePresentacionKPIs(bulkCandidates);
@@ -230,5 +162,31 @@ describe('Módulo de Presentación - Capa de Lógica y Datos', () => {
 
     assert.ok(content.includes('presentacion_selected_search'), 'La página P-PRE-01 debe gestionar localStorage con presentacion_selected_search');
     assert.ok(content.includes('handleSelectSearchChange'), 'La página P-PRE-01 debe utilizar handleSelectSearchChange para mutar y persistir la búsqueda');
+  });
+
+  test('P-PRE-02 (src/app/presentacion/[id]/page.tsx) desincorpora la sección Herramientas de Cliente e IA — F3 y sus tipos/mocks', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const pPre02Path = path.resolve('src/app/presentacion/[id]/page.tsx');
+    const libPath = path.resolve('src/lib/presentacion.ts');
+    
+    const pPre02Content = await fs.readFile(pPre02Path, 'utf-8');
+    const libContent = await fs.readFile(libPath, 'utf-8');
+
+    assert.strictEqual(
+      pPre02Content.includes('Herramientas de Cliente e IA — F3'), 
+      false, 
+      'P-PRE-02 ya no debe contener la sección visual Herramientas de Cliente e IA — F3'
+    );
+    assert.strictEqual(
+      pPre02Content.includes('generateDefaultPresentacionToolsDetails'), 
+      false, 
+      'P-PRE-02 ya no debe importar ni invocar generateDefaultPresentacionToolsDetails'
+    );
+    assert.strictEqual(
+      libContent.includes('generateDefaultPresentacionToolsDetails'), 
+      false, 
+      'src/lib/presentacion.ts ya no debe definir la función helper generateDefaultPresentacionToolsDetails'
+    );
   });
 });

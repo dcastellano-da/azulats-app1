@@ -1290,11 +1290,11 @@ export default function CierrePage() {
 
                           <button
                             onClick={() => handleViewDetails(cad)}
-                            className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                            className="px-2.5 py-1 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 hover:shadow-md hover:shadow-[#6bd8cb]/10 text-[10px] font-extrabold text-[#6bd8cb] transition-all flex items-center gap-1 cursor-pointer shrink-0"
                             title="Ver expediente y detalles completos"
                           >
-                            <Eye className="w-3.5 h-3.5" />
                             <span>Detalles</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-[#6bd8cb]" />
                           </button>
                           {/* PDF CV Direct View button */}
                           <button
@@ -1350,9 +1350,16 @@ function KanbanCard({ cad, onSelect, onTransition, onDragStart, onViewCv }: Kanb
       {/* Header Info */}
       <div className="space-y-1">
         <div className="flex justify-between items-start gap-1">
-          <h4 className="font-bold text-sm text-white group-hover:text-emerald-450 transition-colors">
-            {cad.name}
-          </h4>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSelect(cad); }}
+            className="hover:underline cursor-pointer text-left inline-block"
+            title="Ver expediente y detalles completos del candidato"
+          >
+            <h4 className="font-bold text-sm text-white group-hover:text-[#6bd8cb] transition-colors">
+              {cad.name}
+            </h4>
+          </button>
           <span className="text-[10px] text-white/30 font-mono select-all">
             {cad.id}
           </span>
@@ -1404,11 +1411,11 @@ function KanbanCard({ cad, onSelect, onTransition, onDragStart, onViewCv }: Kanb
 
         <button 
           onClick={(e) => { e.stopPropagation(); onSelect(cad); }}
-          className="px-2.5 py-1 rounded border border-[#c4c1fb]/20 bg-[#c4c1fb]/5 text-[#c4c1fb] font-bold hover:bg-[#c4c1fb] hover:text-[#101415] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
+          className="px-2.5 py-1 rounded-xl border border-[#6bd8cb]/30 bg-[#6bd8cb]/10 hover:bg-[#6bd8cb]/20 hover:border-[#6bd8cb]/60 hover:shadow-md hover:shadow-[#6bd8cb]/10 text-[10px] font-extrabold text-[#6bd8cb] transition-all flex items-center gap-1 cursor-pointer shrink-0 ml-auto"
           title="Ver expediente y detalles completos"
         >
-          <Eye className="w-3.5 h-3.5" />
           <span>Detalles</span>
+          <ChevronRight className="w-3.5 h-3.5 text-[#6bd8cb]" />
         </button>
         {/* PDF CV Direct View button */}
         <button

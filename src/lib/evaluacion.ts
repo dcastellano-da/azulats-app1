@@ -33,34 +33,7 @@ export interface EvaluacionCandidate {
   informe_entrevista_ia?: any | null;
   test_personalidad?: TestPersonalidad | null;
   assessment_manual?: AssessmentManual | null;
-  toolsDetails: {
-    sintetizador: {
-      pros: string[];
-      contras: string[];
-      riesgos: string[];
-    };
-    inconsistencias: {
-      hasGaps: boolean;
-      gaps: { period: string; duration: string; description: string }[];
-      overlaps: string[];
-    };
-    preguntas: string[];
-    validador: {
-      ip: string;
-      location: string;
-      envStatus: string;
-      verificationStatus: "success" | "pending" | "fail";
-      screenshotUrl?: string;
-    };
-    copilot: {
-      activeSession: boolean;
-      difficultyLevel: "Junior" | "Middle" | "Senior" | "Lead";
-      completionRate: number; // e.g. 85 / 100
-      effortScore: number; // capacity vs estimated points match rating (1-5)
-      languageUsed: string;
-      summary: string;
-    };
-  };
+  toolsDetails?: any;
 }
 
 // Initial mock dataset for Evaluacion page
@@ -409,51 +382,6 @@ export function calculateEvaluacionKPIs(candidates: EvaluacionCandidate[]): Eval
   };
 }
 
-export const generateDefaultToolsDetails = (candName: string, role: string, score: number) => {
-  const isRust = role.toLowerCase().includes("rust") || role.toLowerCase().includes("architect");
-  const isSenior = role.toLowerCase().includes("lead") || role.toLowerCase().includes("senior") || role.toLowerCase().includes("architect");
-  
-  return {
-    sintetizador: {
-      pros: [
-        `Sólida trayectoria alineada con la posición de ${role}.`,
-        "Capacidad comunicativa fluida en entornos multiculturales.",
-        "Buen desempeño demostrado en la resolución de problemas técnicos complejos."
-      ],
-      contras: [
-        "Requiere breve período de adaptación a las herramientas internas específicas del cliente."
-      ],
-      riesgos: [
-        "Disponibilidad sujeta a preaviso de 15 días en su empresa actual."
-      ]
-    },
-    inconsistencias: {
-      hasGaps: false,
-      gaps: [],
-      overlaps: []
-    },
-    preguntas: [
-      `¿Cómo abordas la optimización y escalabilidad en arquitecturas para ${role}?`,
-      "Describe un proyecto donde tuviste que tomar decisiones críticas bajo presión.",
-      "¿Cuál es tu enfoque para la entrega continua y colaboración con equipos de producto?"
-    ],
-    validador: {
-      ip: "185.220.101.5",
-      location: "España / Remoto",
-      envStatus: "Ambiente limpio verificado. Sin señales de software no autorizado.",
-      verificationStatus: "success" as const
-    },
-    copilot: {
-      activeSession: true,
-      difficultyLevel: isSenior ? ("Senior" as const) : ("Middle" as const),
-      completionRate: Math.min(100, score + 5),
-      effortScore: Math.round(((score / 20) + Number.EPSILON) * 10) / 10,
-      languageUsed: isRust ? "Rust / WebAssembly" : "TypeScript / React",
-      summary: `${candName} completó la sesión de Live Coding con un desempeño sólido (${score}% fit score). Código limpio y estructurado.`
-    }
-  };
-};
-
 export const mapPipelineToEvaluacionCandidates = (
   pipelineItems: PipelineItem[],
   candidatosList: Candidato[],
@@ -527,8 +455,7 @@ export const mapPipelineToEvaluacionCandidates = (
       url_cv: cand?.url_cv || undefined,
       informe_entrevista_ia: pipe.f2_evaluacion?.informe_entrevista_ia || (pipe.evaluacion as any)?.informe_entrevista_ia || null,
       test_personalidad: pipe.f2_evaluacion?.test_personalidad || (pipe.evaluacion as any)?.test_personalidad || null,
-      assessment_manual: pipe.f2_evaluacion?.assessment_manual || (pipe.evaluacion as any)?.assessment_manual || null,
-      toolsDetails: generateDefaultToolsDetails(candName, role, score)
+      assessment_manual: pipe.f2_evaluacion?.assessment_manual || (pipe.evaluacion as any)?.assessment_manual || null
     });
   }
 
